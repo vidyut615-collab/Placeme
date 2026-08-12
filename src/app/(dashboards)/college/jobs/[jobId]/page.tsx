@@ -100,7 +100,7 @@ export default async function CollegeJobDetailsPage({
           <h2 className="text-xl font-bold tracking-tight">Applications ({applications?.length || 0})</h2>
           <p className="text-sm text-zinc-500">Review and update the status of students who applied to this job.</p>
         </div>
-        <JobApplicationsManager applications={applications || []} />
+        <JobApplicationsManager applications={(applications as any) || []} />
       </div>
     </div>
   )

@@ -35,8 +35,9 @@ export function PlacementCompletionPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>Completion Trigger</Label>
           <Select
-            value={data.completion_trigger}
-            onValueChange={(val: PolicyData['completion_trigger']) => update({ completion_trigger: val })}
+            value={data.completion_trigger || ''}
+            onValueChange={(val) => update({ completion_trigger: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />
@@ -54,8 +55,9 @@ export function PlacementCompletionPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>On Offer Withdrawn</Label>
           <Select
-            value={data.on_offer_withdrawn}
-            onValueChange={(val: PolicyData['on_offer_withdrawn']) => update({ on_offer_withdrawn: val })}
+            value={data.on_offer_withdrawn || ''}
+            onValueChange={(val) => update({ on_offer_withdrawn: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />
@@ -71,8 +73,9 @@ export function PlacementCompletionPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>On Offer Rescinded</Label>
           <Select
-            value={data.on_offer_rescinded}
-            onValueChange={(val: PolicyData['on_offer_rescinded']) => update({ on_offer_rescinded: val })}
+            value={data.on_offer_rescinded || ''}
+            onValueChange={(val) => update({ on_offer_rescinded: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />
@@ -88,8 +91,9 @@ export function PlacementCompletionPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>On Not Joined</Label>
           <Select
-            value={data.on_not_joined}
-            onValueChange={(val: PolicyData['on_not_joined']) => update({ on_not_joined: val })}
+            value={data.on_not_joined || ''}
+            onValueChange={(val) => update({ on_not_joined: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />
@@ -105,8 +109,9 @@ export function PlacementCompletionPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>Counts For Statistics</Label>
           <Select
-            value={data.counts_for_statistics}
-            onValueChange={(val: PolicyData['counts_for_statistics']) => update({ counts_for_statistics: val })}
+            value={data.counts_for_statistics || ''}
+            onValueChange={(val) => update({ counts_for_statistics: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />

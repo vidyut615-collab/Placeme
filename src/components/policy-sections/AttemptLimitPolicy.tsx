@@ -55,8 +55,9 @@ export function AttemptLimitPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>What Counts As Attempt</Label>
           <Select
-            value={data.what_counts_as_attempt}
-            onValueChange={(val: PolicyData['what_counts_as_attempt']) => update({ what_counts_as_attempt: val })}
+            value={data.what_counts_as_attempt || ''}
+            onValueChange={(val) => update({ what_counts_as_attempt: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />

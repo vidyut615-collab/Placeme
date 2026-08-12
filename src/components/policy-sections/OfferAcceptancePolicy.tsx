@@ -53,8 +53,9 @@ export function OfferAcceptancePolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>Expired Offer Action</Label>
           <Select
-            value={data.expired_offer_action}
-            onValueChange={(val: PolicyData['expired_offer_action']) => update({ expired_offer_action: val })}
+            value={data.expired_offer_action || ''}
+            onValueChange={(val) => update({ expired_offer_action: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />
@@ -70,8 +71,9 @@ export function OfferAcceptancePolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>Declined Offer Action</Label>
           <Select
-            value={data.declined_offer_action}
-            onValueChange={(val: PolicyData['declined_offer_action']) => update({ declined_offer_action: val })}
+            value={data.declined_offer_action || ''}
+            onValueChange={(val) => update({ declined_offer_action: val as any })}
+            disabled={!data.enabled}
           >
             <SelectTrigger>
               <SelectValue />

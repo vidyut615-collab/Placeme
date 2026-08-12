@@ -105,8 +105,8 @@ export function JobApplicationsManager({ applications }: JobApplicationsManagerP
                   <TableCell>{new Date(app.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <Select
-                      value={app.status}
-                      onValueChange={(val) => handleStatusChange(app.id, val)}
+                      value={app.status || ''}
+                      onValueChange={(val) => handleStatusChange(app.id, val as string)}
                       disabled={isPending}
                     >
                       <SelectTrigger className="w-[150px] h-8">

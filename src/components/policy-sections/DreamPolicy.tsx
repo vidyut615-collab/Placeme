@@ -37,9 +37,10 @@ export function DreamPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>Classification Method</Label>
           <Select
-            value={data.classification_method}
-            onValueChange={(val: PolicyData['classification_method']) => update({ classification_method: val })}
-          >
+          value={data.classification_method || ''}
+          onValueChange={(val) => update({ classification_method: val as any })}
+          disabled={!data.enabled}
+        >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

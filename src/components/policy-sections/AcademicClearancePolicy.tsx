@@ -38,8 +38,9 @@ export function AcademicClearancePolicy({ data, onChange }: Props) {
           <div className="space-y-2">
             <Label>Clearance Required Before</Label>
             <Select
-              value={data.clearance_required_before}
-              onValueChange={(val: PolicyData['clearance_required_before']) => update({ clearance_required_before: val })}
+              value={data.clearance_required_before || ''}
+              onValueChange={(val) => update({ clearance_required_before: val as any })}
+              disabled={!data.enabled}
             >
               <SelectTrigger>
                 <SelectValue />

@@ -1,234 +1,239 @@
+"use client";
+
 import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { X, ArrowRight, ChevronDown, CheckCircle2, Shield, Settings, Users, Database } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MarketingHeader } from "@/components/MarketingHeader";
+import { MarketingFooter } from "@/components/MarketingFooter";
+import { motion, Variants } from "framer-motion";
 
 export default function Home() {
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-parchment font-sans relative overflow-x-hidden selection:bg-lake-blue/20">
-      
-      {/* Announcement Bar */}
-      <div className="w-full bg-ink text-parchment py-3 px-4 flex items-center justify-center relative z-50">
-        <div className="flex items-center gap-4 text-xs md:text-sm font-sans uppercase tracking-tight">
-          <span>Introducing Truskill Configurable Policies for Campus Placements</span>
-          <Button variant="outline" size="sm" className="hidden md:flex h-6 rounded-full border-parchment text-parchment bg-transparent hover:bg-parchment/10 text-[10px] uppercase tracking-wider px-3">
-            Read Announcement
-          </Button>
-        </div>
-        <button className="absolute right-4 text-parchment/70 hover:text-parchment transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+    <div className="flex flex-col min-h-screen bg-paper font-sans selection:bg-ink selection:text-white">
+      <MarketingHeader />
 
-      {/* Navigation */}
-      <header className="sticky top-0 z-40 w-full bg-parchment/90 backdrop-blur-md supports-[backdrop-filter]:bg-parchment/60">
-        <div className="max-w-[1432px] mx-auto flex h-20 items-center justify-between px-6 md:px-10">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-ink rounded-full" />
-            <div className="font-sans font-medium uppercase tracking-tight text-ink text-lg">
-              PlacementManagement
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="max-w-[1200px] mx-auto px-6 pt-32 pb-24 md:pt-40 md:pb-32">
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="flex flex-col md:flex-row items-center gap-16"
+          >
+            {/* Left Content */}
+            <div className="flex-1 text-center md:text-left">
+              <motion.h1 
+                variants={itemVariants}
+                className="font-heading text-5xl md:text-[64px] font-semibold leading-[1.1] tracking-[0.64px] text-graphite mb-6"
+              >
+                The better way to manage campus placements.
+              </motion.h1>
+              <motion.p 
+                variants={itemVariants}
+                className="font-sans text-lg md:text-[20px] text-slate leading-[1.5] tracking-[-0.19px] max-w-xl mx-auto md:mx-0 mb-10"
+              >
+                A high-precision engine built on strict role-based access, automated policy resolution, and a unified data lake. Scheduling, tracking, and compliance—finally simplified.
+              </motion.p>
+              <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                <Link 
+                  href="/login" 
+                  className={cn(
+                    buttonVariants({ size: "lg" }), 
+                    "font-sans text-base font-medium bg-ink hover:bg-graphite text-white rounded-full px-8 h-12 shadow-sm-2 transition-all hover:scale-[1.02]"
+                  )}
+                >
+                  Start your free trial
+                </Link>
+                <Link 
+                  href="/login" 
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "lg" }), 
+                    "font-sans text-base font-medium text-graphite border border-silver hover:bg-white rounded-full px-8 h-12 transition-all hover:scale-[1.02]"
+                  )}
+                >
+                  Contact Sales
+                </Link>
+              </motion.div>
             </div>
-          </div>
-          
-          <nav className="hidden md:flex items-center gap-8">
-            <Link href="#features" className="font-sans text-sm uppercase tracking-tight text-ink hover:opacity-70 transition-opacity">Features</Link>
-            <Link href="#policies" className="font-sans text-sm uppercase tracking-tight text-ink hover:opacity-70 transition-opacity">Policies</Link>
-            <Link href="#faq" className="font-sans text-sm uppercase tracking-tight text-ink hover:opacity-70 transition-opacity">FAQ</Link>
-          </nav>
 
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/login" 
-              className={cn(
-                buttonVariants({ variant: "ghost" }), 
-                "hidden md:flex font-sans uppercase tracking-tight text-sm text-ink border border-ink hover:bg-transparent rounded-full px-6 h-12"
-              )}
+            {/* Right Widget Mockup */}
+            <motion.div 
+              variants={itemVariants}
+              className="flex-1 w-full max-w-md md:max-w-none"
             >
-              Login
-            </Link>
-            <Link 
-              href="/login" 
-              className={cn(
-                buttonVariants({ variant: "default" }), 
-                "font-sans uppercase tracking-tight text-sm bg-lake-blue hover:bg-lake-blue/90 text-white rounded-full px-8 h-12"
-              )}
-            >
-              Get a Demo <ArrowRight className="w-4 h-4 ml-2" />
-            </Link>
+              <div className="bg-white rounded-xl p-6 shadow-sm-4 border border-silver/50 transition-transform duration-500 hover:-translate-y-2 hover:shadow-sm-3">
+                <div className="flex items-center justify-between mb-6 border-b border-silver pb-4">
+                  <div>
+                    <h3 className="font-heading text-[20px] font-semibold text-graphite">Upcoming Drives</h3>
+                    <p className="font-sans text-[14px] text-slate">Next 7 days</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-paper flex items-center justify-center border border-silver">
+                    <span className="text-graphite font-medium text-xs">AC</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {[
+                    { company: "Acme Corp", role: "SDE-1", type: "Super Dream", time: "Tomorrow, 10:00 AM" },
+                    { company: "Globex", role: "Data Analyst", type: "Dream", time: "Wed, 2:00 PM" },
+                    { company: "Initech", role: "Frontend Eng", type: "Core", time: "Thu, 11:30 AM" },
+                  ].map((job, i) => (
+                    <div key={i} className="flex items-center gap-4 p-3 rounded-lg hover:bg-paper transition-colors group cursor-pointer border border-transparent hover:border-silver/50">
+                      <div className="w-10 h-10 rounded-md bg-paper border border-silver flex items-center justify-center">
+                        <span className="font-heading font-semibold text-graphite text-sm">{job.company[0]}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-sans font-medium text-[14px] text-graphite">{job.company}</h4>
+                          <span className="font-sans text-[10px] uppercase font-medium tracking-wider bg-silver/50 text-slate px-2 py-0.5 rounded-full">
+                            {job.type}
+                          </span>
+                        </div>
+                        <p className="font-sans text-[12px] text-slate mt-0.5">{job.role} • {job.time}</p>
+                      </div>
+                      <div className="w-6 h-6 rounded-full border border-silver flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white">
+                        <span className="text-[10px]">→</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        </section>
+
+        {/* Feature Bento Grid */}
+        <section className="max-w-[1200px] mx-auto px-6 py-24 border-t border-silver/50">
+          <div className="text-center mb-16">
+            <h2 className="font-heading text-4xl md:text-[48px] font-semibold leading-[1.1] tracking-[0.48px] text-graphite mb-4">
+              Everything you need to run placement seasons.
+            </h2>
+            <p className="font-sans text-[18px] text-slate max-w-2xl mx-auto">
+              No more spreadsheets. Just a clean, highly structured engine that enforces your rules automatically.
+            </p>
           </div>
-        </div>
-      </header>
 
-      {/* Atmospheric Background Gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-coral/30 mix-blend-multiply filter blur-[100px] opacity-60 pointer-events-none" />
-      <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-sky-blue/30 mix-blend-multiply filter blur-[100px] opacity-60 pointer-events-none" />
-      <div className="absolute top-[50%] left-[20%] w-[30vw] h-[30vw] rounded-full bg-mint/20 mix-blend-multiply filter blur-[120px] opacity-50 pointer-events-none" />
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Bento Card 1 - Large */}
+            <motion.div 
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="md:col-span-2 bg-white rounded-xl p-8 shadow-sm-4 border border-silver/50 flex flex-col justify-between"
+            >
+              <div className="mb-12">
+                <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-paper border border-silver text-graphite font-heading font-semibold text-sm mb-4">1</div>
+                <h3 className="font-heading text-[24px] font-semibold tracking-[0.24px] text-graphite mb-2">Automated Policy Matrix</h3>
+                <p className="font-sans text-[16px] text-slate leading-[1.5] max-w-md">
+                  Configure complex eligibility rules, attempt limits, and upgrade policies (Dream/Super Dream) without writing code. The system resolves conflicts instantly.
+                </p>
+              </div>
+              <div className="w-full h-48 bg-paper rounded-lg border border-silver p-4 overflow-hidden relative">
+                {/* Mock UI snippet inside the card */}
+                <div className="absolute top-4 left-4 right-4 bg-white rounded-md shadow-sm border border-silver p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-sans text-[14px] font-medium text-graphite">Dream Offer Policy</span>
+                    <div className="w-10 h-5 bg-ink rounded-full relative">
+                      <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div className="h-2 w-full bg-silver/50 rounded-full"></div>
+                    <div className="h-2 w-2/3 bg-silver/50 rounded-full"></div>
+                  </div>
+                </div>
+                <div className="absolute top-24 left-4 right-4 bg-white rounded-md shadow-sm border border-silver p-3 opacity-50">
+                   <div className="flex items-center justify-between">
+                    <span className="font-sans text-[14px] font-medium text-graphite">Attempt Limits</span>
+                    <div className="w-10 h-5 bg-ink rounded-full relative">
+                      <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
 
-      {/* Typographic Hero Section */}
-      <main className="flex-1 relative z-10">
-        <section className="max-w-[1432px] mx-auto px-6 md:px-10 py-24 md:py-32 flex flex-col items-center text-center">
-          <h1 className="font-heading text-6xl md:text-[80px] font-normal leading-[1.1] tracking-[-1.6px] text-off-black max-w-4xl mx-auto mb-8">
-            The elegant engine for campus placements.
-          </h1>
-          <p className="font-sans text-lg md:text-[20px] text-graphite leading-[1.35] tracking-tight max-w-2xl mx-auto mb-12">
-            A powerful, configurable platform to streamline job drives, track applications, and handle placement policies without compromising on design.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {/* Bento Card 2 */}
+            <motion.div 
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="bg-white rounded-xl p-8 shadow-sm-4 border border-silver/50 flex flex-col justify-between"
+            >
+              <div>
+                <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-paper border border-silver text-graphite font-heading font-semibold text-sm mb-4">2</div>
+                <h3 className="font-heading text-[24px] font-semibold tracking-[0.24px] text-graphite mb-2">Unified Data Lake</h3>
+                <p className="font-sans text-[16px] text-slate leading-[1.5]">
+                  A highly structured Postgres database handling student profiles, jobs, and offers flawlessly.
+                </p>
+              </div>
+              <div className="mt-8 w-full aspect-square bg-paper rounded-lg border border-silver flex items-center justify-center">
+                {/* Abstract geometric representation of a database */}
+                <div className="grid grid-cols-2 gap-2 p-4 w-full h-full">
+                   <div className="bg-white rounded border border-silver"></div>
+                   <div className="bg-ink/5 rounded border border-silver"></div>
+                   <div className="bg-ink/5 rounded border border-silver"></div>
+                   <div className="bg-white rounded border border-silver"></div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Bento Card 3 */}
+            <motion.div 
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="bg-white rounded-xl p-8 shadow-sm-4 border border-silver/50"
+            >
+              <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-paper border border-silver text-graphite font-heading font-semibold text-sm mb-4">3</div>
+              <h3 className="font-heading text-[24px] font-semibold tracking-[0.24px] text-graphite mb-2">Role-Based Views</h3>
+              <p className="font-sans text-[16px] text-slate leading-[1.5]">
+                Students, colleges, and agencies get dedicated dashboards showing only what they are authorized to see.
+              </p>
+            </motion.div>
+
+            {/* Bento Card 4 */}
+            <motion.div 
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="md:col-span-2 bg-white rounded-xl p-8 shadow-sm-4 border border-silver/50"
+            >
+              <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-paper border border-silver text-graphite font-heading font-semibold text-sm mb-4">4</div>
+              <h3 className="font-heading text-[24px] font-semibold tracking-[0.24px] text-graphite mb-2">Real-time Analytics</h3>
+              <p className="font-sans text-[16px] text-slate leading-[1.5] max-w-md">
+                Monitor drive performance, offer acceptances, and student demographics instantly with powerful built-in reporting tools.
+              </p>
+            </motion.div>
+          </div>
+        </section>
+        
+        {/* Bottom CTA */}
+        <section className="max-w-[1200px] mx-auto px-6 py-24 text-center">
+           <h2 className="font-heading text-3xl md:text-[40px] font-semibold leading-[1.1] tracking-[0.4px] text-graphite mb-6">
+              Ready to upgrade your placement process?
+            </h2>
             <Link 
               href="/login" 
               className={cn(
                 buttonVariants({ size: "lg" }), 
-                "font-sans uppercase tracking-tight text-sm bg-lake-blue hover:bg-lake-blue/90 text-white rounded-full px-8 h-12"
+                "font-sans text-base font-medium bg-ink hover:bg-graphite text-white rounded-full px-8 h-12 shadow-sm-2 transition-all hover:scale-[1.02] inline-flex items-center"
               )}
             >
-              Start Building <ArrowRight className="w-4 h-4 ml-2" />
+              Get started for free
             </Link>
-            <Link 
-              href="#docs" 
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "lg" }), 
-                "font-sans uppercase tracking-tight text-sm text-ink border border-ink hover:bg-transparent rounded-full px-8 h-12"
-              )}
-            >
-              Read Documentation
-            </Link>
-          </div>
-        </section>
-
-        {/* Logo Strip */}
-        <section className="max-w-[1432px] mx-auto px-6 md:px-10 py-16 border-y border-ash/40">
-          <p className="text-center font-sans text-xs uppercase tracking-widest text-smoke mb-12">Trusted by forward-thinking institutions</p>
-          <div className="flex flex-wrap justify-center gap-12 md:gap-24 opacity-60 grayscale">
-            {/* Placeholder Logos */}
-            {['Acme Corp', 'Globex', 'Soylent', 'Initech', 'Umbrella', 'Stark Ind'].map((logo, i) => (
-              <div key={i} className="font-heading text-2xl font-bold tracking-tighter text-off-black">{logo}</div>
-            ))}
-          </div>
-        </section>
-
-        {/* Elevated Feature Section (Periwinkle Mist) */}
-        <section className="max-w-[1432px] mx-auto px-6 md:px-10 py-24 md:py-32">
-          <div className="bg-periwinkle-mist rounded-[40px] p-10 md:p-16 flex flex-col lg:flex-row gap-16 items-center shadow-sm overflow-hidden relative">
-            {/* Content */}
-            <div className="flex-1 z-10">
-              <div className="inline-flex items-center justify-center bg-white/50 backdrop-blur border border-ash/50 rounded-full px-4 py-1.5 mb-6">
-                <span className="font-sans text-xs uppercase tracking-tight text-off-black font-medium">Policy Engine</span>
-              </div>
-              <h2 className="font-heading text-4xl md:text-5xl font-normal tracking-[-0.96px] text-off-black mb-6">
-                20-Point Configurable Policy Matrix
-              </h2>
-              <p className="font-sans text-lg text-graphite leading-relaxed mb-8 max-w-md">
-                Define complex eligibility rules, attempt limits, dream offers, and upgrade policies without writing a single line of code. The engine resolves conflicts automatically.
-              </p>
-              <Link 
-                href="/login" 
-                className="font-sans text-sm uppercase tracking-tight text-off-black flex items-center hover:opacity-70 transition-opacity"
-              >
-                Explore the Engine <ArrowRight className="w-4 h-4 ml-2" />
-              </Link>
-            </div>
-            
-            {/* Visual (Diagram Mockup) */}
-            <div className="flex-1 relative w-full aspect-square md:aspect-[4/3] bg-white/40 border border-white/60 rounded-3xl p-8 shadow-sm backdrop-blur-sm">
-              <div className="absolute inset-0 bg-gradient-to-br from-coral/20 via-transparent to-sky-blue/20 rounded-3xl" />
-              
-              {/* Pipeline Nodes */}
-              <div className="absolute top-[20%] left-[10%] bg-parchment border border-ash rounded-full px-5 py-3 flex items-center gap-2 shadow-sm">
-                <Users className="w-4 h-4 text-graphite" />
-                <span className="font-sans text-sm uppercase text-off-black">Eligibility Check</span>
-              </div>
-              <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 bg-parchment border border-ash rounded-full px-5 py-3 flex items-center gap-2 shadow-sm z-10">
-                <Settings className="w-4 h-4 text-lake-blue" />
-                <span className="font-sans text-sm uppercase font-medium text-off-black">Truskill Resolution</span>
-              </div>
-              <div className="absolute bottom-[20%] right-[10%] bg-parchment border border-ash rounded-full px-5 py-3 flex items-center gap-2 shadow-sm">
-                <CheckCircle2 className="w-4 h-4 text-graphite" />
-                <span className="font-sans text-sm uppercase text-off-black">Offer Granted</span>
-              </div>
-              
-              {/* Connecting Lines */}
-              <svg className="absolute inset-0 w-full h-full -z-10" pointerEvents="none">
-                <path d="M 150 150 Q 250 150 300 250 T 450 350" fill="none" stroke="var(--color-ash)" strokeWidth="1" strokeDasharray="4 4" />
-              </svg>
-            </div>
-          </div>
-        </section>
-
-        {/* Feature Grid */}
-        <section id="features" className="max-w-[1432px] mx-auto px-6 md:px-10 pb-24 md:pb-32">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Card 1 */}
-            <div className="bg-transparent border border-ash rounded-[40px] p-10 flex flex-col">
-              <Shield className="w-6 h-6 text-off-black mb-8" />
-              <h3 className="font-heading text-[24px] font-normal tracking-[-0.48px] text-off-black mb-4">
-                Role-Based Security
-              </h3>
-              <p className="font-sans text-base text-graphite leading-relaxed">
-                Supabase Row Level Security ensures students, college admins, and agency staff only see what they are authorized to see.
-              </p>
-            </div>
-            {/* Card 2 */}
-            <div className="bg-transparent border border-ash rounded-[40px] p-10 flex flex-col">
-              <Database className="w-6 h-6 text-off-black mb-8" />
-              <h3 className="font-heading text-[24px] font-normal tracking-[-0.48px] text-off-black mb-4">
-                Unified Data Lake
-              </h3>
-              <p className="font-sans text-base text-graphite leading-relaxed">
-                Consolidate student profiles, job postings, and offer letters in a single, highly relational Postgres database.
-              </p>
-            </div>
-            {/* Card 3 */}
-            <div className="bg-transparent border border-ash rounded-[40px] p-10 flex flex-col">
-              <Settings className="w-6 h-6 text-off-black mb-8" />
-              <h3 className="font-heading text-[24px] font-normal tracking-[-0.48px] text-off-black mb-4">
-                Real-time Analytics
-              </h3>
-              <p className="font-sans text-base text-graphite leading-relaxed">
-                Track placement progression instantly. Monitor offer acceptance rates, dream classifications, and cycle performance.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* FAQ Accordion */}
-        <section id="faq" className="max-w-[800px] mx-auto px-6 md:px-10 pb-32">
-          <h2 className="font-heading text-4xl md:text-5xl font-normal tracking-[-0.96px] text-off-black mb-16 text-center">
-            Frequently Asked
-          </h2>
-          
-          <div className="border-b border-ash flex justify-between items-center py-10 cursor-pointer hover:opacity-70 transition-opacity">
-            <h3 className="font-heading text-[24px] font-normal text-off-black">How does the dream policy work?</h3>
-            <ChevronDown className="w-6 h-6 text-off-black" />
-          </div>
-          <div className="border-b border-ash flex justify-between items-center py-10 cursor-pointer hover:opacity-70 transition-opacity">
-            <h3 className="font-heading text-[24px] font-normal text-off-black">Can I configure custom placement levels?</h3>
-            <ChevronDown className="w-6 h-6 text-off-black" />
-          </div>
-          <div className="border-b border-ash flex justify-between items-center py-10 cursor-pointer hover:opacity-70 transition-opacity">
-            <h3 className="font-heading text-[24px] font-normal text-off-black">What happens during a policy conflict?</h3>
-            <ChevronDown className="w-6 h-6 text-off-black" />
-          </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-ash bg-parchment">
-        <div className="max-w-[1432px] mx-auto px-6 md:px-10 py-16 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-ink rounded-full" />
-            <div className="font-sans font-medium uppercase tracking-tight text-ink text-sm">
-              PlacementManagement
-            </div>
-          </div>
-          <nav className="flex flex-wrap gap-8">
-            <Link href="#" className="font-sans text-sm uppercase tracking-tight text-smoke hover:text-ink transition-colors">Privacy</Link>
-            <Link href="#" className="font-sans text-sm uppercase tracking-tight text-smoke hover:text-ink transition-colors">Terms</Link>
-            <Link href="#" className="font-sans text-sm uppercase tracking-tight text-smoke hover:text-ink transition-colors">Documentation</Link>
-            <Link href="#" className="font-sans text-sm uppercase tracking-tight text-smoke hover:text-ink transition-colors">Contact</Link>
-          </nav>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

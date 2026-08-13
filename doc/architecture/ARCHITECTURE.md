@@ -105,3 +105,17 @@ Security must be enforced across THREE layers.
    - **SuperAdmin/Agency:** `true` for all.
    - **College Admin/Staff:** `college_id = auth.jwt()->app_metadata->college_id`.
    - **Student:** Can view agency jobs (`college_id IS NULL`), college jobs (`college_id = ...`), and apply based on their own `student_id`.
+
+## 6. Design & UI
+- **Design System:** "Monochrome Utility" (based on Cal.com design).
+- **Core Principles:** Stark black-and-white palette, functional monochrome, pill-shaped buttons for CTAs, 12px radii for cards, subtle shadows for elevation. No borders on cards.
+- **Typography:** 
+  - `Poppins` (Google Font fallback for Cal Sans) for all Headings (Weight 600, geometric, technical yet friendly).
+  - `Inter` for all UI/Body text (Clean, highly legible, modern).
+- **Color Tokens:**
+  - Background: Paper `#f4f4f4`
+  - Cards/Popover: White `#ffffff`
+  - Primary Action/Ink: `#101010`
+  - Text: Graphite `#242424`
+  - Accent/Informational: Action Blue `#0099ff`
+- **Buttons:** All primary and secondary buttons use `rounded-full` (pill shape).

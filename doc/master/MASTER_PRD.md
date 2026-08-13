@@ -31,6 +31,6 @@
   - [ ] Student Bulk Email invitation.
   - [x] Global Agency Job posting and College Internal Job posting.
   - [x] Unified Agency Jobs command center (search, sort, filter across all jobs).
-  - [ ] Application State Machine (`Applied -> Shortlisted -> Interviewing -> Offered -> Hired`).
-  - [ ] Standard Configurable Placement Policies (e.g., debarment upon 'Hired').
+  - [x] Application State Machine (Tabbed UI with 10 explicit applicant stages).
+  - [x] 9-Core Configurable Placement Policies (Registration/Eligibility tracking, No-Show rules, Withdrawals, Disciplinary strikes, Offer Upgrades, and Smart Auto-Resolve Reinstatements).
 - **Out of Scope:** [Features deferred to later versions]

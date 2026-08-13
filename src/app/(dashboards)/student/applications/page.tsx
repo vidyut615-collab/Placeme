@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { WithdrawButton } from '@/components/WithdrawButton'
 
 const statusMap: Record<string, { label: string, color: string }> = {
   'applied': { label: 'Applied', color: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300' },
@@ -67,6 +68,7 @@ export default async function StudentApplicationsPage() {
               <TableHead>Placement Type</TableHead>
               <TableHead>Date Applied</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -95,6 +97,9 @@ export default async function StudentApplicationsPage() {
                       <Badge variant="secondary" className={`${statusConfig.color} border-transparent hover:${statusConfig.color}`}>
                         {statusConfig.label}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <WithdrawButton applicationId={app.id} status={app.status} />
                     </TableCell>
                   </TableRow>
                 )

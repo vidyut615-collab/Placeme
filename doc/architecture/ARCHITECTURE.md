@@ -35,6 +35,9 @@
 - `college_id` (FK to colleges)
 - `profile_data` (JSONB - Self-authored fields like GPA, resume, skills, academic_10th, academic_12th, etc.)
 - `onboarding_status` (Enum: 'invited', 'completed')
+- `is_blacklisted` (Boolean, Default: false)
+- `blacklist_reason` (String, Nullable)
+- `policy_counters` (JSONB - Tracks penalty strikes and upgrades, e.g., `{ no_shows: 0, withdrawals: 0 }`)
 
 ### `jobs`
 - `id` (PK, UUID)
@@ -52,13 +55,15 @@
 - `placement_level_id` (FK to placement_levels, Nullable)
 - `placement_category_id` (FK to placement_categories, Nullable)
 - `cycle_id` (FK to placement_cycles, Nullable)
+- `eligibility_criteria` (JSONB, Default: `{}`)
 - `created_at` (Timestamp)
 
 ### `applications`
 - `id` (PK, UUID)
 - `job_id` (FK to jobs)
 - `student_id` (FK to students)
-- `status` (Enum: 'applied', 'shortlisted', 'interviewing', 'selected', 'offered', 'offer_accepted', 'offer_declined', 'hired', 'joined', 'not_joined', 'withdrawn', 'rejected')
+- `status` (Enum: 'applied', 'shortlisted', 'interviewing', 'selected', 'offered', 'offer_accepted', 'offer_declined', 'hired', 'joined', 'not_joined', 'withdrawn', 'rejected', 'dropped', 'forfeited')
+- `dropped_reason` (Enum: 'did_not_qualify', 'no_show', 'excused_absence', 'student_withdrew', 'student_withdrew_post_shortlist', 'unprofessional_conduct', 'data_fraud', 'revoked_by_company', Nullable)
 - `offer_amount` (Numeric, Nullable)
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
@@ -66,7 +71,7 @@
 ### `placement_policies`
 - `id` (PK, UUID)
 - `college_id` (FK to colleges, Unique)
-- `config` (JSONB - Full configuration object for 20 Truskill policies)
+- `config` (JSONB - Full configuration object for 9 Core Placement Policies)
 
 ### `placement_cycles`, `job_types`, `placement_levels`, `placement_categories`
 - Core configuration tables supporting the policy engine dimensions.
@@ -107,15 +112,13 @@ Security must be enforced across THREE layers.
    - **Student:** Can view agency jobs (`college_id IS NULL`), college jobs (`college_id = ...`), and apply based on their own `student_id`.
 
 ## 6. Design & UI
-- **Design System:** "Monochrome Utility" (based on Cal.com design).
-- **Core Principles:** Stark black-and-white palette, functional monochrome, pill-shaped buttons for CTAs, 12px radii for cards, subtle shadows for elevation. No borders on cards.
+- **Design System:** "Verdana Health Design System".
+- **Core Principles:** Calm, trustworthy design system built for digital health platforms, telehealth dashboards, and patient-facing wellness applications. Its foundation of deep navy and soft sage greens evokes clinical precision tempered by warmth. The system prioritizes readability, accessibility, and a sense of reassurance.
 - **Typography:** 
-  - `Poppins` (Google Font fallback for Cal Sans) for all Headings (Weight 600, geometric, technical yet friendly).
-  - `Inter` for all UI/Body text (Clean, highly legible, modern).
-- **Color Tokens:**
-  - Background: Paper `#f4f4f4`
-  - Cards/Popover: White `#ffffff`
-  - Primary Action/Ink: `#101010`
-  - Text: Graphite `#242424`
-  - Accent/Informational: Action Blue `#0099ff`
+  - `Plus Jakarta Sans` for all Headings (Display, H1-H4).
+  - `DM Sans` for all UI/Body text.
+  - `Fira Code` for Mono/Code text.
+- **Components:** Headless `Base UI` and accessible Radix primitives via `shadcn/ui`.
+- **Styling Strategy:** Tailwind CSS v4 + utility classes. No complex pre-processors.
+- **Theming:** Full Light/Dark mode support using `next-themes` mapped to Verdana Health tokens.
 - **Buttons:** All primary and secondary buttons use `rounded-full` (pill shape).

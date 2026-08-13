@@ -1,40 +1,100 @@
-import Link from "next/link";
+import Link from 'next/link';
+
+const PRODUCT_LINKS = [
+  { label: 'Features', href: '/features' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Documentation', href: '/docs' },
+  { label: 'Changelog', href: '/changelog' },
+];
+
+const COMPANY_LINKS = [
+  { label: 'About', href: '/about' },
+  { label: 'Blog', href: '/blog' },
+  { label: 'Careers', href: '/careers' },
+  { label: 'Contact', href: '/contact' },
+];
+
+const LEGAL_LINKS = [
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'Security', href: '/security' },
+];
 
 export function MarketingFooter() {
   return (
-    <footer className="w-full border-t border-silver bg-paper mt-24">
-      <div className="max-w-[1200px] mx-auto px-6 py-12 md:py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-          <div className="col-span-2">
+    <footer className="w-full border-t border-[#cecac8] bg-[#f6f3f1]">
+      <div className="max-w-[1200px] mx-auto px-6 py-16 md:py-20">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-16">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-5 h-5 bg-ink rounded-sm" />
-              <span className="font-heading font-semibold tracking-wide text-ink text-lg">Placeme</span>
+              <div className="w-4 h-4 bg-[#242424] rounded-sm" />
+              <span className="font-heading font-semibold text-[18px] text-[#242424]">Placeme</span>
             </div>
-            <p className="font-sans text-sm text-slate max-w-xs leading-relaxed">
-              The precision-engineered placement engine for forward-thinking institutions.
+            <p className="font-mono text-[13px] text-[#797776] leading-[1.6] max-w-[200px]">
+              The precision-engineered placement OS for forward-thinking institutions.
             </p>
           </div>
+
+          {/* Product */}
           <div>
-            <h4 className="font-sans font-semibold text-graphite mb-4 text-sm tracking-tight">Product</h4>
+            <h4 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[#242424] mb-5">Product</h4>
             <ul className="space-y-3">
-              <li><Link href="/features" className="font-sans text-sm text-slate hover:text-ink transition-colors">Features</Link></li>
-              <li><Link href="/pricing" className="font-sans text-sm text-slate hover:text-ink transition-colors">Pricing</Link></li>
-              <li><Link href="/docs" className="font-sans text-sm text-slate hover:text-ink transition-colors">Documentation</Link></li>
+              {PRODUCT_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="font-mono text-[13px] text-[#797776] hover:text-[#242424] transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
+
+          {/* Company */}
           <div>
-            <h4 className="font-sans font-semibold text-graphite mb-4 text-sm tracking-tight">Company</h4>
+            <h4 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[#242424] mb-5">Company</h4>
             <ul className="space-y-3">
-              <li><Link href="/about" className="font-sans text-sm text-slate hover:text-ink transition-colors">About</Link></li>
-              <li><Link href="/contact" className="font-sans text-sm text-slate hover:text-ink transition-colors">Contact</Link></li>
-              <li><Link href="/privacy" className="font-sans text-sm text-slate hover:text-ink transition-colors">Privacy</Link></li>
+              {COMPANY_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="font-mono text-[13px] text-[#797776] hover:text-[#242424] transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div>
+            <h4 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[#242424] mb-5">Legal</h4>
+            <ul className="space-y-3">
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="font-mono text-[13px] text-[#797776] hover:text-[#242424] transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
-        <div className="pt-8 border-t border-silver flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="font-sans text-xs text-slate">© {new Date().getFullYear()} Placeme. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <span className="font-sans text-xs text-slate">System status: <span className="text-action-blue font-medium">All systems operational</span></span>
+
+        <div className="pt-8 border-t border-[#cecac8] flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="font-mono text-[12px] text-[#797776]">
+            © {new Date().getFullYear()} Placeme. All rights reserved.
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+            <span className="font-mono text-[12px] text-[#797776]">All systems operational</span>
           </div>
         </div>
       </div>

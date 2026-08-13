@@ -15,7 +15,17 @@ type Job = {
   created_at: string
 }
 
-export function StudentJobCard({ job, hasApplied }: { job: Job; hasApplied: boolean }) {
+export function StudentJobCard({ 
+  job, 
+  hasApplied,
+  disabledReason,
+  isUpgrade
+}: { 
+  job: Job; 
+  hasApplied: boolean;
+  disabledReason?: string;
+  isUpgrade?: boolean;
+}) {
   const [isPending, startTransition] = useTransition()
 
   const handleApply = () => {
@@ -60,17 +70,24 @@ export function StudentJobCard({ job, hasApplied }: { job: Job; hasApplied: bool
           {job.description}
         </p>
       </CardContent>
-      <CardFooter className="pt-4 border-t">
+      <CardFooter className="pt-4 border-t flex flex-col gap-2 items-start">
+        {disabledReason && (
+          <div className="w-full text-xs text-center text-red-600 bg-red-50 p-1.5 rounded-md font-medium">
+            {disabledReason}
+          </div>
+        )}
         <Button 
           className="w-full" 
-          disabled={hasApplied || isPending}
+          disabled={hasApplied || isPending || !!disabledReason}
           onClick={handleApply}
-          variant={hasApplied ? "outline" : "default"}
+          variant={hasApplied ? "outline" : (isUpgrade ? "secondary" : "default")}
         >
           {isPending ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying...</>
           ) : hasApplied ? (
             'Already Applied'
+          ) : isUpgrade ? (
+            'Apply (Upgrade Attempt)'
           ) : (
             'Apply Now'
           )}

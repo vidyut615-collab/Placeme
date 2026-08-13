@@ -123,6 +123,55 @@ export function CreateJobModal({ action, title, description }: CreateJobModalPro
                 className="min-h-[150px]"
               />
             </div>
+
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <h3 className="font-semibold text-sm">Eligibility Criteria (Optional)</h3>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="eligibility_min_cgpa">Min CGPA</Label>
+                  <Input id="eligibility_min_cgpa" name="eligibility_min_cgpa" type="number" step="0.01" placeholder="e.g. 7.5" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="eligibility_min_10th">Min 10th %</Label>
+                  <Input id="eligibility_min_10th" name="eligibility_min_10th" type="number" step="0.1" placeholder="e.g. 70" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="eligibility_min_12th">Min 12th %</Label>
+                  <Input id="eligibility_min_12th" name="eligibility_min_12th" type="number" step="0.1" placeholder="e.g. 70" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="eligibility_max_active_backlogs">Max Active Backlogs</Label>
+                  <Input id="eligibility_max_active_backlogs" name="eligibility_max_active_backlogs" type="number" placeholder="e.g. 0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="eligibility_max_historical_backlogs">Max Historical Backlogs</Label>
+                  <Input id="eligibility_max_historical_backlogs" name="eligibility_max_historical_backlogs" type="number" placeholder="e.g. 2" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="eligibility_allowed_departments">Allowed Departments (Comma separated)</Label>
+                <Input id="eligibility_allowed_departments" name="eligibility_allowed_departments" placeholder="e.g. Computer Science, Information Technology" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="eligibility_allowed_genders">Allowed Genders</Label>
+                <Select name="eligibility_allowed_genders" defaultValue="any">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any Gender</SelectItem>
+                    <SelectItem value="male">Male Only</SelectItem>
+                    <SelectItem value="female">Female Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </form>
         </div>
 

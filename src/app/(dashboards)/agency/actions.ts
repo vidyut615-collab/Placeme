@@ -284,6 +284,27 @@ export async function createGlobalJob(formData: FormData) {
   const compensation_variable = formData.get('compensation_variable') ? Number(formData.get('compensation_variable')) : null
   const application_deadline = formData.get('application_deadline') as string || null
 
+  const eligibility_min_cgpa = formData.get('eligibility_min_cgpa') ? Number(formData.get('eligibility_min_cgpa')) : null
+  const eligibility_min_10th = formData.get('eligibility_min_10th') ? Number(formData.get('eligibility_min_10th')) : null
+  const eligibility_min_12th = formData.get('eligibility_min_12th') ? Number(formData.get('eligibility_min_12th')) : null
+  const eligibility_max_active_backlogs = formData.get('eligibility_max_active_backlogs') ? Number(formData.get('eligibility_max_active_backlogs')) : null
+  const eligibility_max_historical_backlogs = formData.get('eligibility_max_historical_backlogs') ? Number(formData.get('eligibility_max_historical_backlogs')) : null
+  
+  const rawDepartments = formData.get('eligibility_allowed_departments') as string
+  const eligibility_allowed_departments = rawDepartments ? rawDepartments.split(',').map(s => s.trim()).filter(Boolean) : []
+  
+  const eligibility_allowed_genders = formData.get('eligibility_allowed_genders') as string
+  
+  const eligibility_criteria = {
+    min_cgpa: eligibility_min_cgpa,
+    min_10th: eligibility_min_10th,
+    min_12th: eligibility_min_12th,
+    max_active_backlogs: eligibility_max_active_backlogs,
+    max_historical_backlogs: eligibility_max_historical_backlogs,
+    allowed_departments: eligibility_allowed_departments,
+    allowed_genders: eligibility_allowed_genders && eligibility_allowed_genders !== 'any' ? [eligibility_allowed_genders] : []
+  }
+
   if (!title || !description || !status || !company_name) return { error: 'Missing required fields.' }
 
   const adminClient = getAdminClient()
@@ -297,6 +318,7 @@ export async function createGlobalJob(formData: FormData) {
     compensation_variable,
     application_deadline: application_deadline ? new Date(application_deadline).toISOString() : null,
     college_id: null,
+    eligibility_criteria,
     created_by: user.id
   })
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function Home() {
@@ -14,9 +14,9 @@ export default function Home() {
             </div>
           </div>
           <nav className="flex items-center gap-4">
-            <Button variant="default" className="font-sans px-6" asChild>
-              <Link href="/login">Login</Link>
-            </Button>
+            <Link href="/login" className={buttonVariants({ variant: "default", className: "font-sans px-6" })}>
+              Login
+            </Link>
           </nav>
         </div>
       </header>
@@ -33,9 +33,9 @@ export default function Home() {
               A powerful, configurable platform to streamline job drives, track applications, and handle placement policies—all from one unified interface.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
-              <Button size="lg" className="font-sans text-base" asChild>
-                <Link href="/login">Get started</Link>
-              </Button>
+              <Link href="/login" className={buttonVariants({ size: "lg", className: "font-sans text-base" })}>
+                Get started
+              </Link>
               <Button size="lg" variant="ghost" className="font-sans text-base">
                 Read documentation
               </Button>

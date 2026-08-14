@@ -25,7 +25,7 @@ export default async function CollegeOverview() {
     .is('college_id', null)
 
   return (
-    <div className="flex flex-1 flex-col p-8 space-y-8">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">College Dashboard</h1>
         <p className="text-zinc-500 mt-2">Manage your students, internal jobs, and placement policies.</p>

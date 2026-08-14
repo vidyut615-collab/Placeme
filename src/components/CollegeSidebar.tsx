@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
 
-const navigation = [
+export const collegeNavigation = [
   { name: 'Overview', href: '/college/dashboard', icon: LayoutDashboard },
   { name: 'Local Jobs', href: '/college/jobs', icon: Briefcase },
   { name: 'Students', href: '/college/students', icon: Users },
@@ -19,12 +19,12 @@ export function CollegeSidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-white dark:bg-zinc-950">
+    <div className="flex h-full w-full md:w-64 flex-col border-r bg-white dark:bg-zinc-950">
       <div className="flex h-16 items-center border-b px-6">
         <span className="text-lg font-bold tracking-tight">College Portal</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
+        {collegeNavigation.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link

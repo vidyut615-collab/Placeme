@@ -68,7 +68,7 @@ export function CreateJobModal({ action, title, description }: CreateJobModalPro
           )}
 
           <form id="create-job-form" action={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="title">Job Title</Label>
                 <Input id="title" name="title" placeholder="e.g., Software Engineer Intern" required />
@@ -98,7 +98,7 @@ export function CreateJobModal({ action, title, description }: CreateJobModalPro
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 border-t pt-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
               <div className="space-y-2">
                 <Label htmlFor="compensation_ctc">CTC (LPA)</Label>
                 <Input id="compensation_ctc" name="compensation_ctc" type="number" step="0.01" placeholder="e.g. 10.5" />
@@ -127,7 +127,7 @@ export function CreateJobModal({ action, title, description }: CreateJobModalPro
             <div className="border-t pt-4 mt-4 space-y-4">
               <h3 className="font-semibold text-sm">Eligibility Criteria (Optional)</h3>
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="eligibility_min_cgpa">Min CGPA</Label>
                   <Input id="eligibility_min_cgpa" name="eligibility_min_cgpa" type="number" step="0.01" placeholder="e.g. 7.5" />
@@ -142,7 +142,7 @@ export function CreateJobModal({ action, title, description }: CreateJobModalPro
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="eligibility_max_active_backlogs">Max Active Backlogs</Label>
                   <Input id="eligibility_max_active_backlogs" name="eligibility_max_active_backlogs" type="number" placeholder="e.g. 0" />

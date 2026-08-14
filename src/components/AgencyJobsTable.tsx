@@ -101,8 +101,8 @@ export function AgencyJobsTable({ jobs }: AgencyJobsTableProps) {
       </div>
 
       {/* Data Table */}
-      <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
-        <Table>
+      <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm w-full overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
               <TableHead>Job Title</TableHead>

@@ -42,7 +42,7 @@ export default async function AgencyOverview() {
   ])
 
   return (
-    <div className="flex flex-1 flex-col p-8 space-y-8">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
         <p className="text-zinc-500 mt-2">Real-time metrics across your entire placement network.</p>

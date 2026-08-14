@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
 
-const navigation = [
+export const agencyNavigation = [
   { name: 'Overview', href: '/agency/dashboard', icon: LayoutDashboard },
   { name: 'Colleges', href: '/agency/colleges', icon: GraduationCap },
   { name: 'Global Jobs', href: '/agency/jobs', icon: Briefcase },
@@ -19,12 +19,12 @@ export function AgencySidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-white dark:bg-zinc-950">
+    <div className="flex h-full w-full md:w-64 flex-col border-r bg-white dark:bg-zinc-950">
       <div className="flex h-16 items-center border-b px-6">
         <span className="text-lg font-bold tracking-tight">Placeme Agency</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
+        {agencyNavigation.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link

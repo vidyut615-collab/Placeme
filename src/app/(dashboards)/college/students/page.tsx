@@ -94,7 +94,7 @@ export default async function CollegeStudentsPage({
   const blacklistedList = filteredList.filter(item => item.isBlacklisted)
 
   return (
-    <div className="flex flex-1 flex-col p-8 space-y-8">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Student Directory & Invitations</h1>
@@ -112,8 +112,8 @@ export default async function CollegeStudentsPage({
         </TabsList>
 
         <TabsContent value="active">
-          <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
-            <Table>
+          <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm w-full overflow-x-auto">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
@@ -173,8 +173,8 @@ export default async function CollegeStudentsPage({
         </TabsContent>
 
         <TabsContent value="blacklisted">
-          <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
-            <Table>
+          <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm w-full overflow-x-auto">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Student Name</TableHead>

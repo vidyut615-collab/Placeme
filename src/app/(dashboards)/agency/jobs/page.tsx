@@ -33,8 +33,8 @@ export default async function AgencyJobsPage() {
   }))
 
   return (
-    <div className="flex flex-1 flex-col p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Unified Job Board</h1>
           <p className="text-zinc-500 mt-2">Manage global agency jobs and oversee all local college postings.</p>

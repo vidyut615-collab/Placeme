@@ -54,14 +54,14 @@ export default async function StudentApplicationsPage() {
     .order('created_at', { ascending: false })
 
   return (
-    <div className="flex flex-1 flex-col p-8 space-y-6">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">My Applications</h1>
         <p className="text-zinc-500 mt-2">Track the status of your job applications.</p>
       </div>
 
-      <div className="rounded-md border bg-white dark:bg-zinc-950 shadow-sm">
-        <Table>
+      <div className="rounded-md border bg-white dark:bg-zinc-950 shadow-sm w-full overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
               <TableHead>Job Title</TableHead>

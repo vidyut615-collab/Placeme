@@ -100,7 +100,7 @@ export default async function StudentDashboard() {
             <User className="h-4 w-4 text-zinc-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold">{profile.full_name || 'N/A'}</div>
+            <div className="text-xl font-bold">{profile.full_name || '—'}</div>
           </CardContent>
         </Card>
         <Card>
@@ -118,8 +118,14 @@ export default async function StudentDashboard() {
             <GraduationCap className="h-4 w-4 text-zinc-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold">{profile.type || 'N/A'} – {profile.year || 'N/A'}</div>
-            <p className="text-xs text-zinc-500">{profile.department || 'N/A'}</p>
+            {profile.type ? (
+              <>
+                <div className="text-lg font-bold">{profile.type} – {profile.year}</div>
+                <p className="text-xs text-zinc-500">{profile.department}</p>
+              </>
+            ) : (
+              <div className="text-lg font-bold text-zinc-400">Not Provided</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -128,43 +134,49 @@ export default async function StudentDashboard() {
             <Briefcase className="h-4 w-4 text-zinc-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold">{profile.gpa || 'N/A'}</div>
+            <div className="text-xl font-bold">{profile.gpa || '—'}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Activity stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-blue-200 dark:border-blue-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Jobs Available</CardTitle>
-            <Briefcase className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalJobsCount || 0}</div>
-            <p className="text-xs text-zinc-500">Active openings for you</p>
-          </CardContent>
-        </Card>
-        <Card className="border-purple-200 dark:border-purple-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Applications Sent</CardTitle>
-            <FileText className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalAppsCount || 0}</div>
-            <p className="text-xs text-zinc-500">Total submitted</p>
-          </CardContent>
-        </Card>
-        <Card className="border-green-200 dark:border-green-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{progressCount || 0}</div>
-            <p className="text-xs text-zinc-500">Shortlisted / Interviewing / Offered</p>
-          </CardContent>
-        </Card>
+        <Link href="/student/jobs" className="block h-full">
+          <Card className="h-full border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Jobs Available</CardTitle>
+              <Briefcase className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalJobsCount || 0}</div>
+              <p className="text-xs text-zinc-500">Active openings for you</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/student/applications" className="block h-full">
+          <Card className="h-full border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Applications Sent</CardTitle>
+              <FileText className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalAppsCount || 0}</div>
+              <p className="text-xs text-zinc-500">Total submitted</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/student/applications" className="block h-full">
+          <Card className="h-full border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{progressCount || 0}</div>
+              <p className="text-xs text-zinc-500">Shortlisted / Interviewing / Offered</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Recent jobs + recent applications */}

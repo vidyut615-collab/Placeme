@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { GraduationCap, Users, Briefcase, FileText } from 'lucide-react'
+import Link from 'next/link'
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   applied:      { label: 'Applied',      className: 'bg-zinc-100 text-zinc-800' },
@@ -50,46 +51,54 @@ export default async function AgencyOverview() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Colleges</CardTitle>
-            <GraduationCap className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{collegesCount || 0}</div>
-            <p className="text-xs text-zinc-500">Registered partners</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Students</CardTitle>
-            <Users className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{studentsCount || 0}</div>
-            <p className="text-xs text-zinc-500">{pendingCount || 0} pending invites</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-            <Briefcase className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobsCount || 0}</div>
-            <p className="text-xs text-zinc-500">Open positions</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Applications</CardTitle>
-            <FileText className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{applicationsCount || 0}</div>
-            <p className="text-xs text-zinc-500">Total all-time</p>
-          </CardContent>
-        </Card>
+        <Link href="/agency/colleges" className="block h-full">
+          <Card className="h-full hover:border-zinc-300 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Colleges</CardTitle>
+              <GraduationCap className="h-4 w-4 text-zinc-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{collegesCount || 0}</div>
+              <p className="text-xs text-zinc-500">Registered partners</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/agency/students" className="block h-full">
+          <Card className="h-full hover:border-zinc-300 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Students</CardTitle>
+              <Users className="h-4 w-4 text-zinc-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{studentsCount || 0}</div>
+              <p className="text-xs text-zinc-500">{pendingCount || 0} pending invites</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/agency/jobs" className="block h-full">
+          <Card className="h-full hover:border-zinc-300 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
+              <Briefcase className="h-4 w-4 text-zinc-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{jobsCount || 0}</div>
+              <p className="text-xs text-zinc-500">Open positions</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/agency/jobs" className="block h-full">
+          <Card className="h-full hover:border-zinc-300 transition-colors cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Applications</CardTitle>
+              <FileText className="h-4 w-4 text-zinc-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{applicationsCount || 0}</div>
+              <p className="text-xs text-zinc-500">Total all-time</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Recent Activity */}

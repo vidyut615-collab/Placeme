@@ -62,7 +62,7 @@ export default async function CollegeStudentsPage({
     ...(pendingInvites || []).map((inv: any) => ({
       id: inv.id,
       email: inv.email,
-      name: 'N/A',
+      name: '—',
       status: 'pending',
       date: inv.created_at,
       isInvite: true,
@@ -73,7 +73,7 @@ export default async function CollegeStudentsPage({
     ...(activeStudents || []).map((stu: any) => ({
       id: stu.id,
       email: stu.users?.email,
-      name: stu.profile_data?.full_name || 'N/A',
+      name: stu.profile_data?.full_name || '—',
       status: 'active',
       date: stu.created_at,
       isInvite: false,

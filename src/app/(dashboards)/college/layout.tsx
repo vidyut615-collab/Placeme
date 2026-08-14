@@ -1,6 +1,7 @@
 import { CollegeSidebar, collegeNavigation } from '@/components/CollegeSidebar'
 import { BottomNav } from '@/components/BottomNav'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { MobileUserMenu } from '@/components/MobileUserMenu'
 
 export default function CollegeLayout({
   children,
@@ -21,10 +22,13 @@ export default function CollegeLayout({
           <div className="flex items-center gap-4">
             <span className="text-lg font-bold tracking-tight">College Portal</span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <MobileUserMenu />
+          </div>
         </header>
         
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           {children}
         </main>
 

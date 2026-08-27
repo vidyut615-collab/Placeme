@@ -46,9 +46,7 @@ export function InviteStudentModal({ collegeId }: { collegeId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
-        Invite Student
-      </DialogTrigger>
+      <DialogTrigger render={<Button>Invite Student</Button>} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Invite a Student</DialogTitle>

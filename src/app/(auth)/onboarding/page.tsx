@@ -134,25 +134,30 @@ export default function OnboardingPage() {
           </form>
         ) : (
           <form onSubmit={handleProfileSubmit} className="space-y-6 mt-6">
-            <div>
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input id="fullName" name="fullName" required className="mt-1" placeholder="John Doe" />
+            <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm mb-4">
+              Please enter your current legal name as it appears on official documents.
             </div>
-            <div>
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input id="phone" name="phone" type="tel" className="mt-1" placeholder="+1 (555) 000-0000" />
+            
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
+                <Input id="firstName" name="firstName" required className="mt-1" placeholder="John" />
+              </div>
+              <div>
+                <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
+                <Input id="lastName" name="lastName" required className="mt-1" placeholder="Doe" />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                <Input id="middleName" name="middleName" className="mt-1" placeholder="Michael" />
+              </div>
             </div>
 
             {role === 'student' && (
-              <div className="space-y-6">
-                <div>
-                  <Label htmlFor="gpa">Current GPA (Optional)</Label>
-                  <Input id="gpa" name="gpa" type="number" step="0.01" min="0" max="10" className="mt-1" placeholder="3.8" />
-                </div>
-                
+              <div className="space-y-6 pt-2">
                 {onboardingFields?.years && onboardingFields.years.length > 0 && (
                   <div>
-                    <Label htmlFor="year">Graduation Year</Label>
+                    <Label htmlFor="year">Graduation Year <span className="text-red-500">*</span></Label>
                     <select id="year" name="year" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors mt-1">
                       <option value="">Select Year...</option>
                       {onboardingFields.years.map((y: string) => <option key={y} value={y}>{y}</option>)}
@@ -162,7 +167,7 @@ export default function OnboardingPage() {
 
                 {onboardingFields?.types && onboardingFields.types.length > 0 && (
                   <div>
-                    <Label htmlFor="type">Degree Type</Label>
+                    <Label htmlFor="type">Degree Type <span className="text-red-500">*</span></Label>
                     <select id="type" name="type" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors mt-1">
                       <option value="">Select Type...</option>
                       {onboardingFields.types.map((t: string) => <option key={t} value={t}>{t}</option>)}
@@ -172,51 +177,13 @@ export default function OnboardingPage() {
 
                 {onboardingFields?.departments && onboardingFields.departments.length > 0 && (
                   <div>
-                    <Label htmlFor="department">Department</Label>
+                    <Label htmlFor="department">Department <span className="text-red-500">*</span></Label>
                     <select id="department" name="department" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors mt-1">
                       <option value="">Select Department...</option>
                       {onboardingFields.departments.map((d: string) => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                 )}
-                
-                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                  <h3 className="text-md font-medium mb-4">Academic Details (Optional for now)</h3>
-                  
-                  <div className="grid gap-4 md:grid-cols-2 mb-4">
-                    <div>
-                      <Label htmlFor="academic_10th">10th Percentage</Label>
-                      <Input id="academic_10th" name="academic_10th" type="number" step="0.01" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="academic_12th">12th Percentage</Label>
-                      <Input id="academic_12th" name="academic_12th" type="number" step="0.01" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="diploma_percentage">Diploma % (if any)</Label>
-                      <Input id="diploma_percentage" name="diploma_percentage" type="number" step="0.01" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="graduation_percentage">Graduation %</Label>
-                      <Input id="graduation_percentage" name="graduation_percentage" type="number" step="0.01" className="mt-1" />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div>
-                      <Label htmlFor="active_backlogs">Active Backlogs</Label>
-                      <Input id="active_backlogs" name="active_backlogs" type="number" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="historical_backlogs">Historical Backlogs</Label>
-                      <Input id="historical_backlogs" name="historical_backlogs" type="number" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="academic_gap_years">Academic Gap (Yrs)</Label>
-                      <Input id="academic_gap_years" name="academic_gap_years" type="number" className="mt-1" />
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 

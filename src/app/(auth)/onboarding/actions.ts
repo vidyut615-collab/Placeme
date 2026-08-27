@@ -39,12 +39,15 @@ export async function completeOnboarding(formData: FormData) {
   const collegeId = user.app_metadata?.college_id
   const adminClient = getAdminClient()
 
-  const fullName = formData.get('fullName') as string
-  const phone = formData.get('phone') as string
+  const firstName = formData.get('firstName') as string
+  const middleName = formData.get('middleName') as string
+  const lastName = formData.get('lastName') as string
 
-  if (!fullName) {
-    return { error: 'Full Name is required.' }
+  if (!firstName || !lastName) {
+    return { error: 'First Name and Last Name are required.' }
   }
+
+  const fullName = `${firstName.trim()} ${middleName ? middleName.trim() + ' ' : ''}${lastName.trim()}`.trim()
 
   try {
     // 1. Update auth user metadata with basic details
@@ -52,7 +55,9 @@ export async function completeOnboarding(formData: FormData) {
       user_metadata: {
         ...user.user_metadata,
         full_name: fullName,
-        phone: phone,
+        first_name: firstName.trim(),
+        middle_name: middleName?.trim() || '',
+        last_name: lastName.trim(),
       }
     })
 
@@ -76,18 +81,9 @@ export async function completeOnboarding(formData: FormData) {
 
     // 4. Role-specific database updates
     if (role === 'student') {
-      const gpa = formData.get('gpa') as string
       const year = formData.get('year') as string
       const type = formData.get('type') as string
       const department = formData.get('department') as string
-      
-      const academic_10th = formData.get('academic_10th') as string
-      const academic_12th = formData.get('academic_12th') as string
-      const diploma_percentage = formData.get('diploma_percentage') as string
-      const graduation_percentage = formData.get('graduation_percentage') as string
-      const active_backlogs = formData.get('active_backlogs') as string
-      const historical_backlogs = formData.get('historical_backlogs') as string
-      const academic_gap_years = formData.get('academic_gap_years') as string
       
       // Upsert student record
       const { error: studentError } = await adminClient.from('students').upsert({
@@ -96,18 +92,12 @@ export async function completeOnboarding(formData: FormData) {
         onboarding_status: 'completed',
         profile_data: {
           full_name: fullName,
-          phone: phone,
-          gpa: gpa || null,
+          first_name: firstName.trim(),
+          middle_name: middleName?.trim() || null,
+          last_name: lastName.trim(),
           year: year || null,
           type: type || null,
-          department: department || null,
-          academic_10th: academic_10th || null,
-          academic_12th: academic_12th || null,
-          diploma_percentage: diploma_percentage || null,
-          graduation_percentage: graduation_percentage || null,
-          active_backlogs: active_backlogs || null,
-          historical_backlogs: historical_backlogs || null,
-          academic_gap_years: academic_gap_years || null
+          department: department || null
         }
       }, { onConflict: 'user_id' })
 

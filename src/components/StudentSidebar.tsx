@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Briefcase, FileText, UserCircle } from 'lucide-react'
+import { LayoutDashboard, Briefcase, FileText, UserCircle, FileCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
@@ -12,6 +12,7 @@ export const studentNavigation = [
   { name: 'Jobs', href: '/student/jobs', icon: Briefcase },
   { name: 'Applications', href: '/student/applications', icon: FileText },
   { name: 'My Profile', href: '/student/profile', icon: UserCircle },
+  { name: 'Policies', href: '/student/policies', icon: FileCheck },
 ]
 
 export function StudentSidebar() {

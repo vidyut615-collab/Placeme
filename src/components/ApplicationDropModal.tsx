@@ -54,9 +54,7 @@ export function ApplicationDropModal({ applicationId, studentName, trigger }: { 
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger>
-        {trigger}
-      </DialogTrigger>
+      <DialogTrigger render={trigger as React.ReactElement} />
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Drop Student</DialogTitle>

@@ -15,6 +15,8 @@ export default async function StudentProfilePage() {
   const { data: student } = await supabase
     .from('students')
     .select(`
+      id,
+      college_id,
       profile_data,
       colleges (
         name,
@@ -27,6 +29,21 @@ export default async function StudentProfilePage() {
   const profile = student?.profile_data || {}
   const college = student?.colleges as any
   const onboardingFields = college?.onboarding_fields || { years: [], types: [], departments: [] }
+
+  const { data: pendingRequest } = await supabase
+    .from('profile_update_requests')
+    .select('id')
+    .eq('student_id', student?.id)
+    .eq('status', 'pending')
+    .maybeSingle()
+
+  const { data: policy } = await supabase
+    .from('placement_policies')
+    .select('config')
+    .eq('college_id', student?.college_id)
+    .maybeSingle()
+    
+  const auditEnabled = policy?.config?.profile_audit_enabled !== false
 
   return (
     <div className="flex flex-1 flex-col p-8 space-y-6">
@@ -62,9 +79,16 @@ export default async function StudentProfilePage() {
         <div className="flex-1 bg-white dark:bg-zinc-900 rounded-md border p-6 shadow-sm">
           <h2 className="text-lg font-semibold mb-1">Edit Information</h2>
           <p className="text-sm text-zinc-500 mb-6">
-            Changes are saved instantly and reflected on your applications.
+            {auditEnabled 
+              ? "Your college requires profile changes to be audited. Approvals may take up to 48 hours."
+              : "Changes are saved instantly and reflected on your applications."}
           </p>
-          <StudentProfileForm profile={profile} onboardingFields={onboardingFields} />
+          <StudentProfileForm 
+            profile={profile} 
+            onboardingFields={onboardingFields} 
+            hasPendingRequest={!!pendingRequest}
+            auditEnabled={auditEnabled}
+          />
         </div>
       </div>
     </div>

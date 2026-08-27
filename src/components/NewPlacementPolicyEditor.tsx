@@ -126,6 +126,29 @@ export function NewPlacementPolicyEditor({ initialConfig }: { initialConfig: any
           </div>
         </div>
 
+        <Card className="bg-blue-50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-900/30">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div className="space-y-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                Enable Student Profile Auditing
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-zinc-400 hover:text-zinc-600 cursor-pointer" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[300px]">
+                    <p>When enabled, students cannot instantly update their resume data. All updates are sent to the Approvals Queue for an admin to verify before going live.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+              <CardDescription>Require admin approval for any changes to student resumes or profile data.</CardDescription>
+            </div>
+            <Switch 
+              checked={config.profile_audit_enabled !== false}
+              onCheckedChange={(c) => setConfig({ ...config, profile_audit_enabled: c })}
+            />
+          </CardHeader>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <PolicySection
             title="Registration & Eligibility (Non-Participation)"

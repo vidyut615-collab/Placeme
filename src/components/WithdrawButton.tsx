@@ -41,10 +41,8 @@ export function WithdrawButton({ applicationId, status }: { applicationId: strin
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger>
-        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-          Withdraw
-        </Button>
+      <DialogTrigger render={<Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" />}>
+        Withdraw
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -52,7 +50,7 @@ export function WithdrawButton({ applicationId, status }: { applicationId: strin
             <AlertTriangle className="h-5 w-5 text-red-500" />
             Confirm Withdrawal
           </DialogTitle>
-          <DialogDescription className="pt-3 space-y-3">
+          <DialogDescription render={<div />} className="pt-3 space-y-3">
             <p>Are you sure you want to withdraw your application?</p>
             <div className="bg-orange-50 border border-orange-200 p-3 rounded-md text-orange-900 text-sm">
               <strong>Warning: </strong> 

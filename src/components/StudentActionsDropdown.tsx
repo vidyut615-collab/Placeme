@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { MoreHorizontal, ShieldBan, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +36,7 @@ export function StudentActionsDropdown({ studentId, isBlacklisted }: StudentActi
   const [removeModalOpen, setRemoveModalOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleBlacklist = (formData: FormData) => {
     formData.append('studentId', studentId)
@@ -74,7 +77,11 @@ export function StudentActionsDropdown({ studentId, isBlacklisted }: StudentActi
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           
-          <DropdownMenuItem className="cursor-pointer">
+          <DropdownMenuItem 
+            className="cursor-pointer" 
+            closeOnClick={false}
+            onClick={() => router.push(`/college/students/${studentId}`)}
+          >
             View Profile
           </DropdownMenuItem>
 

@@ -11,11 +11,6 @@ export async function updateStudentProfile(formData: FormData) {
     return { error: 'Unauthorized.' }
   }
 
-  const full_name = (formData.get('full_name') as string)?.trim()
-  const first_name = (formData.get('first_name') as string)?.trim()
-  const last_name = (formData.get('last_name') as string)?.trim()
-  if (!first_name || !last_name) return { error: 'First and Last name are required.' }
-
   let profile_data: any = {}
   
   const rawJson = formData.get('profile_data_json') as string
@@ -26,6 +21,11 @@ export async function updateStudentProfile(formData: FormData) {
       return { error: 'Invalid profile data format.' }
     }
   } else {
+    const first_name = (formData.get('first_name') as string)?.trim() || ''
+    const last_name = (formData.get('last_name') as string)?.trim() || ''
+    const middle_name = (formData.get('middle_name') as string)?.trim() || ''
+    const full_name = (formData.get('full_name') as string)?.trim() || `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}`.trim()
+
     profile_data = {
       full_name,
       first_name,
@@ -44,6 +44,10 @@ export async function updateStudentProfile(formData: FormData) {
       historical_backlogs: (formData.get('historical_backlogs') as string)?.trim() || '',
       academic_gap_years: (formData.get('academic_gap_years') as string)?.trim() || '',
     }
+  }
+
+  if (!profile_data.first_name?.trim() || !profile_data.last_name?.trim()) {
+    return { error: 'First and Last name are required.' }
   }
 
   const { data: studentDoc } = await supabase

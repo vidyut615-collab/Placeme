@@ -328,4 +328,87 @@ export async function updateApplicationStatus(formData: FormData) {
   return { success: 'Application status updated.' }
 }
 
+export async function updateCollegeAcademicConfig(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user || (user.app_metadata.role !== 'college_admin' && user.app_metadata.role !== 'college_staff')) {
+    return { error: 'Unauthorized. Only College Admins can update academic configuration.' }
+  }
+
+  const collegeId = user.app_metadata.college_id
+  if (!collegeId) {
+    return { error: 'No college associated with this account.' }
+  }
+
+  let onboarding_fields = { years: [] as string[], types: [] as string[], departments: [] as string[] }
+  const fieldsJson = formData.get('onboarding_fields_json') as string
+  if (fieldsJson) {
+    try {
+      onboarding_fields = JSON.parse(fieldsJson)
+    } catch (e) {
+      return { error: 'Invalid configuration format.' }
+    }
+  } else {
+    const yearsRaw = formData.get('years') as string
+    const typesRaw = formData.get('types') as string
+    const deptsRaw = formData.get('departments') as string
+
+    onboarding_fields = {
+      years: yearsRaw ? yearsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      types: typesRaw ? typesRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      departments: deptsRaw ? deptsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+    }
+  }
+
+  const { error } = await supabase
+    .from('colleges')
+    .update({ onboarding_fields })
+    .eq('id', collegeId)
+
+  if (error) return { error: error.message }
+
+  // Process cascading renames across students, pending requests, and jobs
+  const renamesJson = formData.get('renames_json') as string
+  let totalStudentsMigrated = 0
+
+  if (renamesJson) {
+    try {
+      const renames: Array<{ category: string, oldValue: string, newValue: string }> = JSON.parse(renamesJson)
+      const fieldMap: Record<string, string> = {
+        departments: 'department',
+        types: 'type',
+        years: 'year'
+      }
+
+      for (const rename of renames) {
+        const field = fieldMap[rename.category]
+        if (field && rename.oldValue && rename.newValue && rename.oldValue !== rename.newValue) {
+          const { data: res, error: rpcErr } = await supabase.rpc('cascade_rename_academic_field', {
+            p_college_id: collegeId,
+            p_field: field,
+            p_old_val: rename.oldValue,
+            p_new_val: rename.newValue
+          })
+
+          if (!rpcErr && res?.students_updated) {
+            totalStudentsMigrated += res.students_updated
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to cascade academic renames:', e)
+    }
+  }
+
+  revalidatePath('/college/settings')
+  revalidatePath('/college/students')
+
+  const successMsg = totalStudentsMigrated > 0
+    ? `Academic lists updated! Automatically migrated ${totalStudentsMigrated} student profile(s) to match the new names.`
+    : 'Academic lists configuration updated successfully!'
+
+  return { success: successMsg }
+}
+
 

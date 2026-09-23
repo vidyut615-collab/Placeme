@@ -20,6 +20,11 @@ export default async function AgencyColleges() {
     .select(`
       id, 
       name, 
+      website,
+      location,
+      description,
+      contact_email,
+      contact_phone,
       created_at,
       users!users_college_id_fkey(email, role)
     `)
@@ -68,7 +73,18 @@ export default async function AgencyColleges() {
                       </TableCell>
                       <TableCell>{new Date(college.created_at).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right">
-                        <CollegeActionsMenu collegeId={college.id} collegeName={college.name} />
+                        <CollegeActionsMenu 
+                          collegeId={college.id} 
+                          collegeName={college.name} 
+                          collegeDetails={{
+                            name: college.name,
+                            website: college.website,
+                            location: college.location,
+                            description: college.description,
+                            contact_email: college.contact_email,
+                            contact_phone: college.contact_phone
+                          }}
+                        />
                       </TableCell>
                     </TableRow>
                   )

@@ -14,8 +14,13 @@ export async function addCollege(formData: FormData) {
     return { error: 'Unauthorized. Only Agency staff can create colleges.' }
   }
 
-  const name = formData.get('name') as string
-  const adminEmail = formData.get('adminEmail') as string
+  const name = (formData.get('name') as string)?.trim()
+  const adminEmail = (formData.get('adminEmail') as string)?.trim()
+  const website = (formData.get('website') as string)?.trim() || null
+  const location = (formData.get('location') as string)?.trim() || null
+  const description = (formData.get('description') as string)?.trim() || null
+  const contact_email = (formData.get('contact_email') as string)?.trim() || null
+  const contact_phone = (formData.get('contact_phone') as string)?.trim() || null
 
   if (!name || !adminEmail) {
     return { error: 'College Name and Admin Email are required.' }
@@ -23,20 +28,36 @@ export async function addCollege(formData: FormData) {
 
   const adminClient = getAdminClient()
 
-  const yearsRaw = formData.get('years') as string
-  const typesRaw = formData.get('types') as string
-  const deptsRaw = formData.get('departments') as string
+  let onboarding_fields = { years: [] as string[], types: [] as string[], departments: [] as string[] }
+  const fieldsJson = formData.get('onboarding_fields_json') as string
+  if (fieldsJson) {
+    try {
+      onboarding_fields = JSON.parse(fieldsJson)
+    } catch (e) {}
+  } else {
+    const yearsRaw = formData.get('years') as string
+    const typesRaw = formData.get('types') as string
+    const deptsRaw = formData.get('departments') as string
 
-  const onboarding_fields = {
-    years: yearsRaw ? yearsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-    types: typesRaw ? typesRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-    departments: deptsRaw ? deptsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+    onboarding_fields = {
+      years: yearsRaw ? yearsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      types: typesRaw ? typesRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      departments: deptsRaw ? deptsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+    }
   }
 
   try {
     const { data: college, error: collegeError } = await adminClient
       .from('colleges')
-      .insert({ name, onboarding_fields })
+      .insert({
+        name,
+        website,
+        location,
+        description,
+        contact_email,
+        contact_phone,
+        onboarding_fields
+      })
       .select()
       .single()
 
@@ -131,17 +152,30 @@ export async function updateCollege(formData: FormData) {
   }
 
   const id = formData.get('id') as string
-  const name = formData.get('name') as string
+  const name = (formData.get('name') as string)?.trim()
+  const website = (formData.get('website') as string)?.trim() || null
+  const location = (formData.get('location') as string)?.trim() || null
+  const description = (formData.get('description') as string)?.trim() || null
+  const contact_email = (formData.get('contact_email') as string)?.trim() || null
+  const contact_phone = (formData.get('contact_phone') as string)?.trim() || null
 
-  if (!id || !name) return { error: 'Missing fields.' }
+  if (!id || !name) return { error: 'College Name is required.' }
 
   const adminClient = getAdminClient()
-  const { error } = await adminClient.from('colleges').update({ name }).eq('id', id)
+  const { error } = await adminClient.from('colleges').update({
+    name,
+    website,
+    location,
+    description,
+    contact_email,
+    contact_phone
+  }).eq('id', id)
 
   if (error) return { error: error.message }
   
   revalidatePath('/agency/colleges')
-  return { success: 'College updated successfully!' }
+  revalidatePath(`/agency/colleges/${id}`)
+  return { success: 'College details updated successfully!' }
 }
 
 export async function addCollegeAdmin(formData: FormData) {
@@ -433,16 +467,26 @@ export async function updateCollegeOnboardingFields(formData: FormData) {
   }
 
   const collegeId = formData.get('collegeId') as string
-  const yearsRaw = formData.get('years') as string
-  const typesRaw = formData.get('types') as string
-  const deptsRaw = formData.get('departments') as string
-
   if (!collegeId) return { error: 'Missing college ID.' }
 
-  const onboarding_fields = {
-    years: yearsRaw ? yearsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-    types: typesRaw ? typesRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-    departments: deptsRaw ? deptsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+  let onboarding_fields = { years: [] as string[], types: [] as string[], departments: [] as string[] }
+  const fieldsJson = formData.get('onboarding_fields_json') as string
+  if (fieldsJson) {
+    try {
+      onboarding_fields = JSON.parse(fieldsJson)
+    } catch (e) {
+      return { error: 'Invalid configuration format.' }
+    }
+  } else {
+    const yearsRaw = formData.get('years') as string
+    const typesRaw = formData.get('types') as string
+    const deptsRaw = formData.get('departments') as string
+
+    onboarding_fields = {
+      years: yearsRaw ? yearsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      types: typesRaw ? typesRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      departments: deptsRaw ? deptsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+    }
   }
 
   const adminClient = getAdminClient()
@@ -453,8 +497,47 @@ export async function updateCollegeOnboardingFields(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  // Process cascading renames across students, pending requests, and jobs
+  const renamesJson = formData.get('renames_json') as string
+  let totalStudentsMigrated = 0
+
+  if (renamesJson) {
+    try {
+      const renames: Array<{ category: string, oldValue: string, newValue: string }> = JSON.parse(renamesJson)
+      const fieldMap: Record<string, string> = {
+        departments: 'department',
+        types: 'type',
+        years: 'year'
+      }
+
+      for (const rename of renames) {
+        const field = fieldMap[rename.category]
+        if (field && rename.oldValue && rename.newValue && rename.oldValue !== rename.newValue) {
+          const { data: res, error: rpcErr } = await adminClient.rpc('cascade_rename_academic_field', {
+            p_college_id: collegeId,
+            p_field: field,
+            p_old_val: rename.oldValue,
+            p_new_val: rename.newValue
+          })
+          
+          if (!rpcErr && res?.students_updated) {
+            totalStudentsMigrated += res.students_updated
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to cascade academic renames:', e)
+    }
+  }
+
   revalidatePath(`/agency/colleges/${collegeId}`)
-  return { success: 'Onboarding fields updated successfully!' }
+  revalidatePath('/agency/students')
+
+  const successMsg = totalStudentsMigrated > 0
+    ? `Academic lists updated! Automatically migrated ${totalStudentsMigrated} student profile(s) to match the new names.`
+    : 'Academic lists configuration updated successfully!'
+
+  return { success: successMsg }
 }
 
 

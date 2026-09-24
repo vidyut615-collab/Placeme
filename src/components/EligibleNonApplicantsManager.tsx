@@ -14,8 +14,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { recordNonApplicantResolution, bulkRecordNonApplicantResolution } from '@/app/(dashboards)/college/actions'
+import { TableColumnFilter, TableColumnSort } from '@/components/TableColumnFilter'
 import { toast } from 'sonner'
-import { Search, ShieldAlert, CheckCircle, AlertTriangle, Loader2, UserX, Clock, Filter } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { Search, ShieldAlert, CheckCircle, AlertTriangle, Loader2, UserX, Clock, Filter, Download, RotateCcw } from 'lucide-react'
 import type { EligibleNonApplicant } from '@/lib/non-applicants-helper'
 
 interface EligibleNonApplicantsManagerProps {
@@ -37,18 +39,87 @@ export function EligibleNonApplicantsManager({
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [isBulkProcessing, setIsBulkProcessing] = useState(false)
 
-  // Filter non-applicants based on search
+  // Column Filters & Sorting State
+  const [selectedDegrees, setSelectedDegrees] = useState<string[]>([])
+  const [selectedDepts, setSelectedDepts] = useState<string[]>([])
+  const [sortField, setSortField] = useState<'passYear' | 'cgpa' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  const availableDegrees = useMemo(() => {
+    const set = new Set<string>()
+    nonApplicants.forEach((s) => {
+      if (s.degreeType && s.degreeType !== '—') set.add(s.degreeType)
+    })
+    return Array.from(set).sort()
+  }, [nonApplicants])
+
+  const availableDepts = useMemo(() => {
+    const set = new Set<string>()
+    nonApplicants.forEach((s) => {
+      if (s.department && s.department !== '—') set.add(s.department)
+    })
+    return Array.from(set).sort()
+  }, [nonApplicants])
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc')
+      } else {
+        setSortField(null)
+        setSortDirection('asc')
+      }
+    } else {
+      setSortField(field as any)
+      setSortDirection('asc')
+    }
+  }
+
+  // Filter & Sort non-applicants based on search query, column filters, and sort field
   const filteredList = useMemo(() => {
-    if (!search.trim()) return nonApplicants
-    const q = search.toLowerCase()
-    return nonApplicants.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.email.toLowerCase().includes(q) ||
-        s.rollNumber.toLowerCase().includes(q) ||
-        s.department.toLowerCase().includes(q)
-    )
-  }, [nonApplicants, search])
+    let result = nonApplicants
+
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.email.toLowerCase().includes(q) ||
+          s.rollNumber.toLowerCase().includes(q) ||
+          s.department.toLowerCase().includes(q) ||
+          s.degreeType.toLowerCase().includes(q) ||
+          s.gradYear.toLowerCase().includes(q)
+      )
+    }
+
+    if (selectedDegrees.length > 0) {
+      result = result.filter((s) => selectedDegrees.includes(s.degreeType))
+    }
+
+    if (selectedDepts.length > 0) {
+      result = result.filter((s) => selectedDepts.includes(s.department))
+    }
+
+    if (sortField) {
+      const mult = sortDirection === 'asc' ? 1 : -1
+      result = [...result].sort((a, b) => {
+        if (sortField === 'cgpa') {
+          const cA = parseFloat(a.gpa?.toString() || '0') || 0
+          const cB = parseFloat(b.gpa?.toString() || '0') || 0
+          return mult * (cA - cB)
+        }
+        if (sortField === 'passYear') {
+          const yA = parseInt(a.gradYear || '0', 10) || 0
+          const yB = parseInt(b.gradYear || '0', 10) || 0
+          if (yA && yB) return mult * (yA - yB)
+          return mult * (a.gradYear || '').localeCompare(b.gradYear || '')
+        }
+        return 0
+      })
+    }
+
+    return result
+  }, [nonApplicants, search, selectedDegrees, selectedDepts, sortField, sortDirection])
 
   // Select all toggle
   const allFilteredSelected =
@@ -108,6 +179,36 @@ export function EligibleNonApplicantsManager({
     }
   }
 
+  // Excel Export
+  const handleExportExcel = () => {
+    if (filteredList.length === 0) {
+      toast.error('No eligible non-applicants to export.')
+      return
+    }
+
+    const rows = filteredList.map((cand, index) => ({
+      '#': index + 1,
+      'Candidate': cand.name,
+      'Email': cand.email,
+      'Degree': cand.degreeType,
+      'Dept': cand.department,
+      'Pass Year': cand.gradYear,
+      'CGPA': cand.gpa,
+      'Previous Strikes': cand.nonParticipationStrikes,
+      'Roll / USN': cand.rollNumber,
+      'Active Backlogs': cand.activeBacklogs,
+      'Status': 'Eligible Non-Applicant'
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Non_Applicants')
+
+    const cleanTitle = (jobTitle || 'Job').replace(/[^a-zA-Z0-9_-]/g, '_')
+    XLSX.writeFile(workbook, `${cleanTitle}_Eligible_Non_Applicants.xlsx`)
+    toast.success(`Exported ${filteredList.length} candidate(s) to Excel!`)
+  }
+
   return (
     <div className="space-y-4">
       {/* Notice Banner */}
@@ -139,19 +240,45 @@ export function EligibleNonApplicantsManager({
           />
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
+        <div className="flex items-center gap-3 text-xs text-zinc-500">
           <span>
             Showing <strong>{filteredList.length}</strong> of <strong>{nonApplicants.length}</strong> eligible non-applicants
           </span>
+          {(selectedDegrees.length > 0 || selectedDepts.length > 0 || sortField !== null) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedDegrees([])
+                setSelectedDepts([])
+                setSortField(null)
+                setSortDirection('asc')
+              }}
+              className="gap-1 text-xs h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              title="Reset all active column filters and sorting"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset Filters
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="gap-1.5 text-xs h-8 border-zinc-300 dark:border-zinc-700"
+          >
+            <Download className="h-3.5 w-3.5 text-emerald-600" />
+            Export (.xlsx)
+          </Button>
         </div>
       </div>
 
       {/* Non-Applicants Table */}
-      <div className="rounded-lg border bg-white dark:bg-zinc-950 shadow-sm overflow-x-auto">
-        <Table className="min-w-[750px]">
-          <TableHeader>
+      <div className="rounded-xl border bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader className="bg-zinc-50 dark:bg-zinc-800/50">
             <TableRow>
-              <TableHead className="w-10">
+              <TableHead className="w-10 pl-4">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -160,18 +287,59 @@ export function EligibleNonApplicantsManager({
                   className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
               </TableHead>
-              <TableHead>Candidate Details</TableHead>
-              <TableHead>Branch &amp; Batch</TableHead>
-              <TableHead>Academic Stats</TableHead>
-              <TableHead>Previous Strikes</TableHead>
-              <TableHead className="text-right">Audit Action</TableHead>
+              <TableHead className="text-xs font-semibold">Candidate</TableHead>
+              <TableHead className="py-2 px-1">
+                <TableColumnFilter
+                  title="Degree"
+                  options={availableDegrees}
+                  selectedValues={selectedDegrees}
+                  onChange={setSelectedDegrees}
+                />
+              </TableHead>
+              <TableHead className="py-2 px-1">
+                <TableColumnFilter
+                  title="Dept"
+                  options={availableDepts}
+                  selectedValues={selectedDepts}
+                  onChange={setSelectedDepts}
+                />
+              </TableHead>
+              <TableHead className="py-2 px-1">
+                <TableColumnSort
+                  title="Pass Year"
+                  field="passYear"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+              </TableHead>
+              <TableHead className="py-2 px-1">
+                <TableColumnSort
+                  title="CGPA"
+                  field="cgpa"
+                  currentField={sortField}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+              </TableHead>
+              <TableHead className="text-xs font-semibold">Previous Strikes</TableHead>
+              <TableHead className="text-xs font-semibold text-right pr-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-28 text-center text-zinc-500 text-xs">
-                  {search ? 'No eligible non-applicants match your search filter.' : 'All eligible students have applied or been resolved!'}
+                <TableCell colSpan={8} className="h-40 text-center">
+                  <div className="flex flex-col items-center justify-center text-zinc-400">
+                    <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                      {search ? 'No eligible non-applicants match your search filter.' : 'All eligible students have applied or been resolved!'}
+                    </p>
+                    {search && (
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Try clearing your search query &ldquo;{search}&rdquo;
+                      </p>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -180,8 +348,8 @@ export function EligibleNonApplicantsManager({
                 const isItemProcessing = processingId === cand.studentId || isBulkProcessing
 
                 return (
-                  <TableRow key={cand.studentId} className={isSelected ? 'bg-zinc-50 dark:bg-zinc-900/50' : ''}>
-                    <TableCell>
+                  <TableRow key={cand.studentId} className={`transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}>
+                    <TableCell className="pl-4">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -191,44 +359,50 @@ export function EligibleNonApplicantsManager({
                       />
                     </TableCell>
 
+                    {/* 1. Candidate Name & Email */}
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">{cand.name}</span>
-                        <span className="text-[11px] text-zinc-500">{cand.email}</span>
-                        <span className="text-[10px] text-zinc-400">Roll: {cand.rollNumber}</span>
+                      <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                        {cand.name}
                       </div>
+                      <div className="text-[11px] text-zinc-500">{cand.email}</div>
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-col text-xs">
-                        <span className="font-medium text-zinc-800 dark:text-zinc-200">{cand.department}</span>
-                        <span className="text-[11px] text-zinc-500">{cand.degreeType} &bull; Class of {cand.gradYear}</span>
-                      </div>
+                    {/* 2. Degree */}
+                    <TableCell className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                      {cand.degreeType || '—'}
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-col text-xs">
-                        <span>CGPA: <strong>{cand.gpa}</strong></span>
-                        <span className={`text-[11px] ${cand.activeBacklogs > 0 ? 'text-amber-600 font-medium' : 'text-zinc-400'}`}>
-                          Backlogs: {cand.activeBacklogs}
-                        </span>
-                      </div>
+                    {/* 3. Dept */}
+                    <TableCell className="text-xs text-zinc-700 dark:text-zinc-300">
+                      {cand.department || '—'}
                     </TableCell>
 
+                    {/* 4. Pass Year */}
+                    <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                      {cand.gradYear || '—'}
+                    </TableCell>
+
+                    {/* 5. CGPA */}
+                    <TableCell className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      {cand.gpa || '—'}
+                    </TableCell>
+
+                    {/* 6. Previous Strikes */}
                     <TableCell>
                       <Badge
                         variant="outline"
                         className={`text-[10px] ${
                           cand.nonParticipationStrikes > 0
                             ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300'
-                            : 'bg-zinc-50 text-zinc-600'
+                            : 'bg-zinc-50 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                         }`}
                       >
                         {cand.nonParticipationStrikes} Strike{cand.nonParticipationStrikes !== 1 ? 's' : ''}
                       </Badge>
                     </TableCell>
 
-                    <TableCell className="text-right">
+                    {/* 7. Actions */}
+                    <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="ghost"

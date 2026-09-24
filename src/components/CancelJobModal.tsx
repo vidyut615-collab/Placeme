@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import { cancelOrDeleteJob } from '@/app/(dashboards)/college/actions'
 import { toast } from 'sonner'
 import { Trash2, AlertTriangle, ShieldCheck, Loader2, Ban } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { ScreenLoader } from '@/components/ScreenLoader'
 
 interface CancelJobModalProps {
   jobId: string
@@ -49,37 +50,62 @@ export function CancelJobModal({
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const [selectedReason, setSelectedReason] = useState(CANCEL_REASONS[0])
   const [details, setDetails] = useState('')
 
   const hasApplicants = applicantCount > 0
+  const isBusy = isSubmitting || isPending
 
-  const handleAction = async () => {
+  const handleAction = () => {
     setIsSubmitting(true)
-    const reasonString = hasApplicants
-      ? `${selectedReason}${details.trim() ? ` — ${details.trim()}` : ''}`
-      : undefined
+    startTransition(async () => {
+      try {
+        const reasonString = hasApplicants
+          ? `${selectedReason}${details.trim() ? ` — ${details.trim()}` : ''}`
+          : undefined
 
-    const res = await cancelOrDeleteJob({
-      jobId,
-      reason: reasonString,
-    })
-    setIsSubmitting(false)
+        const res = await cancelOrDeleteJob({
+          jobId,
+          reason: reasonString,
+        })
 
-    if (res.error) {
-      toast.error(res.error)
-    } else {
-      toast.success(res.success || (hasApplicants ? 'Drive cancelled.' : 'Job deleted.'))
-      setOpen(false)
-      if (res.action === 'deleted') {
-        router.push('/college/jobs')
+        if (res.error) {
+          toast.error(res.error)
+          setIsSubmitting(false)
+        } else {
+          toast.success(res.success || (hasApplicants ? 'Drive cancelled.' : 'Job deleted.'))
+          setOpen(false)
+          if (res.action === 'deleted') {
+            router.push('/college/jobs')
+            // Keep isSubmitting true so ScreenLoader stays active until page transitions
+          } else {
+            router.refresh()
+            setIsSubmitting(false)
+          }
+        }
+      } catch {
+        toast.error('An unexpected error occurred.')
+        setIsSubmitting(false)
       }
-    }
+    })
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
+    <>
+      <ScreenLoader
+        show={isBusy}
+        title={hasApplicants ? 'Cancelling Recruitment Drive...' : 'Deleting Job Posting...'}
+        message={
+          hasApplicants
+            ? 'Scrapping drive, resetting applicant quotas, and updating records...'
+            : 'Permanently removing job posting from system...'
+        }
+        variant="red"
+      />
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger render={
         hasApplicants ? (
           <Button variant="outline" size="sm" className="gap-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/50">
             <Ban className="h-3.5 w-3.5" />
@@ -211,5 +237,6 @@ export function CancelJobModal({
         )}
       </DialogContent>
     </Dialog>
+    </>
   )
 }

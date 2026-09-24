@@ -23,6 +23,7 @@ import {
 import { PasteShortlistModal } from '@/components/PasteShortlistModal'
 import { CloseReasonModal } from '@/components/CloseReasonModal'
 import { advanceCandidatesBatch, reinstateCandidate } from '@/app/(dashboards)/college/actions'
+import { TableColumnFilter, TableColumnSort } from '@/components/TableColumnFilter'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { formatDate } from '@/lib/utils'
@@ -85,6 +86,7 @@ export function JobPipelineManager({
   const [closeTargetIds, setCloseTargetIds] = useState<string[]>([])
 
   const isClosedTab = currentStageId === 'closed' || currentStageId === 'dropped'
+  const isHiredTab = currentStageId === 'hired'
 
   // Map subsequent stages for advancing
   const currentStageIndex = stageOptions.findIndex(s => s.id === currentStageId)
@@ -95,25 +97,141 @@ export function JobPipelineManager({
   const defaultNextStage = subsequentStages[0]?.id || ''
   const [bulkTargetStage, setBulkTargetStage] = useState<string>(defaultNextStage)
 
-  // Filter candidates by search query
-  const filteredCandidates = useMemo(() => {
-    if (!searchQuery.trim()) return applications
+  // Column Filters & Sorting State
+  const [selectedDegrees, setSelectedDegrees] = useState<string[]>([])
+  const [selectedDepts, setSelectedDepts] = useState<string[]>([])
+  const [sortField, setSortField] = useState<'passYear' | 'cgpa' | 'appliedOn' | 'closedOn' | 'hiredOn' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-    const q = searchQuery.toLowerCase().trim()
-    return applications.filter(app => {
-      const student = app.students
-      const profile = student?.profile_data || {}
-      const personal = profile.personal || {}
-      const academic = profile.academic || {}
-
-      const name = (personal.full_name || profile.name || '').toLowerCase()
-      const roll = (personal.roll_number || profile.roll_number || academic.roll_no || '').toLowerCase()
-      const email = (student?.user_email || personal.email || profile.email || '').toLowerCase()
-      const dept = (academic.department || profile.department || '').toLowerCase()
-
-      return name.includes(q) || roll.includes(q) || email.includes(q) || dept.includes(q)
+  // Available unique degrees and departments for filters
+  const availableDegrees = useMemo(() => {
+    const set = new Set<string>()
+    applications.forEach(app => {
+      const prof = app.students?.profile_data || {}
+      const acad = prof.academic || {}
+      const deg = acad.degree || acad.type || prof.type || prof.degree || ''
+      if (deg && deg !== '—' && deg !== 'N/A') set.add(deg)
     })
-  }, [applications, searchQuery])
+    return Array.from(set).sort()
+  }, [applications])
+
+  const availableDepts = useMemo(() => {
+    const set = new Set<string>()
+    applications.forEach(app => {
+      const prof = app.students?.profile_data || {}
+      const acad = prof.academic || {}
+      const d = acad.department || prof.department || ''
+      if (d && d !== '—' && d !== 'N/A') set.add(d)
+    })
+    return Array.from(set).sort()
+  }, [applications])
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc')
+      } else {
+        setSortField(null)
+        setSortDirection('asc')
+      }
+    } else {
+      setSortField(field as any)
+      setSortDirection('asc')
+    }
+  }
+
+  // Filter & Sort candidates by search query, column filters, and sort field
+  const filteredCandidates = useMemo(() => {
+    let result = applications
+
+    // 1. Search query filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      result = result.filter(app => {
+        const student = app.students
+        const profile = student?.profile_data || {}
+        const personal = profile.personal || {}
+        const academic = profile.academic || {}
+
+        const name = (personal.full_name || profile.full_name || profile.name || '').toLowerCase()
+        const roll = (personal.roll_number || profile.roll_number || academic.roll_no || '').toLowerCase()
+        const email = (student?.user_email || personal.email || profile.email || '').toLowerCase()
+        const dept = (academic.department || profile.department || '').toLowerCase()
+        const degree = (academic.degree || academic.type || profile.type || profile.degree || '').toLowerCase()
+        const passYear = (academic.year || academic.batch || profile.year || profile.batch || profile.pass_year || profile.passing_year || '').toString().toLowerCase()
+
+        return name.includes(q) || roll.includes(q) || email.includes(q) || dept.includes(q) || degree.includes(q) || passYear.includes(q)
+      })
+    }
+
+    // 2. Degree filter (multi-select)
+    if (selectedDegrees.length > 0) {
+      result = result.filter(app => {
+        const prof = app.students?.profile_data || {}
+        const acad = prof.academic || {}
+        const deg = acad.degree || acad.type || prof.type || prof.degree || '—'
+        return selectedDegrees.includes(deg)
+      })
+    }
+
+    // 3. Dept filter (multi-select)
+    if (selectedDepts.length > 0) {
+      result = result.filter(app => {
+        const prof = app.students?.profile_data || {}
+        const acad = prof.academic || {}
+        const d = acad.department || prof.department || '—'
+        return selectedDepts.includes(d)
+      })
+    }
+
+    // 4. Sorting
+    if (sortField) {
+      const mult = sortDirection === 'asc' ? 1 : -1
+      result = [...result].sort((a, b) => {
+        const profA = a.students?.profile_data || {}
+        const acadA = profA.academic || {}
+        const profB = b.students?.profile_data || {}
+        const acadB = profB.academic || {}
+
+        if (sortField === 'cgpa') {
+          const cA = parseFloat(acadA.cgpa || profA.cgpa || profA.gpa || '0') || 0
+          const cB = parseFloat(acadB.cgpa || profB.cgpa || profB.gpa || '0') || 0
+          return mult * (cA - cB)
+        }
+
+        if (sortField === 'passYear') {
+          const yA = (acadA.year || acadA.batch || profA.year || profA.batch || profA.pass_year || profA.passing_year || '').toString()
+          const yB = (acadB.year || acadB.batch || profB.year || profB.batch || profB.pass_year || profB.passing_year || '').toString()
+          const numA = parseInt(yA, 10) || 0
+          const numB = parseInt(yB, 10) || 0
+          if (numA && numB) return mult * (numA - numB)
+          return mult * yA.localeCompare(yB)
+        }
+
+        if (sortField === 'appliedOn') {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return mult * (tA - tB)
+        }
+
+        if (sortField === 'closedOn') {
+          const tA = a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0)
+          const tB = b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0)
+          return mult * (tA - tB)
+        }
+
+        if (sortField === 'hiredOn') {
+          const tA = a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0)
+          const tB = b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0)
+          return mult * (tA - tB)
+        }
+
+        return 0
+      })
+    }
+
+    return result
+  }, [applications, searchQuery, selectedDegrees, selectedDepts, sortField, sortDirection])
 
   // Multi-select handlers
   const handleSelectAll = (checked: boolean) => {
@@ -224,46 +342,63 @@ export function JobPipelineManager({
       const personal = profile.personal || {}
       const academic = profile.academic || {}
 
-      const name = personal.full_name || profile.name || 'N/A'
+      const name = personal.full_name || profile.full_name || profile.name || 'N/A'
       const rollNo = personal.roll_number || profile.roll_number || academic.roll_no || 'N/A'
       const email = student?.user_email || personal.email || profile.email || 'N/A'
       const phone = personal.phone || profile.phone || 'N/A'
       const dept = academic.department || profile.department || 'N/A'
-      const degree = academic.degree || academic.type || profile.degree || 'N/A'
-      const batch = academic.batch || academic.year || profile.batch || 'N/A'
-      const cgpa = academic.cgpa || profile.cgpa || 'N/A'
-      const appliedAt = app.created_at ? new Date(app.created_at).toLocaleDateString() : 'N/A'
+      const degree = academic.degree || academic.type || profile.type || profile.degree || 'N/A'
+      const passYear = academic.year || academic.batch || profile.year || profile.batch || profile.pass_year || profile.passing_year || 'N/A'
+      const cgpa = academic.cgpa || profile.cgpa || profile.gpa || 'N/A'
+      const appliedOn = app.created_at ? formatDate(app.created_at) : 'N/A'
 
       if (isClosedTab) {
         return {
           '#': index + 1,
-          'Name': name,
-          'Roll / USN': rollNo,
+          'Candidate': name,
           'Email': email,
-          'Phone': phone,
-          'Department': dept,
           'Degree': degree,
-          'Batch': batch,
+          'Dept': dept,
+          'Pass Year': passYear,
           'CGPA': cgpa,
-          'Date Applied': appliedAt,
+          'Applied on': appliedOn,
+          'Closed on': app.updated_at ? formatDate(app.updated_at) : (app.created_at ? formatDate(app.created_at) : 'N/A'),
           'Exit Reason': app.dropped_reason || (app.is_withdrawn ? 'Self-Withdrawn by Student' : 'Closed by College'),
-          'Withdrawn by Student': app.is_withdrawn ? 'Yes' : 'No',
-          'Exit Date': app.updated_at ? new Date(app.updated_at).toLocaleDateString() : 'N/A'
+          'Exit Type': app.is_withdrawn ? 'Student Withdrawn' : 'College Dropped',
+          'Roll / USN': rollNo,
+          'Phone': phone,
+        }
+      }
+
+      if (isHiredTab) {
+        return {
+          '#': index + 1,
+          'Candidate': name,
+          'Email': email,
+          'Degree': degree,
+          'Dept': dept,
+          'Pass Year': passYear,
+          'CGPA': cgpa,
+          'Applied on': appliedOn,
+          'Hired on': app.updated_at ? formatDate(app.updated_at) : (app.created_at ? formatDate(app.created_at) : 'N/A'),
+          'Status': 'Hired',
+          'Roll / USN': rollNo,
+          'Phone': phone,
         }
       }
 
       return {
         '#': index + 1,
-        'Name': name,
-        'Roll / USN': rollNo,
+        'Candidate': name,
         'Email': email,
-        'Phone': phone,
-        'Department': dept,
         'Degree': degree,
-        'Batch': batch,
+        'Dept': dept,
+        'Pass Year': passYear,
         'CGPA': cgpa,
-        'Date Applied': appliedAt,
-        'Current Stage': currentStageLabel
+        'Applied on': appliedOn,
+        'Current Stage': currentStageLabel,
+        'Roll / USN': rollNo,
+        'Phone': phone,
       }
     })
 
@@ -302,6 +437,24 @@ export function JobPipelineManager({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          {(selectedDegrees.length > 0 || selectedDepts.length > 0 || sortField !== null) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedDegrees([])
+                setSelectedDepts([])
+                setSortField(null)
+                setSortDirection('asc')
+              }}
+              className="gap-1.5 text-xs h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              title="Reset all active column filters and sorting"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset Filters
+            </Button>
+          )}
+
           {!isClosedTab && (
             <Button
               variant="outline"
@@ -358,19 +511,166 @@ export function JobPipelineManager({
                   />
                 </TableHead>
               )}
-              <TableHead className="text-xs font-semibold">Candidate</TableHead>
-              <TableHead className="text-xs font-semibold">Roll / USN</TableHead>
-              <TableHead className="text-xs font-semibold">Program & Branch</TableHead>
-              <TableHead className="text-xs font-semibold">CGPA</TableHead>
               {isClosedTab ? (
                 <>
-                  <TableHead className="text-xs font-semibold">Exit Reason</TableHead>
-                  <TableHead className="text-xs font-semibold">Exit Date</TableHead>
-                  <TableHead className="text-xs font-semibold text-right pr-4">Action</TableHead>
+                  <TableHead className="text-xs font-semibold">Candidate</TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnFilter
+                      title="Degree"
+                      options={availableDegrees}
+                      selectedValues={selectedDegrees}
+                      onChange={setSelectedDegrees}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnFilter
+                      title="Dept"
+                      options={availableDepts}
+                      selectedValues={selectedDepts}
+                      onChange={setSelectedDepts}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Pass Year"
+                      field="passYear"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="CGPA"
+                      field="cgpa"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Applied on"
+                      field="appliedOn"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Closed on"
+                      field="closedOn"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-right pr-4">Actions</TableHead>
+                </>
+              ) : isHiredTab ? (
+                <>
+                  <TableHead className="text-xs font-semibold">Candidate</TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnFilter
+                      title="Degree"
+                      options={availableDegrees}
+                      selectedValues={selectedDegrees}
+                      onChange={setSelectedDegrees}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnFilter
+                      title="Dept"
+                      options={availableDepts}
+                      selectedValues={selectedDepts}
+                      onChange={setSelectedDepts}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Pass Year"
+                      field="passYear"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="CGPA"
+                      field="cgpa"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Applied on"
+                      field="appliedOn"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Hired on"
+                      field="hiredOn"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-right pr-4">Actions</TableHead>
                 </>
               ) : (
                 <>
-                  <TableHead className="text-xs font-semibold">Applied On</TableHead>
+                  <TableHead className="text-xs font-semibold">Candidate</TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnFilter
+                      title="Degree"
+                      options={availableDegrees}
+                      selectedValues={selectedDegrees}
+                      onChange={setSelectedDegrees}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnFilter
+                      title="Dept"
+                      options={availableDepts}
+                      selectedValues={selectedDepts}
+                      onChange={setSelectedDepts}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Pass Year"
+                      field="passYear"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="CGPA"
+                      field="cgpa"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
+                  <TableHead className="py-2 px-1">
+                    <TableColumnSort
+                      title="Applied on"
+                      field="appliedOn"
+                      currentField={sortField}
+                      currentDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </TableHead>
                   <TableHead className="text-xs font-semibold text-right pr-4">Actions</TableHead>
                 </>
               )}
@@ -379,7 +679,7 @@ export function JobPipelineManager({
           <TableBody>
             {filteredCandidates.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isClosedTab ? 7 : 7} className="h-40 text-center">
+                <TableCell colSpan={isClosedTab ? 8 : (isHiredTab ? 9 : 8)} className="h-40 text-center">
                   <div className="flex flex-col items-center justify-center text-zinc-400">
                     <Users className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
@@ -400,12 +700,13 @@ export function JobPipelineManager({
                 const personal = profile.personal || {}
                 const academic = profile.academic || {}
 
-                const name = personal.full_name || profile.name || 'Candidate'
+                const name = personal.full_name || profile.full_name || profile.name || 'Candidate'
                 const roll = personal.roll_number || profile.roll_number || academic.roll_no || '—'
                 const email = student?.user_email || personal.email || profile.email || '—'
                 const dept = academic.department || profile.department || '—'
-                const degree = academic.degree || academic.type || profile.degree || ''
-                const cgpa = academic.cgpa || profile.cgpa || '—'
+                const degree = academic.degree || academic.type || profile.type || profile.degree || '—'
+                const passYear = academic.year || academic.batch || profile.year || profile.batch || profile.pass_year || profile.passing_year || '—'
+                const cgpa = academic.cgpa || profile.cgpa || profile.gpa || '—'
                 const isSelected = selectedIds.includes(app.id)
 
                 return (
@@ -424,58 +725,63 @@ export function JobPipelineManager({
                       </TableCell>
                     )}
 
-                    {/* Candidate Name & Email */}
-                    <TableCell>
-                      <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
-                        {name}
-                      </div>
-                      <div className="text-[11px] text-zinc-500">{email}</div>
-                    </TableCell>
-
-                    {/* Roll No */}
-                    <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
-                      {roll}
-                    </TableCell>
-
-                    {/* Program & Branch */}
-                    <TableCell>
-                      <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
-                        {dept}
-                      </div>
-                      {degree && <div className="text-[11px] text-zinc-400">{degree}</div>}
-                    </TableCell>
-
-                    {/* CGPA */}
-                    <TableCell className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                      {cgpa}
-                    </TableCell>
-
                     {isClosedTab ? (
                       <>
-                        {/* Exit Reason */}
+                        {/* 1. Candidate Name & Email */}
                         <TableCell>
-                          <div className="space-y-1">
-                            <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 block">
-                              {app.dropped_reason || (app.is_withdrawn ? 'Self-Withdrawn by Student' : 'Closed by College')}
-                            </span>
+                          <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                            {name}
+                          </div>
+                          <div className="text-[11px] text-zinc-500">{email}</div>
+                        </TableCell>
+
+                        {/* 2. Degree */}
+                        <TableCell className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {degree}
+                        </TableCell>
+
+                        {/* 3. Dept */}
+                        <TableCell className="text-xs text-zinc-700 dark:text-zinc-300">
+                          {dept}
+                        </TableCell>
+
+                        {/* 4. Pass Year */}
+                        <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                          {passYear}
+                        </TableCell>
+
+                        {/* 5. CGPA */}
+                        <TableCell className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          {cgpa}
+                        </TableCell>
+
+                        {/* 6. Applied on */}
+                        <TableCell className="text-xs text-zinc-500" suppressHydrationWarning>
+                          {formatDate(app.created_at)}
+                        </TableCell>
+
+                        {/* 7. Closed on & Reason Legend */}
+                        <TableCell>
+                          <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100" suppressHydrationWarning>
+                            {formatDate(app.updated_at || app.created_at)}
+                          </div>
+                          <div className="text-[11px] text-zinc-500 line-clamp-1 mt-0.5" title={app.dropped_reason || (app.is_withdrawn ? 'Self-Withdrawn by Student' : 'Closed by College')}>
+                            {app.dropped_reason || (app.is_withdrawn ? 'Self-Withdrawn by Student' : 'Closed by College')}
+                          </div>
+                          <div className="mt-1">
                             {app.is_withdrawn ? (
-                              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400">
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400">
                                 Student Withdrawn
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[10px] bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                                 College Dropped
                               </Badge>
                             )}
                           </div>
                         </TableCell>
 
-                        {/* Exit Date */}
-                        <TableCell className="text-xs text-zinc-500" suppressHydrationWarning>
-                          {formatDate(app.updated_at)}
-                        </TableCell>
-
-                        {/* Reinstate Action */}
+                        {/* 8. Reinstate Action */}
                         <TableCell className="text-right pr-4">
                           <Button
                             variant="outline"
@@ -493,14 +799,97 @@ export function JobPipelineManager({
                           </Button>
                         </TableCell>
                       </>
-                    ) : (
+                    ) : isHiredTab ? (
                       <>
-                        {/* Applied Date */}
+                        {/* 1. Candidate Name & Email */}
+                        <TableCell>
+                          <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                            {name}
+                          </div>
+                          <div className="text-[11px] text-zinc-500">{email}</div>
+                        </TableCell>
+
+                        {/* 2. Degree */}
+                        <TableCell className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {degree}
+                        </TableCell>
+
+                        {/* 3. Dept */}
+                        <TableCell className="text-xs text-zinc-700 dark:text-zinc-300">
+                          {dept}
+                        </TableCell>
+
+                        {/* 4. Pass Year */}
+                        <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                          {passYear}
+                        </TableCell>
+
+                        {/* 5. CGPA */}
+                        <TableCell className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          {cgpa}
+                        </TableCell>
+
+                        {/* 6. Applied on */}
                         <TableCell className="text-xs text-zinc-500" suppressHydrationWarning>
                           {formatDate(app.created_at)}
                         </TableCell>
 
-                        {/* Quick Row Actions */}
+                        {/* 7. Hired on */}
+                        <TableCell className="text-xs text-zinc-500" suppressHydrationWarning>
+                          {formatDate(app.updated_at || app.created_at)}
+                        </TableCell>
+
+                        {/* 8. Quick Row Actions */}
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenSingleClose(app.id)}
+                              className="h-7 w-7 p-0 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              title="Close candidate"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </>
+                    ) : (
+                      <>
+                        {/* 1. Candidate Name & Email */}
+                        <TableCell>
+                          <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                            {name}
+                          </div>
+                          <div className="text-[11px] text-zinc-500">{email}</div>
+                        </TableCell>
+
+                        {/* 2. Degree */}
+                        <TableCell className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {degree}
+                        </TableCell>
+
+                        {/* 3. Dept */}
+                        <TableCell className="text-xs text-zinc-700 dark:text-zinc-300">
+                          {dept}
+                        </TableCell>
+
+                        {/* 4. Pass Year */}
+                        <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                          {passYear}
+                        </TableCell>
+
+                        {/* 5. CGPA */}
+                        <TableCell className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          {cgpa}
+                        </TableCell>
+
+                        {/* 6. Applied on */}
+                        <TableCell className="text-xs text-zinc-500" suppressHydrationWarning>
+                          {formatDate(app.created_at)}
+                        </TableCell>
+
+                        {/* 7. Actions */}
                         <TableCell className="text-right pr-4">
                           <div className="flex items-center justify-end gap-1.5">
                             {defaultNextStage && (

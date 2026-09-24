@@ -779,6 +779,23 @@ export async function approveStudentOffer(offerId: string) {
     return { error: `Failed to approve offer: ${updateErr.message}` }
   }
 
+  // 1.5 Log the approval in approval_logs
+  await supabase.from('approval_logs').insert({
+    college_id: offer.college_id,
+    entity_type: 'placement_offer',
+    entity_id: offerId,
+    student_id: offer.student_id,
+    action_by: user.id,
+    status: 'approved',
+    snapshot_data: {
+      company_name: offer.company_name,
+      job_role: offer.job_role,
+      compensation_ctc: offer.compensation_ctc,
+      offer_type: offer.offer_type,
+      offer_letter_url: offer.offer_letter_url,
+    }
+  })
+
   // 2. If tied to an on-campus job, update application to 'hired'
   if (offer.job_id && offer.student_id) {
     const { data: appRow } = await supabase
@@ -841,6 +858,17 @@ export async function rejectStudentOffer({
     return { error: 'Rejection reason is required.' }
   }
 
+  // Fetch offer details to log them
+  const { data: offer, error: fetchErr } = await supabase
+    .from('student_offers')
+    .select('*')
+    .eq('id', offerId)
+    .single()
+
+  if (fetchErr || !offer) {
+    return { error: 'Offer declaration not found.' }
+  }
+
   const { error } = await supabase
     .from('student_offers')
     .update({
@@ -855,6 +883,24 @@ export async function rejectStudentOffer({
   if (error) {
     return { error: `Failed to reject offer: ${error.message}` }
   }
+
+  // Log the rejection in approval_logs
+  await supabase.from('approval_logs').insert({
+    college_id: offer.college_id,
+    entity_type: 'placement_offer',
+    entity_id: offerId,
+    student_id: offer.student_id,
+    action_by: user.id,
+    status: 'rejected',
+    reason: reason.trim(),
+    snapshot_data: {
+      company_name: offer.company_name,
+      job_role: offer.job_role,
+      compensation_ctc: offer.compensation_ctc,
+      offer_type: offer.offer_type,
+      offer_letter_url: offer.offer_letter_url,
+    }
+  })
 
   revalidatePath('/college/approvals')
   revalidatePath('/student/dashboard')
@@ -1378,9 +1424,8 @@ export async function checkJobCompletionReadiness(jobId: string) {
       created_at,
       students (
         id,
-        roll_number,
+        profile_data,
         users (
-          full_name,
           email
         )
       )
@@ -1393,7 +1438,7 @@ export async function checkJobCompletionReadiness(jobId: string) {
   const inProgressStatuses = ['applied', 'screened', 'ppt', 'stage1', 'stage2', 'stage3', 'shortlisted']
 
   const allApps = apps || []
-  const hiredCount = allApps.filter(a => a.status === 'hired').length
+  const hiredCount = allApps.filter(a => a.status === 'hired' || a.status === 'offer_accepted').length
   const closedCount = allApps.filter(a => closedStatuses.includes(a.status)).length
   const inProgressApps = allApps.filter(a => inProgressStatuses.includes(a.status))
 
@@ -1406,12 +1451,24 @@ export async function checkJobCompletionReadiness(jobId: string) {
     inProgressCount: inProgressApps.length,
     inProgressApplicants: inProgressApps.map(a => {
       const student = a.students as any
+      const rawUsers = student?.users
+      const userEmail = Array.isArray(rawUsers) ? rawUsers[0]?.email : rawUsers?.email
+      
+      const profileName = student?.profile_data?.personal?.full_name || 
+                          student?.profile_data?.full_name || 
+                          'Unnamed Candidate'
+                          
+      const email = userEmail || 
+                    student?.profile_data?.personal?.email || 
+                    student?.profile_data?.email || 
+                    ''
+                    
       return {
         id: a.id,
         status: a.status,
-        name: student?.users?.full_name || 'Unnamed Candidate',
-        email: student?.users?.email || '',
-        rollNumber: student?.roll_number || 'N/A',
+        name: profileName,
+        email: email,
+        rollNumber: student?.profile_data?.roll_number || student?.profile_data?.personal?.roll_number || 'N/A',
       }
     }),
   }
@@ -1420,9 +1477,11 @@ export async function checkJobCompletionReadiness(jobId: string) {
 export async function completeJob({
   jobId,
   bulkDropRemaining = false,
+  massDropReason = 'Not Selected (Drive Concluded)',
 }: {
   jobId: string
   bulkDropRemaining?: boolean
+  massDropReason?: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -1471,7 +1530,7 @@ export async function completeJob({
 
   const now = new Date().toISOString()
 
-  // If bulk dropping remaining candidates, update them to 'dropped' (penalty-free)
+  // If bulk dropping remaining candidates, update them to 'dropped'
   if (inProgressApps.length > 0 && bulkDropRemaining) {
     const inProgressIds = inProgressApps.map(a => a.id)
 
@@ -1479,6 +1538,7 @@ export async function completeJob({
       .from('applications')
       .update({
         status: 'dropped',
+        dropped_reason: massDropReason,
         updated_at: now,
       })
       .in('id', inProgressIds)
@@ -1493,7 +1553,7 @@ export async function completeJob({
       from_status: a.status,
       to_status: 'dropped',
       changed_by: user.id,
-      reason: 'Drive concluded — Candidate not selected in final results',
+      reason: massDropReason,
       created_at: now,
     }))
 

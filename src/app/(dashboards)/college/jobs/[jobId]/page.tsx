@@ -73,9 +73,10 @@ export default async function CollegeJobDetailsPage({
     )
   }
 
-  // Fetch eligible non-applicants for this job
+  // Fetch eligible non-applicants for this job (only for college-posted jobs)
   const collegeId = user.app_metadata.college_id
-  const nonApplicants = collegeId ? await fetchEligibleNonApplicants(supabase, jobId, collegeId) : []
+  const isCollegeJob = Boolean(job.college_id && collegeId && job.college_id === collegeId)
+  const nonApplicants = collegeId && isCollegeJob ? await fetchEligibleNonApplicants(supabase, jobId, collegeId) : []
 
   // Fetch all applications for this job including student profile and auth email
   const { data: applications } = await supabase
@@ -322,34 +323,41 @@ export default async function CollegeJobDetailsPage({
             </div>
           </div>
 
-          {/* Action buttons: Pause/Resume, Edit, Complete, Cancel */}
+          {/* Action buttons: Pause/Resume, Edit, Complete, Cancel (ONLY for college-posted jobs) */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {job.status !== 'cancelled' && job.status !== 'completed' && (
-              <>
-                <PauseResumeJobButton
-                  jobId={job.id}
-                  isPaused={job.status === 'paused'}
-                />
-                <EditJobModal
-                  job={job}
-                  applicantCount={formattedApplications.length}
-                  jobTypes={jobTypes || []}
-                  placementLevels={placementLevels || []}
-                  placementCategories={placementCategories || []}
-                  placementCycles={placementCycles || []}
-                  academicFields={collegeData?.onboarding_fields || { departments: [], types: [], years: [] }}
-                />
-                <CompleteJobModal
-                  jobId={job.id}
-                  jobTitle={job.title}
-                />
-                <CancelJobModal
-                  jobId={job.id}
-                  jobTitle={job.title}
-                  companyName={job.company_name}
-                  applicantCount={formattedApplications.length}
-                />
-              </>
+            {isCollegeJob ? (
+              job.status !== 'cancelled' && job.status !== 'completed' && (
+                <>
+                  <PauseResumeJobButton
+                    jobId={job.id}
+                    isPaused={job.status === 'paused'}
+                  />
+                  <EditJobModal
+                    job={job}
+                    applicantCount={formattedApplications.length}
+                    jobTypes={jobTypes || []}
+                    placementLevels={placementLevels || []}
+                    placementCategories={placementCategories || []}
+                    placementCycles={placementCycles || []}
+                    academicFields={collegeData?.onboarding_fields || { departments: [], types: [], years: [] }}
+                  />
+                  <CompleteJobModal
+                    jobId={job.id}
+                    jobTitle={job.title}
+                  />
+                  <CancelJobModal
+                    jobId={job.id}
+                    jobTitle={job.title}
+                    companyName={job.company_name}
+                    applicantCount={formattedApplications.length}
+                  />
+                </>
+              )
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-semibold shadow-xs">
+                <Globe2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                <span>Global Opportunity (Managed by Platform Agency)</span>
+              </div>
             )}
           </div>
         </div>
@@ -390,23 +398,24 @@ export default async function CollegeJobDetailsPage({
       </div>
 
       {/* Sticky Tabs with Live Count Badges */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 px-8 pt-2">
-        <nav className="flex w-full overflow-x-auto no-scrollbar" aria-label="Pipeline Stages">
+      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 px-6 lg:px-8 pt-2">
+        <nav className="flex w-full items-center overflow-x-auto no-scrollbar" aria-label="Pipeline Stages">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
             return (
               <Link
                 key={tab.id}
                 href={`/college/jobs/${jobId}?tab=${tab.id}`}
-                className={`flex-1 min-w-[100px] text-center py-3.5 px-2 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                title={tab.label}
+                className={`flex-1 min-w-[75px] sm:min-w-[85px] max-w-full py-3 px-1.5 text-xs sm:text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 overflow-hidden ${
                   isActive 
                     ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400 font-semibold' 
                     : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:hover:text-zinc-300'
                 }`}
               >
-                <span>{tab.label}</span>
+                <span className="truncate min-w-0">{tab.label}</span>
                 {tab.count !== null && (
-                  <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                     isActive
                       ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
                       : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
@@ -528,8 +537,8 @@ export default async function CollegeJobDetailsPage({
               </p>
             </div>
 
-            {/* Secondary Sub-tab Bar inside Application stage */}
-            {activeTab === 'application' && (
+            {/* Secondary Sub-tab Bar inside Application stage (only for college local jobs) */}
+            {activeTab === 'application' && isCollegeJob && (
               <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-2">
                 <Link
                   href={`/college/jobs/${jobId}?tab=application&subview=applicants`}

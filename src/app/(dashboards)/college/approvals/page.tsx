@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ApprovalsList } from './ApprovalsList'
 import { OfferApprovalsList } from '@/components/OfferApprovalsList'
-import { Award, UserCheck } from 'lucide-react'
+import { ApprovalLogTable } from '@/components/ApprovalLogTable'
+import { Award, UserCheck, History } from 'lucide-react'
 
 export default async function ApprovalsPage({
   searchParams
@@ -25,7 +26,8 @@ export default async function ApprovalsPage({
   const [
     { data: pendingOffers },
     { data: pendingProfileRequests },
-    { data: policyRow }
+    { data: policyRow },
+    { data: logs }
   ] = await Promise.all([
     supabase
       .from('student_offers')
@@ -71,12 +73,32 @@ export default async function ApprovalsPage({
           users ( email )
         )
       `)
+      .eq('college_id', collegeId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false }),
 
     collegeId
       ? supabase.from('placement_policies').select('config').eq('college_id', collegeId).maybeSingle()
-      : Promise.resolve({ data: null })
+      : Promise.resolve({ data: null }),
+
+    supabase
+      .from('approval_logs')
+      .select(`
+        id,
+        entity_type,
+        entity_id,
+        student_id,
+        action_by,
+        status,
+        reason,
+        snapshot_data,
+        created_at,
+        students ( profile_data, users ( email ) ),
+        admin:users!approval_logs_action_by_fkey ( email )
+      `)
+      .eq('college_id', collegeId)
+      .order('created_at', { ascending: false })
+      .limit(100)
   ])
 
   const dreamMin = policyRow?.config?.dream?.min_ctc || 8
@@ -84,6 +106,7 @@ export default async function ApprovalsPage({
 
   const offersCount = pendingOffers?.length || 0
   const profileCount = pendingProfileRequests?.length || 0
+  const logsCount = logs?.length || 0
 
   return (
     <div className="flex flex-1 flex-col p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -130,6 +153,23 @@ export default async function ApprovalsPage({
               </span>
             )}
           </Link>
+
+          <Link
+            href="/college/approvals?tab=logs"
+            className={`py-3 px-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+              activeTab === 'logs'
+                ? 'border-purple-600 text-purple-600 dark:border-purple-500 dark:text-purple-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+            }`}
+          >
+            <History className="h-4 w-4" />
+            <span>Approval Log</span>
+            {logsCount > 0 && (
+              <span className="inline-flex items-center rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 px-2 py-0.5 text-xs font-bold">
+                {logsCount}
+              </span>
+            )}
+          </Link>
         </nav>
       </div>
 
@@ -154,7 +194,7 @@ export default async function ApprovalsPage({
               superDreamThreshold={superDreamMin}
             />
           </div>
-        ) : (
+        ) : activeTab === 'profiles' ? (
           <div className="space-y-4">
             <div>
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -166,6 +206,19 @@ export default async function ApprovalsPage({
             </div>
 
             <ApprovalsList requests={(pendingProfileRequests as any[]) || []} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Approval Logs
+              </h2>
+              <p className="text-xs text-zinc-500">
+                A complete history of all approval actions performed by college coordinators.
+              </p>
+            </div>
+
+            <ApprovalLogTable logs={logs || []} />
           </div>
         )}
       </div>

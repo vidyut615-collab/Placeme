@@ -91,7 +91,6 @@ export function PlacedStudentsTable({
       return {
         '#': idx + 1,
         'Student Name': personal.full_name || profile.name || 'N/A',
-        'Roll No / USN': personal.roll_number || profile.roll_number || academic.roll_no || 'N/A',
         'Email': student?.user_email || personal.email || profile.email || 'N/A',
         'Department': academic.department || profile.department || 'N/A',
         'Degree': academic.degree || academic.type || profile.degree || 'N/A',
@@ -143,7 +142,6 @@ export function PlacedStudentsTable({
           <TableHeader className="bg-zinc-50 dark:bg-zinc-800/50">
             <TableRow>
               <TableHead className="text-xs font-semibold">Student</TableHead>
-              <TableHead className="text-xs font-semibold">Roll / USN</TableHead>
               <TableHead className="text-xs font-semibold">Department</TableHead>
               <TableHead className="text-xs font-semibold">Company & Role</TableHead>
               <TableHead className="text-xs font-semibold">CTC (LPA)</TableHead>
@@ -155,7 +153,7 @@ export function PlacedStudentsTable({
           <TableBody>
             {filteredOffers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-40 text-center">
+                <TableCell colSpan={7} className="h-40 text-center">
                   <div className="flex flex-col items-center justify-center text-zinc-400">
                     <Award className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
@@ -177,7 +175,6 @@ export function PlacedStudentsTable({
                 const academic = profile.academic || {}
 
                 const name = personal.full_name || profile.name || 'Candidate'
-                const roll = personal.roll_number || profile.roll_number || academic.roll_no || '—'
                 const email = student?.user_email || personal.email || profile.email || '—'
                 const dept = academic.department || profile.department || '—'
 
@@ -189,10 +186,6 @@ export function PlacedStudentsTable({
                     <TableCell>
                       <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">{name}</div>
                       <div className="text-[11px] text-zinc-500">{email}</div>
-                    </TableCell>
-
-                    <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
-                      {roll}
                     </TableCell>
 
                     <TableCell className="text-xs text-zinc-800 dark:text-zinc-200">

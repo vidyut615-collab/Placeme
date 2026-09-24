@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   CheckCircle2,
   XCircle,
@@ -117,10 +119,14 @@ function countTotalChanges(oldData: any, newData: any): number {
 export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [viewingRequest, setViewingRequest] = useState<RequestItem | null>(null)
+  
+  // Rejection modal state
+  const [rejectingRequest, setRejectingRequest] = useState<RequestItem | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
 
-  const handleAction = async (id: string, action: 'approve' | 'reject') => {
+  const handleAction = async (id: string, action: 'approve' | 'reject', reason?: string) => {
     setProcessingId(id)
-    const res = await processApprovalRequest(id, action)
+    const res = await processApprovalRequest(id, action, reason)
     setProcessingId(null)
 
     if (res.error) {
@@ -130,7 +136,20 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
       if (viewingRequest?.id === id) {
         setViewingRequest(null)
       }
+      if (rejectingRequest?.id === id) {
+        setRejectingRequest(null)
+        setRejectionReason('')
+      }
     }
+  }
+
+  const handleConfirmReject = async () => {
+    if (!rejectingRequest) return
+    if (!rejectionReason.trim()) {
+      toast.error('Please provide a reason for rejecting the profile update.')
+      return
+    }
+    await handleAction(rejectingRequest.id, 'reject', rejectionReason.trim())
   }
 
   if (requests.length === 0) {
@@ -225,7 +244,10 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleAction(req.id, 'reject')}
+                  onClick={() => {
+                    setRejectingRequest(req)
+                    setRejectionReason('')
+                  }}
                   disabled={processingId === req.id}
                   className="h-8 text-xs font-medium text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
                 >
@@ -628,7 +650,12 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleAction(viewingRequest.id, 'reject')}
+                      onClick={() => {
+                        const toReject = viewingRequest
+                        setViewingRequest(null)
+                        setRejectingRequest(toReject)
+                        setRejectionReason('')
+                      }}
                       disabled={processingId === viewingRequest.id}
                       className="h-8 text-xs font-semibold text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:text-red-400 gap-1.5"
                     >
@@ -658,6 +685,49 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
               </div>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Profile Update Dialog */}
+      <Dialog open={!!rejectingRequest} onOpenChange={(open) => !open && setRejectingRequest(null)}>
+        <DialogContent className="sm:max-w-[480px] p-6">
+          <DialogHeader className="pb-3 border-b">
+            <DialogTitle className="text-base flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-4 w-4" />
+              Reject Profile Update
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-500">
+              State the reason for rejecting this profile update. The candidate will be notified.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-2">
+            <Label htmlFor="reject-reason" className="text-xs font-semibold">
+              Reason for Rejection *
+            </Label>
+            <Input
+              id="reject-reason"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="e.g. Proof document is blurry, CGPA doesn't match..."
+              className="text-xs"
+            />
+          </div>
+
+          <div className="flex justify-end pt-3 border-t gap-2">
+            <Button size="sm" variant="outline" onClick={() => setRejectingRequest(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleConfirmReject}
+              disabled={processingId === rejectingRequest?.id}
+            >
+              {processingId === rejectingRequest?.id && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+              Confirm Rejection
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -609,7 +609,7 @@ export function CollegeJobsTable({ jobs }: CollegeJobsTableProps) {
                         href={`/college/jobs/${job.id}`}
                         className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
                       >
-                        Manage Pipeline &rarr;
+                        {isLocal ? 'Manage Pipeline \u2192' : 'View Pipeline \u2192'}
                       </Link>
                     </TableCell>
                   </TableRow>

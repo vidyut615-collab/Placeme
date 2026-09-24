@@ -1,14 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import Link from 'next/link'
+import { AgencyStudentsDirectoryTable } from '@/components/AgencyStudentsDirectoryTable'
 
 export default async function AgencyStudentsPage(props: { searchParams?: Promise<{ q?: string }> }) {
   const searchParams = await props.searchParams
@@ -35,6 +27,9 @@ export default async function AgencyStudentsPage(props: { searchParams?: Promise
       studentId: null as string | null,
       email: inv.email,
       name: '—',
+      degree: '—',
+      department: '—',
+      passingYear: '—',
       gpa: '—',
       status: 'pending',
       college: inv.colleges?.name || 'Unknown',
@@ -45,6 +40,9 @@ export default async function AgencyStudentsPage(props: { searchParams?: Promise
       studentId: stu.id,
       email: stu.users?.email || '—',
       name: stu.profile_data?.full_name || '—',
+      degree: stu.profile_data?.type || '—',
+      department: stu.profile_data?.department || '—',
+      passingYear: stu.profile_data?.year || '—',
       gpa: stu.profile_data?.gpa || '—',
       status: 'active',
       college: stu.colleges?.name || 'Unknown',
@@ -56,7 +54,10 @@ export default async function AgencyStudentsPage(props: { searchParams?: Promise
     combinedList = combinedList.filter(item =>
       item.email?.toLowerCase().includes(q) ||
       item.college?.toLowerCase().includes(q) ||
-      item.name?.toLowerCase().includes(q)
+      item.name?.toLowerCase().includes(q) ||
+      item.degree?.toLowerCase().includes(q) ||
+      item.department?.toLowerCase().includes(q) ||
+      item.passingYear?.toLowerCase().includes(q)
     )
   }
 
@@ -82,63 +83,10 @@ export default async function AgencyStudentsPage(props: { searchParams?: Promise
         </form>
       </div>
 
-      <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>College</TableHead>
-              <TableHead>GPA</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Joined On</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {combinedList.length > 0 ? (
-              combinedList.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>{item.email}</TableCell>
-                  <TableCell>{item.college}</TableCell>
-                  <TableCell>{item.gpa}</TableCell>
-                  <TableCell>
-                    {item.status === 'active' ? (
-                      <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
-                        Pending
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    {item.studentId ? (
-                      <Link
-                        href={`/agency/students/${item.studentId}`}
-                        className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        View Profile
-                      </Link>
-                    ) : (
-                      <span className="text-sm text-zinc-400">Pending</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-zinc-500">
-                  No students found matching your search.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <AgencyStudentsDirectoryTable
+        students={combinedList}
+        query={q}
+      />
     </div>
   )
 }

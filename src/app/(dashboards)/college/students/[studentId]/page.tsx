@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatDate } from '@/lib/utils'
 
 export default async function StudentProfileAuditPage({ params }: { params: Promise<{ studentId: string }> }) {
   const supabase = await createClient()
@@ -90,6 +91,7 @@ export default async function StudentProfileAuditPage({ params }: { params: Prom
       student_withdrew_post_shortlist: 'Student Withdrew Post-Shortlist',
       did_not_qualify: 'Did Not Qualify',
       no_show: 'No-Show (Interview)',
+      non_participation: 'Non-Participation (Failed to Apply)',
       excused_absence: 'Excused Absence',
       unprofessional_conduct: 'Unprofessional Conduct',
       data_fraud: 'Data Fraud',
@@ -232,6 +234,12 @@ export default async function StudentProfileAuditPage({ params }: { params: Prom
                 {counters.disciplinary || 0}
               </Badge>
             </div>
+            <div className="flex justify-between items-center pb-2 border-b">
+              <span className="text-sm font-medium">Non-Participation Strikes</span>
+              <Badge variant="outline" className={counters.non_participation > 0 ? "bg-red-100 text-red-800" : ""}>
+                {counters.non_participation || 0}
+              </Badge>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Offer Rejections</span>
               <Badge variant="outline" className={counters.offer_rejections > 0 ? "bg-red-100 text-red-800" : ""}>
@@ -284,11 +292,11 @@ export default async function StudentProfileAuditPage({ params }: { params: Prom
                         <span className="text-zinc-400">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-zinc-500">
-                      {new Date(app.created_at).toLocaleDateString()}
+                    <TableCell className="text-sm text-zinc-500" suppressHydrationWarning>
+                      {formatDate(app.created_at)}
                     </TableCell>
-                    <TableCell className="text-sm text-zinc-500">
-                      {new Date(app.updated_at).toLocaleDateString()}
+                    <TableCell className="text-sm text-zinc-500" suppressHydrationWarning>
+                      {formatDate(app.updated_at)}
                     </TableCell>
                   </TableRow>
                 ))

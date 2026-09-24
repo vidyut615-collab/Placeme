@@ -102,6 +102,11 @@ export async function updateSession(request: NextRequest) {
       url.pathname = targetDashboard
       return NextResponse.redirect(url)
     }
+    if (path.startsWith('/college/roles') && role !== 'college_admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/college/dashboard'
+      return NextResponse.redirect(url)
+    }
     if (path.startsWith('/student') && role !== 'student') {
       const url = request.nextUrl.clone()
       url.pathname = targetDashboard

@@ -6,6 +6,7 @@ import { LayoutDashboard, Briefcase, FileText, UserCircle, FileCheck } from 'luc
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
+import { SidebarThemeToggle } from './ThemeToggle'
 
 export const studentNavigation = [
   { name: 'Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
@@ -51,7 +52,9 @@ export function StudentSidebar() {
           )
         })}
       </nav>
-      <div className="border-t p-4 flex flex-col gap-4">
+      <div className="border-t p-4 flex flex-col gap-3">
+        <SidebarThemeToggle />
+
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
             <span className="text-sm font-medium text-blue-600 dark:text-blue-300">ST</span>

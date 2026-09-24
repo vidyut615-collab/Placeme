@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { LogOut, UserCircle } from 'lucide-react'
+import { LogOut, UserCircle, User } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 
-export function MobileUserMenu() {
+export function MobileUserMenu({
+  onEditProfile,
+}: {
+  onEditProfile?: () => void
+} = {}) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -33,6 +36,12 @@ export function MobileUserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        {onEditProfile && (
+          <DropdownMenuItem onClick={onEditProfile} className="cursor-pointer">
+            <User className="mr-2 h-4 w-4" />
+            <span>Edit Profile</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} disabled={loading} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950 cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />

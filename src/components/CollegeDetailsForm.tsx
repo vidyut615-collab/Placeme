@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateCollegeProfile } from '@/app/(dashboards)/college/actions'
+import { ShieldAlert, Lock } from 'lucide-react'
 
 interface CollegeDetailsFormProps {
   initialData: {
@@ -16,13 +17,15 @@ interface CollegeDetailsFormProps {
     contact_email: string | null
     contact_phone: string | null
   }
+  isAdmin?: boolean
 }
 
-export function CollegeDetailsForm({ initialData }: CollegeDetailsFormProps) {
+export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetailsFormProps) {
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   const handleSubmit = async (formData: FormData) => {
+    if (!isAdmin) return
     setMessage(null)
     startTransition(async () => {
       const result = await updateCollegeProfile(formData)
@@ -35,12 +38,26 @@ export function CollegeDetailsForm({ initialData }: CollegeDetailsFormProps) {
   }
 
   return (
-    <form action={handleSubmit} className="space-y-6 max-w-2xl bg-white dark:bg-zinc-900 p-6 rounded-lg border shadow-sm">
+    <form action={handleSubmit} className="space-y-6 max-w-3xl bg-white dark:bg-zinc-900 p-6 rounded-lg border shadow-sm">
+      {!isAdmin && (
+        <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-800/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-center gap-3 shadow-xs">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <span className="font-bold block">Institutional Profile View</span>
+            <span className="text-xs text-amber-800/90 dark:text-amber-300/90">
+              You are viewing institutional details in read-only mode. Editing college details and placement office contacts is restricted to College Administrators.
+            </span>
+          </div>
+        </div>
+      )}
+
       {message && (
         <div className={`p-3 rounded-md text-sm ${message.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
           {message.text}
         </div>
       )}
+
+      <fieldset disabled={!isAdmin} className="space-y-6 border-0 p-0 m-0">
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2 col-span-1 md:col-span-2">
@@ -79,11 +96,24 @@ export function CollegeDetailsForm({ initialData }: CollegeDetailsFormProps) {
           />
         </div>
       </div>
+      </fieldset>
 
       <div className="flex justify-end pt-4 border-t">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving Changes...' : 'Save Profile Details'}
-        </Button>
+        {isAdmin ? (
+          <Button type="submit" disabled={isPending}>
+            {isPending ? 'Saving Changes...' : 'Save Profile Details'}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            disabled
+            variant="outline"
+            className="cursor-not-allowed opacity-70 gap-2 border-zinc-300 dark:border-zinc-700"
+          >
+            <Lock className="h-4 w-4 text-zinc-400" />
+            Admin Only (Locked)
+          </Button>
+        )}
       </div>
     </form>
   )

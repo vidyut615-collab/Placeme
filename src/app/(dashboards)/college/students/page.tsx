@@ -1,15 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { SearchInput } from '@/components/SearchInput'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { StudentActionsDropdown } from '@/components/StudentActionsDropdown'
+import { CollegeStudentDirectoryTable } from '@/components/CollegeStudentDirectoryTable'
 
 export default async function CollegeStudentsPage({ 
   searchParams 
@@ -17,6 +8,8 @@ export default async function CollegeStudentsPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }> 
 }) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const collegeId = user?.app_metadata?.college_id || user?.user_metadata?.college_id || ''
   const params = await searchParams;
   const query = typeof params.q === 'string' ? params.q.toLowerCase() : '';
   
@@ -63,6 +56,9 @@ export default async function CollegeStudentsPage({
       id: inv.id,
       email: inv.email,
       name: '—',
+      degree: '—',
+      department: '—',
+      passingYear: '—',
       status: 'pending',
       date: inv.created_at,
       isInvite: true,
@@ -74,6 +70,9 @@ export default async function CollegeStudentsPage({
       id: stu.id,
       email: stu.users?.email,
       name: stu.profile_data?.full_name || '—',
+      degree: stu.profile_data?.type || '—',
+      department: stu.profile_data?.department || '—',
+      passingYear: stu.profile_data?.year || '—',
       status: 'active',
       date: stu.created_at,
       isInvite: false,
@@ -86,7 +85,10 @@ export default async function CollegeStudentsPage({
   const filteredList = query 
     ? combinedList.filter(item => 
         item.email?.toLowerCase().includes(query) || 
-        item.name?.toLowerCase().includes(query)
+        item.name?.toLowerCase().includes(query) ||
+        item.degree?.toLowerCase().includes(query) ||
+        item.department?.toLowerCase().includes(query) ||
+        item.passingYear?.toLowerCase().includes(query)
       )
     : combinedList;
 
@@ -105,116 +107,12 @@ export default async function CollegeStudentsPage({
         </div>
       </div>
 
-      <Tabs defaultValue="active" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="active">Active & Pending ({activeAndPendingList.length})</TabsTrigger>
-          <TabsTrigger value="blacklisted">Blacklisted ({blacklistedList.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="active">
-          <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm w-full overflow-x-auto">
-            <Table className="min-w-[600px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Added On</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activeAndPendingList.length > 0 ? (
-                  activeAndPendingList.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="font-medium">{item.name}</div>
-                        {item.counters && Object.keys(item.counters).length > 0 && (
-                          <div className="flex gap-1 mt-1 flex-wrap max-w-[200px]">
-                            {item.counters.no_shows > 0 && <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded-full">{item.counters.no_shows} No-Shows</span>}
-                            {item.counters.withdrawals > 0 && <span className="text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded-full">{item.counters.withdrawals} Withdrawals</span>}
-                            {item.counters.post_shortlist_withdrawals > 0 && <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded-full">{item.counters.post_shortlist_withdrawals} Late Drops</span>}
-                            {item.counters.disciplinary > 0 && <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded-full">{item.counters.disciplinary} Disciplinary</span>}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-zinc-500">{item.email}</TableCell>
-                      <TableCell>
-                        {item.status === 'active' ? (
-                          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
-                            Pending
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        {!item.isInvite ? (
-                          <StudentActionsDropdown studentId={item.id} isBlacklisted={item.isBlacklisted} />
-                        ) : (
-                          <span className="text-sm text-zinc-400 italic">No profile yet</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-zinc-500">
-                      {query ? 'No active students match your search.' : 'No active students found.'}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="blacklisted">
-          <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm w-full overflow-x-auto">
-            <Table className="min-w-[600px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Added On</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {blacklistedList.length > 0 ? (
-                  blacklistedList.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-zinc-500">{item.email}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20 max-w-[250px] truncate" title={item.blacklistReason || ''}>
-                          {item.blacklistReason || 'No reason provided'}
-                        </span>
-                      </TableCell>
-                      <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        {!item.isInvite ? (
-                          <StudentActionsDropdown studentId={item.id} isBlacklisted={item.isBlacklisted} />
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-zinc-500">
-                      {query ? 'No blacklisted students match your search.' : 'No students have been blacklisted.'}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
+      <CollegeStudentDirectoryTable
+        activeAndPendingList={activeAndPendingList}
+        blacklistedList={blacklistedList}
+        query={query}
+        collegeId={collegeId}
+      />
     </div>
   )
 }

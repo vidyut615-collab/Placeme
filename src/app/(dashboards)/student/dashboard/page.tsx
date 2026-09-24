@@ -9,7 +9,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { User, GraduationCap, Building, Briefcase, FileText, TrendingUp } from 'lucide-react'
+import { User, GraduationCap, Building, Briefcase, FileText, TrendingUp, Award } from 'lucide-react'
+import { DeclareHiredModal } from '@/components/DeclareHiredModal'
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   applied:      { label: 'Applied',      className: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300' },
@@ -44,6 +45,8 @@ export default async function StudentDashboard() {
     { count: totalJobsCount },
     { count: totalAppsCount },
     { count: progressCount },
+    { data: offers },
+    { data: allApplications },
   ] = await Promise.all([
     // 3 most recent active, eligible jobs
     supabase
@@ -81,16 +84,59 @@ export default async function StudentDashboard() {
       .select('*', { count: 'exact', head: true })
       .eq('student_id', student?.id)
       .in('status', ['shortlisted', 'interviewing', 'offered', 'hired']),
+
+    // Placement offers declared
+    supabase
+      .from('student_offers')
+      .select('*')
+      .eq('student_id', student?.id)
+      .order('created_at', { ascending: false }),
+
+    // All applications for declaration modal
+    supabase
+      .from('applications')
+      .select('id, job_id, jobs ( title, company_name, compensation_ctc )')
+      .eq('student_id', student?.id),
   ])
+
+  const approvedOffer = offers?.find(o => o.status === 'approved')
+  const pendingOffer = offers?.find(o => o.status === 'pending')
 
   return (
     <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome back, {profile.full_name || 'Student'}!
-        </h1>
-        <p className="text-zinc-500 mt-2">Here's what's happening with your placement journey.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome back, {profile.full_name || 'Student'}!
+          </h1>
+          <p className="text-zinc-500 mt-2">Here's what's happening with your placement journey.</p>
+        </div>
+
+        <div>
+          <DeclareHiredModal 
+            appliedJobs={allApplications || []} 
+            hasPendingOffer={!!pendingOffer}
+            pendingOfferDetails={pendingOffer ? { company_name: pendingOffer.company_name, job_role: pendingOffer.job_role, created_at: pendingOffer.created_at } : null}
+            approvedOfferDetails={approvedOffer ? { company_name: approvedOffer.company_name, job_role: approvedOffer.job_role, compensation_ctc: Number(approvedOffer.compensation_ctc) } : null}
+          />
+        </div>
       </div>
+
+      {approvedOffer && (
+        <div className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4">
+          <div className="flex items-center gap-3">
+            <Award className="h-6 w-6 text-emerald-600 flex-shrink-0" />
+            <div>
+              <div className="font-semibold text-emerald-900 dark:text-emerald-200">
+                Officially Placed at {approvedOffer.company_name} (₹{approvedOffer.compensation_ctc} LPA)
+              </div>
+              <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-0.5">
+                Congratulations! Your placement offer is officially confirmed. 1-Offer policy is active.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile stat cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

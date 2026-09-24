@@ -31,6 +31,12 @@ export type PolicyConfig = {
   training_readiness?: TrainingReadinessPolicy
   academic_clearance?: AcademicClearancePolicy
   override_management?: OverrideManagementPolicy
+  profile_audit_enabled?: boolean
+  non_participation?: any
+  post_shortlist_withdrawal?: any
+  disciplinary?: any
+  integrity?: any
+  offer_rejection?: any
 }
 
 type RegistrationPolicy = {

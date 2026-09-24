@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatDate } from '@/lib/utils'
 
 export default async function AgencyColleges() {
   const supabase = await createClient()
@@ -71,7 +72,9 @@ export default async function AgencyColleges() {
                       <TableCell className="text-zinc-500">
                         {adminUser ? adminUser.email : 'No admin assigned'}
                       </TableCell>
-                      <TableCell>{new Date(college.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-zinc-500" suppressHydrationWarning>
+                        {formatDate(college.created_at)}
+                      </TableCell>
                       <TableCell className="text-right">
                         <CollegeActionsMenu 
                           collegeId={college.id} 

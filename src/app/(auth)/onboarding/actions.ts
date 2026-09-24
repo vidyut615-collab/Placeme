@@ -39,34 +39,52 @@ export async function completeOnboarding(formData: FormData) {
   const collegeId = user.app_metadata?.college_id
   const adminClient = getAdminClient()
 
-  const firstName = formData.get('firstName') as string
-  const middleName = formData.get('middleName') as string
-  const lastName = formData.get('lastName') as string
+  const firstName = (formData.get('firstName') as string)?.trim()
+  const middleName = (formData.get('middleName') as string)?.trim()
+  const lastName = (formData.get('lastName') as string)?.trim()
 
   if (!firstName || !lastName) {
     return { error: 'First Name and Last Name are required.' }
   }
 
-  const fullName = `${firstName.trim()} ${middleName ? middleName.trim() + ' ' : ''}${lastName.trim()}`.trim()
+  const fullName = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim()
+  const phone = (formData.get('phone') as string)?.trim() || null
+  const department = (formData.get('department') as string)?.trim() || null
+
+  if (role === 'college_admin' || role === 'college_staff') {
+    if (!phone) {
+      return { error: 'Contact Phone Number is required.' }
+    }
+    if (!department) {
+      return { error: 'Please select your Department or Placement Role.' }
+    }
+  }
 
   try {
-    // 1. Update auth user metadata with basic details
+    // 1. Update auth user metadata with details
     await adminClient.auth.admin.updateUserById(user.id, {
       user_metadata: {
         ...user.user_metadata,
         full_name: fullName,
-        first_name: firstName.trim(),
-        middle_name: middleName?.trim() || '',
-        last_name: lastName.trim(),
+        first_name: firstName,
+        middle_name: middleName || '',
+        last_name: lastName,
+        phone: phone,
+        department: department,
       }
     })
 
-    // 2. Just-In-Time Database Insertion
+    // 2. Just-In-Time Database Insertion into public.users
     const { error: userError } = await adminClient.from('users').upsert({
       id: user.id,
       email: user.email,
       role: role,
-      college_id: collegeId
+      college_id: collegeId,
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone,
+      department: department,
+      is_active: true,
     }, { onConflict: 'id' })
 
     if (userError) {

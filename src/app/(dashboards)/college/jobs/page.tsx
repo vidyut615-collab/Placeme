@@ -1,28 +1,30 @@
 import { createClient } from '@/utils/supabase/server'
-import Link from 'next/link'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { CreateJobModal } from '@/components/CreateJobModal'
 import { createLocalJob } from '@/app/(dashboards)/college/actions'
+import { CollegeJobsTable } from '@/components/CollegeJobsTable'
 
 export default async function CollegeJobsPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const collegeId = user?.app_metadata?.college_id
 
-  // RLS will automatically only return:
-  // 1. Jobs where college_id = JWT college_id
-  // 2. Jobs where college_id IS NULL (Agency global jobs)
+  // Fetch jobs, counts, classifications, and college academic fields
   const [
     { data: jobs },
     { data: appCounts },
+    { data: collegeData },
+    { data: jobTypes },
+    { data: placementLevels },
+    { data: placementCategories },
+    { data: placementCycles },
   ] = await Promise.all([
     supabase.from('jobs').select('*').order('created_at', { ascending: false }),
     supabase.from('applications').select('job_id'),
+    collegeId ? supabase.from('colleges').select('onboarding_fields').eq('id', collegeId).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('job_types').select('id, name').order('name'),
+    supabase.from('placement_levels').select('id, name, is_dream, is_super_dream').order('rank'),
+    supabase.from('placement_categories').select('id, name').order('name'),
+    supabase.from('placement_cycles').select('id, name, is_active').order('start_date', { ascending: false }),
   ])
 
   // Build a count map
@@ -31,76 +33,34 @@ export default async function CollegeJobsPage() {
     countMap[app.job_id] = (countMap[app.job_id] || 0) + 1
   })
 
+  const jobsWithCounts = (jobs || []).map((job) => ({
+    ...job,
+    application_count: countMap[job.id] || 0,
+  }))
+
   return (
-    <div className="flex flex-1 flex-col p-8 space-y-8">
+    <div className="flex flex-1 flex-col p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Job Board</h1>
-          <p className="text-zinc-500 mt-2">Manage your local job postings and view global opportunities.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Jobs</h1>
+          <p className="text-zinc-500 mt-1 text-sm">
+            Manage local campus drives and monitor global placement opportunities.
+          </p>
         </div>
         <CreateJobModal
           action={createLocalJob}
           title="Post Local Job"
           description="Create a job that will only be visible to students enrolled in your college."
+          jobTypes={jobTypes || []}
+          placementLevels={placementLevels || []}
+          placementCategories={placementCategories || []}
+          placementCycles={placementCycles || []}
+          academicFields={collegeData?.onboarding_fields || { departments: [], types: [], years: [] }}
         />
       </div>
 
-      <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Job Title</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Applicants</TableHead>
-              <TableHead>Posted On</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {jobs && jobs.length > 0 ? (
-              jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-medium">{job.title}</TableCell>
-                  <TableCell>
-                    {job.college_id ? (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
-                        Local
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">
-                        Global (Agency)
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                      {job.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      {countMap[job.id] || 0}
-                    </span>
-                  </TableCell>
-                  <TableCell>{new Date(job.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <Link href={`/college/jobs/${job.id}`} className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-                      View Details
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-zinc-500">
-                  No jobs available yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <CollegeJobsTable jobs={jobsWithCounts} />
     </div>
   )
 }
+

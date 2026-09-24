@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateApplicationStatus } from '@/app/actions/application'
+import { formatDate } from '@/lib/utils'
 
 type ApplicationRow = {
   id: string
@@ -102,7 +103,7 @@ export function JobApplicationsManager({ applications }: JobApplicationsManagerP
                     </div>
                   </TableCell>
                   <TableCell>{profile.gpa || 'N/A'}</TableCell>
-                  <TableCell>{new Date(app.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell suppressHydrationWarning>{formatDate(app.created_at)}</TableCell>
                   <TableCell>
                     <Select
                       value={app.status || ''}

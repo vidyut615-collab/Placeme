@@ -6,6 +6,7 @@ import { LayoutDashboard, GraduationCap, Briefcase, Users, Settings } from 'luci
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
+import { SidebarThemeToggle } from './ThemeToggle'
 
 export const agencyNavigation = [
   { name: 'Overview', href: '/agency/dashboard', icon: LayoutDashboard },
@@ -51,8 +52,10 @@ export function AgencySidebar() {
           )
         })}
       </nav>
-      <div className="border-t p-4 flex flex-col gap-4">
-        {/* User profile snippet could go here */}
+      <div className="border-t p-4 flex flex-col gap-3">
+        <SidebarThemeToggle />
+
+        {/* User profile snippet */}
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
             <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">SA</span>

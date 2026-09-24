@@ -158,6 +158,20 @@ export function StudentPoliciesViewer({ config }: StudentPoliciesViewerProps) {
         <CardContent>
           <div className="space-y-6">
             <div>
+              <h4 className="font-semibold text-sm mb-2 text-zinc-900 dark:text-zinc-100 border-b pb-1">Non-Participation (Eligibility Ignored)</h4>
+              {config.non_participation?.enabled ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">Students who meet all academic eligibility criteria for a posted drive are required to apply or seek formal coordinator excusal.</p>
+                  {renderItem('Max Unapplied Drives Before Debarment', config.non_participation.max_allowed)}
+                  {renderItem('Default Action', formatText(config.non_participation.penalty || 'Add Strike'))}
+                  {renderItem('Reinstatement Quota (if appealed)', config.non_participation.reinstatement_chances)}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500 italic">Mandatory application / non-participation policy is not active.</p>
+              )}
+            </div>
+
+            <div>
               <h4 className="font-semibold text-sm mb-2 text-zinc-900 dark:text-zinc-100 border-b pb-1">No-Show Policy</h4>
               {config.no_show?.enabled ? (
                 <div className="space-y-1">

@@ -2,18 +2,13 @@ import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { InviteStudentModal } from '@/components/InviteStudentModal'
+import { BulkUploadStudentsModal } from '@/components/BulkUploadStudentsModal'
 import { AcademicConfigManager } from '@/components/AcademicConfigManager'
 import { EditCollegeDetailsModal } from '@/components/EditCollegeDetailsModal'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Building2, Globe, MapPin, Mail, Phone, ArrowLeft, Users, Calendar } from 'lucide-react'
+import { AgencyCollegeStudentsTable, type CollegeStudentItem } from '@/components/AgencyCollegeStudentsTable'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Building2, Globe, MapPin, Mail, Phone, ArrowLeft, Users, GraduationCap, Info } from 'lucide-react'
 
 export default async function CollegeProfilePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -52,185 +47,184 @@ export default async function CollegeProfilePage(props: { params: Promise<{ id: 
     .order('created_at', { ascending: false })
 
   // Combine and format the list
-  const combinedList = [
+  const combinedList: CollegeStudentItem[] = [
     ...(pendingInvites || []).map((inv: any) => ({
       id: inv.id,
+      studentId: null,
       email: inv.email,
       name: '—',
-      status: 'pending',
+      degree: '—',
+      department: '—',
+      passingYear: '—',
+      status: 'pending' as const,
       date: inv.created_at,
       isInvite: true
     })),
     ...(activeStudents || []).map((stu: any) => ({
       id: stu.id,
-      email: stu.users?.email,
+      studentId: stu.id,
+      email: stu.users?.email || '—',
       name: stu.profile_data?.full_name || '—',
-      status: 'active',
+      degree: stu.profile_data?.type || '—',
+      department: stu.profile_data?.department || '—',
+      passingYear: stu.profile_data?.year || '—',
+      status: 'active' as const,
       date: stu.created_at,
       isInvite: false
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   return (
-    <div className="flex flex-1 flex-col p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+    <div className="flex flex-1 flex-col p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
       {/* Top Navigation & Header */}
       <div>
         <Link 
           href="/agency/colleges" 
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 mb-4 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Colleges
         </Link>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-              <Building2 className="h-8 w-8 text-blue-600 shrink-0" />
-              {college.name}
-            </h1>
-            <p className="text-zinc-500 mt-1">Manage college profile details, academic lists, and student invitations.</p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <EditCollegeDetailsModal college={college} />
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <Building2 className="h-8 w-8 text-blue-600 shrink-0" />
+            {college.name}
+          </h1>
+          <p className="text-zinc-500 mt-1">
+            Manage institution details, academic lists, and student roster.
+          </p>
+        </div>
+      </div>
+
+      {/* 3 DISTINCT TABS FOR CLEAR ORGANIZATION */}
+      <Tabs defaultValue="details" className="w-full">
+        <TabsList className="grid grid-cols-3 max-w-2xl mb-6">
+          <TabsTrigger value="details" className="flex items-center gap-2 py-2.5">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">College Information</span>
+            <span className="sm:hidden">Info</span>
+          </TabsTrigger>
+          <TabsTrigger value="academic" className="flex items-center gap-2 py-2.5">
+            <GraduationCap className="h-4 w-4" />
+            <span className="hidden sm:inline">Academic Configuration</span>
+            <span className="sm:hidden">Academics</span>
+          </TabsTrigger>
+          <TabsTrigger value="students" className="flex items-center gap-2 py-2.5">
+            <Users className="h-4 w-4" />
+            <span>Students ({combinedList.length})</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: COLLEGE INFORMATION & CONTACTS */}
+        <TabsContent value="details" className="space-y-6">
+          <Card className="shadow-sm border">
+            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-blue-600" />
+                  College Profile & Public Contacts
+                </CardTitle>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  General and contact information visible to students and placement coordinators.
+                </p>
+              </div>
+              <EditCollegeDetailsModal college={college} />
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
+                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
+                    <Globe className="h-4 w-4 text-blue-600" /> Official Website
+                  </div>
+                  <div>
+                    {college.website ? (
+                      <a 
+                        href={college.website.startsWith('http') ? college.website : `https://${college.website}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-600 hover:underline font-medium break-all block"
+                      >
+                        {college.website}
+                      </a>
+                    ) : (
+                      <span className="text-zinc-400 italic">Not provided</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
+                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 text-blue-600" /> Location / Campus
+                  </div>
+                  <div className="font-medium text-zinc-800 dark:text-zinc-200">
+                    {college.location || <span className="text-zinc-400 italic font-normal">Not provided</span>}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
+                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
+                    <Mail className="h-4 w-4 text-blue-600" /> Placement Email
+                  </div>
+                  <div className="font-medium text-zinc-800 dark:text-zinc-200 break-all">
+                    {college.contact_email ? (
+                      <a href={`mailto:${college.contact_email}`} className="text-zinc-700 hover:text-blue-600 dark:text-zinc-300">
+                        {college.contact_email}
+                      </a>
+                    ) : (
+                      <span className="text-zinc-400 italic font-normal">Not provided</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
+                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
+                    <Phone className="h-4 w-4 text-blue-600" /> Contact Phone
+                  </div>
+                  <div className="font-medium text-zinc-800 dark:text-zinc-200">
+                    {college.contact_phone || <span className="text-zinc-400 italic font-normal">Not provided</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
+                <div className="text-xs font-medium text-zinc-500 mb-2 flex items-center gap-1.5">
+                  <Info className="h-4 w-4 text-blue-600" /> About the Institution
+                </div>
+                {college.description ? (
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-line leading-relaxed">
+                    {college.description}
+                  </p>
+                ) : (
+                  <p className="text-sm text-zinc-400 italic">
+                    No description provided yet. Click &quot;Edit Details&quot; to add institutional highlights.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 2: ACADEMIC CONFIGURATION (Batches, Degrees, Departments) */}
+        <TabsContent value="academic" className="space-y-6">
+          <AcademicConfigManager 
+            collegeId={college.id} 
+            initialFields={college.onboarding_fields} 
+            role="agency" 
+          />
+        </TabsContent>
+
+        {/* TAB 3: STUDENT DIRECTORY & INVITATIONS (Paginated at 25 per page) */}
+        <TabsContent value="students" className="space-y-4">
+          <div className="flex items-center justify-end gap-3">
+            <BulkUploadStudentsModal collegeId={college.id} collegeName={college.name} />
             <InviteStudentModal collegeId={college.id} />
           </div>
-        </div>
-      </div>
-
-      {/* College Profile Summary Card */}
-      <Card className="shadow-sm border">
-        <CardHeader className="pb-3 border-b">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-zinc-500" />
-            College Information & Contacts
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-xs font-medium text-zinc-500 mb-1 flex items-center gap-1">
-                <Globe className="h-3.5 w-3.5" /> Official Website
-              </div>
-              <div>
-                {college.website ? (
-                  <a 
-                    href={college.website.startsWith('http') ? college.website : `https://${college.website}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-blue-600 hover:underline font-medium truncate block"
-                  >
-                    {college.website}
-                  </a>
-                ) : (
-                  <span className="text-zinc-400 italic">Not provided</span>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="text-xs font-medium text-zinc-500 mb-1 flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" /> Location
-              </div>
-              <div className="font-medium text-zinc-800 dark:text-zinc-200">
-                {college.location || <span className="text-zinc-400 italic font-normal">Not provided</span>}
-              </div>
-            </div>
-
-            <div>
-              <div className="text-xs font-medium text-zinc-500 mb-1 flex items-center gap-1">
-                <Mail className="h-3.5 w-3.5" /> Contact Email
-              </div>
-              <div className="font-medium text-zinc-800 dark:text-zinc-200 truncate">
-                {college.contact_email ? (
-                  <a href={`mailto:${college.contact_email}`} className="text-zinc-700 hover:text-blue-600 dark:text-zinc-300">
-                    {college.contact_email}
-                  </a>
-                ) : (
-                  <span className="text-zinc-400 italic font-normal">Not provided</span>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="text-xs font-medium text-zinc-500 mb-1 flex items-center gap-1">
-                <Phone className="h-3.5 w-3.5" /> Contact Phone
-              </div>
-              <div className="font-medium text-zinc-800 dark:text-zinc-200">
-                {college.contact_phone || <span className="text-zinc-400 italic font-normal">Not provided</span>}
-              </div>
-            </div>
-          </div>
-
-          {college.description && (
-            <div className="mt-4 pt-4 border-t text-sm">
-              <div className="text-xs font-medium text-zinc-500 mb-1">About the Institution</div>
-              <p className="text-zinc-700 dark:text-zinc-300 whitespace-pre-line leading-relaxed">
-                {college.description}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Academic Lists Configuration (Years, Degrees, Departments with Add/Edit/Delete modals) */}
-      <AcademicConfigManager 
-        collegeId={college.id} 
-        initialFields={college.onboarding_fields} 
-        role="agency" 
-      />
-
-      {/* Student Directory & Invitations */}
-      <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-medium flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" />
-              Student Directory & Invitations
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Students invited or actively registered under {college.name}.</p>
-          </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-            {combinedList.length} Total
-          </span>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date Added</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {combinedList.length > 0 ? (
-              combinedList.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell className="text-zinc-600 dark:text-zinc-400">{item.email}</TableCell>
-                  <TableCell>
-                    {item.status === 'active' ? (
-                      <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
-                        Pending
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-zinc-500">
-                  No students or invitations found for this college.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+          <AgencyCollegeStudentsTable 
+            students={combinedList} 
+            collegeName={college.name} 
+            collegeId={college.id}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

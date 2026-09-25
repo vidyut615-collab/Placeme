@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -98,6 +98,21 @@ export function EditJobModal({
   const [selectedCity, setSelectedCity] = useState(job.job_location || 'Bengaluru / Bangalore')
   const [citySearch, setCitySearch] = useState('')
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false)
+  const cityDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(event.target as Node)) {
+        setCityDropdownOpen(false)
+      }
+    }
+    if (cityDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [cityDropdownOpen])
   const [jobDomain, setJobDomain] = useState(job.job_domain || '')
   const [driveMode, setDriveMode] = useState(job.drive_mode || 'Virtual / Online')
   const [skillsInput, setSkillsInput] = useState(job.skills_required || '')
@@ -297,14 +312,8 @@ export function EditJobModal({
             </div>
           )}
 
-          <form id="edit-job-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            {/* ══════════════════════════════════════════════════════════
-                LEFT COLUMN: Role, Location, Compensation, Bond, Skills
-                ══════════════════════════════════════════════════════════ */}
-            <div className="space-y-6">
-
-              {/* 1. ROLE & LOCATION SPECIFICS */}
+          <form id="edit-job-form" onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6 pb-6">
+            {/* 1. ROLE & LOCATION SPECIFICS */}
               <div className="p-4 rounded-xl border bg-white dark:bg-zinc-900/60 space-y-4 shadow-xs">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
                   <Briefcase className="h-4 w-4" />
@@ -357,7 +366,7 @@ export function EditJobModal({
                   </div>
 
                   {/* Searchable City */}
-                  <div className="space-y-1 sm:col-span-2 relative">
+                  <div className="space-y-1 sm:col-span-2 relative" ref={cityDropdownRef}>
                     <Label className="text-xs font-semibold flex items-center gap-1">
                       <MapPin className="h-3 w-3 text-red-500" />
                       Job Location / City *
@@ -705,13 +714,6 @@ export function EditJobModal({
                 </div>
               </div>
 
-            </div>
-
-            {/* ══════════════════════════════════════════════════════════
-                RIGHT COLUMN: Window, Custom Stages, Description
-                ══════════════════════════════════════════════════════════ */}
-            <div className="space-y-6">
-
               {/* 5. APPLICATION DEADLINE & STATUS */}
               <div className="p-4 rounded-xl border bg-white dark:bg-zinc-900/60 space-y-4 shadow-xs">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1.5">
@@ -737,6 +739,7 @@ export function EditJobModal({
                     <Label className="text-xs font-semibold">Application Deadline</Label>
                     <Input 
                       type="datetime-local" 
+                      step="60"
                       value={deadline} 
                       onChange={(e) => setDeadline(e.target.value)}
                       className="h-9 text-sm" 
@@ -745,10 +748,12 @@ export function EditJobModal({
 
                   {placementCycles && placementCycles.length > 0 && (
                     <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs font-semibold">Placement Season <span className="text-red-500">*</span></Label>
+                      <Label className="text-xs font-semibold">Placement Cycle <span className="text-red-500">*</span></Label>
                       <Select value={cycleId} onValueChange={(val) => setCycleId(val)}>
                         <SelectTrigger className="h-9 text-sm">
-                          <SelectValue placeholder="Select Cycle" />
+                          <SelectValue placeholder="Select Placement Cycle">
+                            {placementCycles.find(c => c.id === cycleId)?.name || 'Select Placement Cycle'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {placementCycles
@@ -816,8 +821,6 @@ export function EditJobModal({
                   className="min-h-[220px] text-sm"
                 />
               </div>
-
-            </div>
 
           </form>
         </div>

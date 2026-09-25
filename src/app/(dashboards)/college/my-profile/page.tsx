@@ -20,7 +20,7 @@ export default async function CollegeMyProfilePage() {
   const [{ data: dbUser }, { data: college }] = await Promise.all([
     supabase
       .from('users')
-      .select('first_name, last_name, phone, department')
+      .select('first_name, last_name, phone, department, designation, linkedin_url, whatsapp_number, cabin_location, employee_id, avatar_url')
       .eq('id', user.id)
       .maybeSingle(),
     supabase
@@ -34,6 +34,12 @@ export default async function CollegeMyProfilePage() {
   const lastName = dbUser?.last_name || user.user_metadata?.last_name || ''
   const phone = dbUser?.phone || user.user_metadata?.phone || ''
   const department = dbUser?.department || user.user_metadata?.department || ''
+  const designation = dbUser?.designation || user.user_metadata?.designation || ''
+  const linkedin_url = dbUser?.linkedin_url || ''
+  const whatsapp_number = dbUser?.whatsapp_number || ''
+  const cabin_location = dbUser?.cabin_location || ''
+  const employee_id = dbUser?.employee_id || ''
+  const avatar_url = dbUser?.avatar_url || user.user_metadata?.avatar_url || ''
   const collegeName = college?.name || 'Your Institution'
   const academicDepartments = college?.onboarding_fields?.departments || []
 
@@ -48,7 +54,7 @@ export default async function CollegeMyProfilePage() {
             My Profile
           </h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            Manage your personal profile details, placement contact phone, and department wing.
+            Manage your personal placement coordinator profile, contact details, and institutional credentials.
           </p>
         </div>
       </div>
@@ -62,6 +68,12 @@ export default async function CollegeMyProfilePage() {
           department,
           role,
           collegeName,
+          designation,
+          linkedin_url,
+          whatsapp_number,
+          cabin_location,
+          employee_id,
+          avatar_url,
         }}
         academicDepartments={academicDepartments}
       />

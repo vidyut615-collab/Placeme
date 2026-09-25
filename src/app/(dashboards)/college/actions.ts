@@ -46,23 +46,72 @@ export async function updateCollegeProfile(formData: FormData) {
 
   // Extract all fields
   const name = formData.get('name') as string
-  const website = formData.get('website') as string
-  const location = formData.get('location') as string
-  const description = formData.get('description') as string
-  const contact_email = formData.get('contact_email') as string
-  const contact_phone = formData.get('contact_phone') as string
+  if (!name?.trim()) {
+    return { error: 'College Name is required.' }
+  }
 
-  // We use the standard supabase client. The RLS policy we just added 
-  // explicitly allows them to UPDATE where id = auth_college_id()
+  const website = (formData.get('website') as string)?.trim() || null
+  const location = (formData.get('location') as string)?.trim() || null
+  const description = (formData.get('description') as string)?.trim() || null
+  const contact_email = (formData.get('contact_email') as string)?.trim() || null
+  const contact_phone = (formData.get('contact_phone') as string)?.trim() || null
+
+  const logo_url = (formData.get('logo_url') as string) || null
+  const banner_url = (formData.get('banner_url') as string) || null
+  const brochure_url = (formData.get('brochure_url') as string) || null
+
+  const address_street = (formData.get('address_street') as string)?.trim() || null
+  const address_state = (formData.get('address_state') as string)?.trim() || null
+  const address_pincode = (formData.get('address_pincode') as string)?.trim() || null
+
+  const naac_grade = (formData.get('naac_grade') as string)?.trim() || null
+  const nba_accreditation = (formData.get('nba_accreditation') as string)?.trim() || null
+  const aishe_code = (formData.get('aishe_code') as string)?.trim() || null
+  const university_affiliation = (formData.get('university_affiliation') as string)?.trim() || null
+  const nirf_rank = (formData.get('nirf_rank') as string)?.trim() || null
+  const establishment_year = (formData.get('establishment_year') as string)?.trim() || null
+
+  const lab_capacity = (formData.get('lab_capacity') as string)?.trim() || null
+  const auditorium_capacity = (formData.get('auditorium_capacity') as string)?.trim() || null
+  const interview_cabins = (formData.get('interview_cabins') as string)?.trim() || null
+  const nearest_airport = (formData.get('nearest_airport') as string)?.trim() || null
+  const nearest_railway = (formData.get('nearest_railway') as string)?.trim() || null
+  const campus_guest_house = (formData.get('campus_guest_house') as string)?.trim() || null
+
+  const highest_ctc = (formData.get('highest_ctc') as string)?.trim() || null
+  const average_ctc = (formData.get('average_ctc') as string)?.trim() || null
+  const total_companies_visited = (formData.get('total_companies_visited') as string)?.trim() || null
+
   const { error } = await supabase
     .from('colleges')
     .update({
-      name,
+      name: name.trim(),
       website,
       location,
       description,
       contact_email,
-      contact_phone
+      contact_phone,
+      logo_url,
+      banner_url,
+      brochure_url,
+      address_street,
+      address_state,
+      address_pincode,
+      naac_grade,
+      nba_accreditation,
+      aishe_code,
+      university_affiliation,
+      nirf_rank,
+      establishment_year,
+      lab_capacity,
+      auditorium_capacity,
+      interview_cabins,
+      nearest_airport,
+      nearest_railway,
+      campus_guest_house,
+      highest_ctc,
+      average_ctc,
+      total_companies_visited
     })
     .eq('id', collegeId)
 
@@ -1790,11 +1839,23 @@ export async function updateCollegeUserProfile({
   lastName,
   phone,
   department,
+  designation,
+  linkedin_url,
+  whatsapp_number,
+  cabin_location,
+  employee_id,
+  avatar_url,
 }: {
   firstName: string
   lastName: string
   phone: string
   department: string
+  designation?: string
+  linkedin_url?: string
+  whatsapp_number?: string
+  cabin_location?: string
+  employee_id?: string
+  avatar_url?: string
 }) {
   const supabase = await createClient()
   const {
@@ -1822,6 +1883,12 @@ export async function updateCollegeUserProfile({
       last_name: cleanLast,
       phone: cleanPhone,
       department: cleanDept,
+      designation: designation?.trim() || null,
+      linkedin_url: linkedin_url?.trim() || null,
+      whatsapp_number: whatsapp_number?.trim() || null,
+      cabin_location: cabin_location?.trim() || null,
+      employee_id: employee_id?.trim() || null,
+      avatar_url: avatar_url || null,
     })
     .eq('id', user.id)
 
@@ -1840,6 +1907,8 @@ export async function updateCollegeUserProfile({
         full_name: `${cleanFirst} ${cleanLast}`,
         phone: cleanPhone,
         department: cleanDept,
+        designation: designation?.trim() || null,
+        avatar_url: avatar_url || null,
       },
     })
   } catch (err: any) {

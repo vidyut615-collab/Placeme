@@ -652,22 +652,23 @@ export function CreateJobModal({
                     </Select>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="cycle_id" className="text-xs font-semibold">Placement Season</Label>
-                    <Select name="cycle_id" defaultValue={placementCycles.find(c => c.is_active)?.id || 'none'}>
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select Season" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">General Cycle</SelectItem>
-                        {placementCycles.map(pc => (
-                          <SelectItem key={pc.id} value={pc.id}>
-                            {pc.name} {pc.is_active ? '⭐ (Active)' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {placementCycles && placementCycles.length > 0 && (
+                    <div className="space-y-1">
+                      <Label htmlFor="cycle_id" className="text-xs font-semibold">Placement Season <span className="text-red-500">*</span></Label>
+                      <Select name="cycle_id" defaultValue={placementCycles.find(c => c.is_active)?.id} required>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Select Active Season" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {placementCycles.filter(c => c.is_active).map(pc => (
+                            <SelectItem key={pc.id} value={pc.id}>
+                              {pc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
 

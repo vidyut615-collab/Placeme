@@ -10,7 +10,6 @@ import { savePlacementPolicies } from '@/app/(dashboards)/college/actions'
 import { DEFAULT_POLICY_CONFIG, type PolicyConfig } from '@/lib/policy-engine'
 
 // Policy section components
-import { RegistrationPolicy } from './policy-sections/RegistrationPolicy'
 import { EligibilityPolicy } from './policy-sections/EligibilityPolicy'
 import { ApplicationLimitPolicy } from './policy-sections/ApplicationLimitPolicy'
 import { WithdrawalPolicy } from './policy-sections/WithdrawalPolicy'
@@ -42,7 +41,6 @@ type PolicySectionDef = {
 
 const POLICY_SECTIONS: PolicySectionDef[] = [
   // Group: Registration & Eligibility
-  { key: 'registration', title: 'Registration & Participation', description: 'Who can participate in the placement cycle', policyNumber: 1, component: RegistrationPolicy, group: 'Registration & Eligibility' },
   { key: 'eligibility', title: 'Job Eligibility Criteria', description: 'Academic and profile requirements for applying', policyNumber: 2, component: EligibilityPolicy, group: 'Registration & Eligibility' },
   { key: 'academic_clearance', title: 'Academic Clearance', description: 'When academic clearance is checked', policyNumber: 19, component: AcademicClearancePolicy, group: 'Registration & Eligibility' },
   { key: 'training_readiness', title: 'Training Readiness', description: 'Training prerequisites for placement', policyNumber: 18, component: TrainingReadinessPolicy, group: 'Registration & Eligibility' },
@@ -220,3 +218,4 @@ export function PlacementPolicyEditor({ initialConfig }: Props) {
     </div>
   )
 }
+

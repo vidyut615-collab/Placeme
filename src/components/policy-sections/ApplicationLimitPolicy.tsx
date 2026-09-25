@@ -8,7 +8,6 @@ export type ApplicationLimitPolicyData = {
   enabled: boolean;
   max_total: number | null;
   max_active: number | null;
-  max_per_cycle: number | null;
   max_per_level: number | null;
   max_per_category: number | null;
   max_per_job_type: number | null;
@@ -39,10 +38,6 @@ export function ApplicationLimitPolicy({ data, onChange }: Props) {
         <div className="space-y-2">
           <Label>Max Active</Label>
           <Input type="number" value={data.max_active ?? ''} onChange={(e) => update({ max_active: e.target.value === '' ? null : Number(e.target.value) })} />
-        </div>
-        <div className="space-y-2">
-          <Label>Max Per Cycle</Label>
-          <Input type="number" value={data.max_per_cycle ?? ''} onChange={(e) => update({ max_per_cycle: e.target.value === '' ? null : Number(e.target.value) })} />
         </div>
         <div className="space-y-2">
           <Label>Max Per Level</Label>

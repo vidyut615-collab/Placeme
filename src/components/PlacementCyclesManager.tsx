@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -146,7 +146,7 @@ export function PlacementCyclesManager({
   }
 
   const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—'
+    if (!dateStr) return 'â€”'
     try {
       return new Date(dateStr).toLocaleDateString('en-US', {
         month: 'short',
@@ -180,7 +180,7 @@ export function PlacementCyclesManager({
               <CardTitle className="text-lg">Placement Seasons &amp; Cycles</CardTitle>
             </div>
             <CardDescription className="mt-1 text-xs text-zinc-500">
-              Define academic placement seasons (e.g. 2025–2026 Campus Drive, Summer Internships). Jobs and policy counters can be scoped to each cycle.
+              Define academic placement seasons (e.g. 2025â€“2026 Campus Drive, Summer Internships). Jobs and policy counters can be scoped to each cycle.
             </CardDescription>
           </div>
 
@@ -211,7 +211,7 @@ export function PlacementCyclesManager({
                   id="cycle-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. 2025–2026 Campus Placement Season"
+                  placeholder="e.g. 2025â€“2026 Campus Placement Season"
                   required
                   className="h-9 text-xs"
                 />
@@ -219,8 +219,8 @@ export function PlacementCyclesManager({
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <span className="text-[11px] text-zinc-400">Suggestions:</span>
                   {[
-                    '2025–2026 Campus Placements',
-                    '2024–2025 Final Season',
+                    '2025â€“2026 Campus Placements',
+                    '2024â€“2025 Final Season',
                     'Summer Internship Drive 2025',
                   ].map((preset) => (
                     <button
@@ -317,7 +317,7 @@ export function PlacementCyclesManager({
             <div>
               <h4 className="text-sm font-semibold">No Placement Cycles Created Yet</h4>
               <p className="text-xs text-zinc-500 max-w-md mx-auto mt-1">
-                Create a cycle (such as &quot;2025–2026 Campus Drive&quot;) to organize jobs, enforce cycle-specific application caps, and generate annual accreditation reports.
+                Create a cycle (such as &quot;2025â€“2026 Campus Drive&quot;) to organize jobs, enforce cycle-specific application caps, and generate annual accreditation reports.
               </p>
             </div>
             <Button
@@ -360,7 +360,7 @@ export function PlacementCyclesManager({
                       <TableCell className="text-xs text-zinc-600 dark:text-zinc-400">
                         {cycle.start_date || cycle.end_date ? (
                           <span>
-                            {formatDate(cycle.start_date)} — {formatDate(cycle.end_date)}
+                            {formatDate(cycle.start_date)} â€” {formatDate(cycle.end_date)}
                           </span>
                         ) : (
                           <span className="text-zinc-400">Full Academic Year</span>
@@ -402,7 +402,7 @@ export function PlacementCyclesManager({
                             )}
                           </Button>
                         ) : (
-                          <span className="text-xs text-zinc-400">—</span>
+                          <span className="text-xs text-zinc-400">â€”</span>
                         )}
                       </TableCell>
                     </TableRow>

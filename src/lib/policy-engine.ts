@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Placement Policy Engine
  * Evaluates all 20 Truskill policies against a student + job context.
  * 
@@ -8,10 +8,9 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
-// ─── Types ───────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export type PolicyConfig = {
-  registration?: RegistrationPolicy
   eligibility?: EligibilityPolicy
   application_limit?: ApplicationLimitPolicy
   withdrawal?: WithdrawalPolicy
@@ -39,17 +38,6 @@ export type PolicyConfig = {
   offer_rejection?: any
 }
 
-type RegistrationPolicy = {
-  enabled: boolean
-  requirement: 'mandatory' | 'optional'
-  late_registration_allowed: boolean
-  approval_required_for_late: boolean
-  min_attendance_pct: number | null
-  academic_clearance_required: boolean
-  orientation_required: boolean
-  training_completion_required: boolean
-}
-
 type EligibilityPolicy = {
   enabled: boolean
   min_gpa: number | null
@@ -71,7 +59,6 @@ type ApplicationLimitPolicy = {
   enabled: boolean
   max_total: number | null
   max_active: number | null
-  max_per_cycle: number | null
   max_per_level: number | null
   max_per_category: number | null
   max_per_job_type: number | null
@@ -227,14 +214,14 @@ type OverrideManagementPolicy = {
   document_required: boolean
 }
 
-// ─── Evaluation Result ───────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Evaluation Result Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export type PolicyResult = {
   allowed: boolean
   violations: string[]
 }
 
-// ─── Student Context (gathered before evaluation) ────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Student Context (gathered before evaluation) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 type StudentContext = {
   id: string
@@ -244,7 +231,6 @@ type StudentContext = {
   active_applications: number
   applications_today: number
   applications_this_week: number
-  applications_in_cycle: number
   applications_per_level: Record<string, number>
   applications_per_category: Record<string, number>
   applications_per_job_type: Record<string, number>
@@ -256,14 +242,13 @@ type StudentContext = {
   total_attempts: number
   existing_offer_ctc: number | null
   existing_offer_level_rank: number | null
-  is_registered_for_cycle: boolean
   training_completed: boolean
   training_score: number | null
   has_active_override: boolean
   override_policies: string[]
 }
 
-// ─── Job Context ─────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Job Context Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 type JobContext = {
   id: string
@@ -279,19 +264,9 @@ type JobContext = {
   level_is_super_dream: boolean
 }
 
-// ─── Default Policy Config ──────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Default Policy Config Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export const DEFAULT_POLICY_CONFIG: PolicyConfig = {
-  registration: {
-    enabled: false,
-    requirement: 'optional',
-    late_registration_allowed: true,
-    approval_required_for_late: false,
-    min_attendance_pct: null,
-    academic_clearance_required: false,
-    orientation_required: false,
-    training_completion_required: false,
-  },
   eligibility: {
     enabled: false,
     min_gpa: null,
@@ -312,7 +287,6 @@ export const DEFAULT_POLICY_CONFIG: PolicyConfig = {
     enabled: false,
     max_total: null,
     max_active: null,
-    max_per_cycle: null,
     max_per_level: null,
     max_per_category: null,
     max_per_job_type: null,
@@ -447,7 +421,7 @@ export const DEFAULT_POLICY_CONFIG: PolicyConfig = {
   },
 }
 
-// ─── Context Gatherer ────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Context Gatherer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function gatherStudentContext(
   supabase: SupabaseClient,
@@ -506,35 +480,6 @@ export async function gatherStudentContext(
     .select('*', { count: 'exact', head: true })
     .eq('student_id', studentId)
     .eq('status', 'absent')
-
-  // Registration check for active cycle
-  const { data: activeCycle } = await supabase
-    .from('placement_cycles')
-    .select('id')
-    .eq('college_id', collegeId)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle()
-
-  let isRegistered = true
-  let cycleAppCount = apps.length
-  if (activeCycle) {
-    const { data: reg } = await supabase
-      .from('student_registrations')
-      .select('status')
-      .eq('student_id', studentId)
-      .eq('cycle_id', activeCycle.id)
-      .maybeSingle()
-    isRegistered = !!reg && reg.status === 'registered'
-
-    // Applications in this cycle
-    const { data: cycleJobs } = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('cycle_id', activeCycle.id)
-    const cycleJobIds = (cycleJobs || []).map((j: any) => j.id)
-    cycleAppCount = apps.filter(a => cycleJobIds.includes(a.job_id)).length
-  }
 
   // Training check
   const { data: mandatoryModules } = await supabase
@@ -597,7 +542,6 @@ export async function gatherStudentContext(
     active_applications: activeApps.length,
     applications_today: todayApps.length,
     applications_this_week: weekApps.length,
-    applications_in_cycle: cycleAppCount,
     applications_per_level: perLevel,
     applications_per_category: perCategory,
     applications_per_job_type: perJobType,
@@ -609,7 +553,6 @@ export async function gatherStudentContext(
     total_attempts: apps.length,
     existing_offer_ctc: existingOfferCtc,
     existing_offer_level_rank: existingLevelRank,
-    is_registered_for_cycle: isRegistered,
     training_completed: trainingCompleted,
     training_score: trainingScore,
     has_active_override: overridePolicies.length > 0,
@@ -659,7 +602,7 @@ export async function gatherJobContext(
   }
 }
 
-// ─── Main Policy Evaluator ───────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Main Policy Evaluator Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export function evaluatePolicies(
   config: PolicyConfig,
@@ -676,15 +619,8 @@ export function evaluatePolicies(
   const isOverridden = (policy: string) =>
     student.has_active_override && student.override_policies.includes(policy)
 
-  // ── Policy #1: Registration ──
-  const reg = config.registration
-  if (reg?.enabled && !isOverridden('registration')) {
-    if (reg.requirement === 'mandatory' && !student.is_registered_for_cycle) {
-      violations.push('You must register for the active placement cycle before applying.')
-    }
-  }
 
-  // ── Policy #19: Academic Clearance ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #19: Academic Clearance Ã¢â€â‚¬Ã¢â€â‚¬
   const acad = config.academic_clearance
   if (acad?.enabled && !isOverridden('academic_clearance')) {
     if (acad.clearance_required_before === 'application') {
@@ -699,7 +635,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #18: Training Readiness ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #18: Training Readiness Ã¢â€â‚¬Ã¢â€â‚¬
   const training = config.training_readiness
   if (training?.enabled && !isOverridden('training_readiness')) {
     if (!student.training_completed) {
@@ -710,7 +646,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #2: Eligibility ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #2: Eligibility Ã¢â€â‚¬Ã¢â€â‚¬
   const elig = config.eligibility
   if (elig?.enabled && !isOverridden('eligibility')) {
     const p = student.profile_data
@@ -749,7 +685,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #3: Application Limits ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #3: Application Limits Ã¢â€â‚¬Ã¢â€â‚¬
   const appLimit = config.application_limit
   if (appLimit?.enabled && !isOverridden('application_limit')) {
     if (appLimit.max_total !== null && student.total_applications >= appLimit.max_total) {
@@ -757,9 +693,6 @@ export function evaluatePolicies(
     }
     if (appLimit.max_active !== null && student.active_applications >= appLimit.max_active) {
       violations.push(`Maximum active applications reached: ${appLimit.max_active}.`)
-    }
-    if (appLimit.max_per_cycle !== null && student.applications_in_cycle >= appLimit.max_per_cycle) {
-      violations.push(`Maximum applications per placement cycle reached: ${appLimit.max_per_cycle}.`)
     }
     if (appLimit.max_per_day !== null && student.applications_today >= appLimit.max_per_day) {
       violations.push(`Maximum daily application limit reached: ${appLimit.max_per_day}.`)
@@ -787,7 +720,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #12: Attempt Limits ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #12: Attempt Limits Ã¢â€â‚¬Ã¢â€â‚¬
   const attemptLimit = config.attempt_limit
   if (attemptLimit?.enabled && !isOverridden('attempt_limit')) {
     if (student.total_offers === 0 && attemptLimit.max_first_offer_attempts !== null) {
@@ -802,7 +735,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #6: Offer Limits ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #6: Offer Limits Ã¢â€â‚¬Ã¢â€â‚¬
   const offerLimit = config.offer_limit
   if (offerLimit?.enabled && !isOverridden('offer_limit')) {
     if (offerLimit.debar_on_hired && student.has_hired_status) {
@@ -826,7 +759,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #17: Placement Completion ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #17: Placement Completion Ã¢â€â‚¬Ã¢â€â‚¬
   const completion = config.placement_completion
   if (completion?.enabled && !isOverridden('placement_completion')) {
     const trigger = completion.completion_trigger
@@ -841,7 +774,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #7: Upgrade Rules ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #7: Upgrade Rules Ã¢â€â‚¬Ã¢â€â‚¬
   const upgrade = config.upgrade
   if (upgrade?.enabled && !isOverridden('upgrade') && student.existing_offer_ctc !== null) {
     const newCtc = job.compensation_ctc
@@ -849,7 +782,7 @@ export function evaluatePolicies(
       const existingCtc = student.existing_offer_ctc
 
       if (upgrade.comparison_operator === 'greater_than' && newCtc <= existingCtc) {
-        violations.push(`Upgrade policy: New CTC (₹${newCtc}) must be greater than existing offer (₹${existingCtc}).`)
+        violations.push(`Upgrade policy: New CTC (Ã¢â€šÂ¹${newCtc}) must be greater than existing offer (Ã¢â€šÂ¹${existingCtc}).`)
       }
 
       if (upgrade.min_increment_pct !== null) {
@@ -861,7 +794,7 @@ export function evaluatePolicies(
 
       if (upgrade.min_increment_amount !== null) {
         if (newCtc < existingCtc + upgrade.min_increment_amount) {
-          violations.push(`Upgrade policy: New CTC must be at least ₹${upgrade.min_increment_amount} higher than existing offer.`)
+          violations.push(`Upgrade policy: New CTC must be at least Ã¢â€šÂ¹${upgrade.min_increment_amount} higher than existing offer.`)
         }
       }
     }
@@ -877,7 +810,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #11: Level/Category Movement ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #11: Level/Category Movement Ã¢â€â‚¬Ã¢â€â‚¬
   const movement = config.level_movement
   if (movement?.enabled && !isOverridden('level_movement')) {
     if (movement.requires_higher_package && student.existing_offer_ctc !== null && job.compensation_ctc !== null) {
@@ -887,11 +820,11 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #13: Dream Opportunity ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #13: Dream Opportunity Ã¢â€â‚¬Ã¢â€â‚¬
   const dream = config.dream
   if (dream?.enabled && !isOverridden('dream') && job.level_is_dream) {
     if (dream.max_dream_attempts !== null) {
-      // Count dream applications (simplified — based on level_is_dream tag)
+      // Count dream applications (simplified Ã¢â‚¬â€ based on level_is_dream tag)
       const dreamAppCount = Object.entries(student.applications_per_level)
         .reduce((sum) => sum + 1, 0) // Simplified count
       if (dreamAppCount >= dream.max_dream_attempts) {
@@ -903,7 +836,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #14: Super Dream ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #14: Super Dream Ã¢â€â‚¬Ã¢â€â‚¬
   const superDream = config.super_dream
   if (superDream?.enabled && !isOverridden('super_dream') && job.level_is_super_dream) {
     if (superDream.max_attempts !== null && student.total_attempts >= superDream.max_attempts) {
@@ -914,7 +847,7 @@ export function evaluatePolicies(
     }
   }
 
-  // ── Policy #5: No-Show ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Policy #5: No-Show Ã¢â€â‚¬Ã¢â€â‚¬
   const noShow = config.no_show
   if (noShow?.enabled && !isOverridden('no_show')) {
     if (student.no_show_count >= noShow.max_no_shows) {

@@ -911,11 +911,13 @@ export async function rejectStudentOffer({
 
 export async function createPlacementCycle({
   name,
+  description,
   startDate,
   endDate,
   isActive = true,
 }: {
   name: string
+  description?: string
   startDate?: string | null
   endDate?: string | null
   isActive?: boolean
@@ -936,19 +938,12 @@ export async function createPlacementCycle({
     return { error: 'Placement cycle name is required.' }
   }
 
-  // If new cycle is set as active, deactivate other cycles for this college
-  if (isActive) {
-    await supabase
-      .from('placement_cycles')
-      .update({ is_active: false })
-      .eq('college_id', collegeId)
-  }
-
   const { data: cycle, error } = await supabase
     .from('placement_cycles')
     .insert({
       college_id: collegeId,
       name: name.trim(),
+      description: description?.trim() || null,
       start_date: startDate || null,
       end_date: endDate || null,
       is_active: isActive,
@@ -967,6 +962,49 @@ export async function createPlacementCycle({
   return { success: 'Placement cycle created successfully!', cycle }
 }
 
+export async function updatePlacementCycle({
+  cycleId,
+  name,
+  description,
+  startDate,
+  endDate,
+}: {
+  cycleId: string
+  name: string
+  description?: string
+  startDate?: string | null
+  endDate?: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user || user.app_metadata.role !== 'college_admin') {
+    return { error: 'Unauthorized.' }
+  }
+
+  const collegeId = user.app_metadata.college_id
+  if (!name.trim()) return { error: 'Name is required.' }
+
+  const { data: cycle, error } = await supabase
+    .from('placement_cycles')
+    .update({
+      name: name.trim(),
+      description: description?.trim() || null,
+      start_date: startDate || null,
+      end_date: endDate || null,
+    })
+    .eq('id', cycleId)
+    .eq('college_id', collegeId)
+    .select()
+    .single()
+
+  if (error) return { error: `Failed to update placement cycle: ${error.message}` }
+
+  revalidatePath('/college/placement-cycles')
+  revalidatePath('/college/jobs')
+  return { success: 'Placement cycle updated successfully!', cycle }
+}
+
 export async function togglePlacementCycleActive(cycleId: string, isActive: boolean) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -978,14 +1016,6 @@ export async function togglePlacementCycleActive(cycleId: string, isActive: bool
   const collegeId = user.app_metadata.college_id
   if (!collegeId) {
     return { error: 'College ID not found.' }
-  }
-
-  // If activating this cycle, deactivate others
-  if (isActive) {
-    await supabase
-      .from('placement_cycles')
-      .update({ is_active: false })
-      .eq('college_id', collegeId)
   }
 
   const { error } = await supabase
@@ -1001,7 +1031,7 @@ export async function togglePlacementCycleActive(cycleId: string, isActive: bool
   revalidatePath('/college/placement-cycles')
   revalidatePath('/college/settings')
   revalidatePath('/college/jobs')
-  return { success: isActive ? 'Cycle set as active season.' : 'Cycle marked as inactive.' }
+  return { success: isActive ? 'Cycle set as active.' : 'Cycle marked as inactive.' }
 }
 
 export async function deletePlacementCycle(cycleId: string) {

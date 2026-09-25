@@ -743,22 +743,25 @@ export function EditJobModal({
                     />
                   </div>
 
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label className="text-xs font-semibold">Placement Season / Cycle</Label>
-                    <Select value={cycleId} onValueChange={(val) => setCycleId(val || 'none')}>
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select Cycle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">General Cycle</SelectItem>
-                        {placementCycles.map(pc => (
-                          <SelectItem key={pc.id} value={pc.id}>
-                            {pc.name} {pc.is_active ? '⭐ (Active)' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {placementCycles && placementCycles.length > 0 && (
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs font-semibold">Placement Season <span className="text-red-500">*</span></Label>
+                      <Select value={cycleId} onValueChange={(val) => setCycleId(val)}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Select Cycle" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {placementCycles
+                            .filter(c => c.is_active || c.id === job.cycle_id)
+                            .map(pc => (
+                            <SelectItem key={pc.id} value={pc.id}>
+                              {pc.name} {pc.is_active ? ' (Active)' : ' (Inactive)'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -938,12 +938,16 @@ export async function createPlacementCycle({
     return { error: 'Placement cycle name is required.' }
   }
 
+  if (!description?.trim()) {
+    return { error: 'Placement cycle description is required.' }
+  }
+
   const { data: cycle, error } = await supabase
     .from('placement_cycles')
     .insert({
       college_id: collegeId,
       name: name.trim(),
-      description: description?.trim() || null,
+      description: description.trim(),
       start_date: startDate || null,
       end_date: endDate || null,
       is_active: isActive,
@@ -971,7 +975,7 @@ export async function updatePlacementCycle({
 }: {
   cycleId: string
   name: string
-  description?: string
+  description: string
   startDate?: string | null
   endDate?: string | null
 }) {
@@ -983,13 +987,14 @@ export async function updatePlacementCycle({
   }
 
   const collegeId = user.app_metadata.college_id
-  if (!name.trim()) return { error: 'Name is required.' }
+  if (!name.trim()) return { error: 'Placement cycle name is required.' }
+  if (!description?.trim()) return { error: 'Placement cycle description is required.' }
 
   const { data: cycle, error } = await supabase
     .from('placement_cycles')
     .update({
       name: name.trim(),
-      description: description?.trim() || null,
+      description: description.trim(),
       start_date: startDate || null,
       end_date: endDate || null,
     })

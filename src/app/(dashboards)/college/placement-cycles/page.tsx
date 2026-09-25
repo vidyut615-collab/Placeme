@@ -18,7 +18,7 @@ export default async function CollegePlacementCyclesPage() {
   // Fetch placement cycles with linked jobs count
   const { data: cycles, error } = await supabase
     .from('placement_cycles')
-    .select('id, name, start_date, end_date, is_active, created_at, jobs(id)')
+    .select('id, name, description, start_date, end_date, is_active, created_at, jobs(id)')
     .eq('college_id', user.app_metadata.college_id)
     .order('created_at', { ascending: false })
 

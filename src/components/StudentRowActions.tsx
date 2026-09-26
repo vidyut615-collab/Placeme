@@ -138,8 +138,8 @@ export function StudentRowActions({
           </Button>
         )}
 
-        {/* Three-dot (kebab) menu: Admin only */}
-        {canDelete && (
+        {/* Three-dot (kebab) menu: Admin only (for ACTIVE students) */}
+        {!isInvite && canDelete && (
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 h-7 w-7 p-0 text-zinc-500">
               <span className="sr-only">Open options</span>
@@ -155,6 +155,20 @@ export function StudentRowActions({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+
+        {/* Red Bin Icon: Admin only (for PENDING invites) */}
+        {isInvite && canDelete && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleOpenDelete}
+            disabled={isPending}
+            className="h-7 text-[11px] px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40"
+            title="Revoke invitation"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         )}
       </div>
 

@@ -58,6 +58,17 @@ export default async function StudentJobsPage() {
   const counters = student.policy_counters || {}
 
   // Fetch active and paused jobs with extended job board fields
+  const { data: targetedJobs } = await supabase
+    .from('job_target_colleges')
+    .select('job_id')
+    .eq('college_id', student.college_id)
+  
+  const targetedJobIds = targetedJobs?.map(t => t.job_id) || []
+  let orQuery = `college_id.eq.${student.college_id},is_all_colleges.eq.true`
+  if (targetedJobIds.length > 0) {
+    orQuery += `,id.in.(${targetedJobIds.join(',')})`
+  }
+
   const { data: jobs } = await supabase
     .from('jobs')
     .select(`
@@ -86,10 +97,11 @@ export default async function StudentJobsPage() {
       jd_attachment_url,
       jd_attachment_name,
       eligibility_criteria,
-      custom_stages
+      custom_stages,
+      ideal_for
     `)
     .in('status', ['active', 'paused'])
-    .or(`college_id.is.null,college_id.eq.${student.college_id}`)
+    .or(orQuery)
     .order('created_at', { ascending: false })
 
   return (

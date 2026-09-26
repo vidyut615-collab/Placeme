@@ -17,7 +17,7 @@ export default async function CollegeProfilePage() {
   const { data: college, error } = await supabase
     .from('colleges')
     .select(`
-      id, name, website, location, description, contact_email, contact_phone,
+      id, name, website, city, location, description, contact_email, contact_phone,
       logo_url, banner_url, brochure_url,
       address_street, address_state, address_pincode,
       naac_grade, nba_accreditation, aishe_code, university_affiliation, nirf_rank, establishment_year,

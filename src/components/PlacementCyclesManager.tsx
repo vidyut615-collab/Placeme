@@ -9,6 +9,16 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -58,6 +68,16 @@ export function PlacementCyclesManager({
   const [editingCycle, setEditingCycle] = useState<PlacementCycleItem | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  type ConfirmAction = {
+    title: string
+    description: string
+    confirmText: string
+    isDestructive?: boolean
+    onConfirm: () => void
+  } | null
+  
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmAction>(null)
 
   // Create Form Fields
   const [name, setName] = useState('')
@@ -181,20 +201,24 @@ export function PlacementCyclesManager({
   }
 
   const handleDelete = async (cycleId: string, cycleName: string) => {
-    if (!confirm(`Are you sure you want to delete "${cycleName}"? Any jobs linked to this cycle will have their cycle unlinked.`)) {
-      return
-    }
+    setConfirmDialog({
+      title: 'Delete Placement Cycle',
+      description: `Are you sure you want to delete "${cycleName}"? Any jobs linked to this cycle will have their cycle unlinked. This action cannot be undone.`,
+      confirmText: 'Delete',
+      isDestructive: true,
+      onConfirm: async () => {
+        setDeletingId(cycleId)
+        const res = await deletePlacementCycle(cycleId)
+        setDeletingId(null)
 
-    setDeletingId(cycleId)
-    const res = await deletePlacementCycle(cycleId)
-    setDeletingId(null)
-
-    if (res.error) {
-      toast.error(res.error)
-    } else {
-      toast.success(res.success || 'Cycle deleted.')
-      setCycles(prev => prev.filter(c => c.id !== cycleId))
-    }
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success(res.success || 'Cycle deleted.')
+          setCycles(prev => prev.filter(c => c.id !== cycleId))
+        }
+      }
+    })
   }
 
   const formatDate = (dateStr: string | null) => {
@@ -606,6 +630,29 @@ export function PlacementCyclesManager({
           </DialogContent>
         </Dialog>
       )}
+
+      <AlertDialog open={!!confirmDialog} onOpenChange={(open) => !open && setConfirmDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (confirmDialog) confirmDialog.onConfirm()
+                setConfirmDialog(null)
+              }}
+              className={confirmDialog?.isDestructive ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+            >
+              {confirmDialog?.confirmText || 'Continue'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

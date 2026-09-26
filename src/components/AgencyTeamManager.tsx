@@ -42,15 +42,15 @@ import {
   Building2,
 } from 'lucide-react'
 import {
-  resendCollegeMemberInvite,
-  revokeCollegeMemberInvite,
-  updateCollegeMemberRole,
-  toggleCollegeMemberStatus,
-} from '@/app/(dashboards)/college/roles/actions'
+  resendAgencyMemberInvite,
+  revokeAgencyMemberInvite,
+  updateAgencyMemberRole,
+  toggleAgencyMemberStatus,
+} from '@/app/(dashboards)/agency/roles/actions'
 import { toast } from 'sonner'
 import { formatDate } from '@/lib/utils'
 
-export type CollegeMember = {
+export type AgencyMember = {
   id: string
   email: string
   role: string
@@ -62,7 +62,7 @@ export type CollegeMember = {
   created_at: string
 }
 
-export type CollegeInvitation = {
+export type AgencyInvitation = {
   id: string
   email: string
   role: string
@@ -74,14 +74,14 @@ export type CollegeInvitation = {
   created_at: string
 }
 
-export function CollegeTeamManager({
+export function AgencyTeamManager({
   currentUserId,
   members,
   invitations,
 }: {
   currentUserId: string
-  members: CollegeMember[]
-  invitations: CollegeInvitation[]
+  members: AgencyMember[]
+  invitations: AgencyInvitation[]
 }) {
   const [activeTab, setActiveTab] = useState('members')
   const [searchQuery, setSearchQuery] = useState('')
@@ -96,8 +96,8 @@ export function CollegeTeamManager({
   
   const [confirmDialog, setConfirmDialog] = useState<ConfirmAction>(null)
 
-  const adminCount = members.filter((m) => m.role === 'college_admin' && m.is_active).length
-  const staffCount = members.filter((m) => m.role === 'college_staff' && m.is_active).length
+  const adminCount = members.filter((m) => m.role === 'agency_admin' && m.is_active).length
+  const staffCount = members.filter((m) => m.role === 'agency_staff' && m.is_active).length
   const pendingCount = invitations.length
 
   const filteredMembers = members.filter((m) => {
@@ -118,7 +118,7 @@ export function CollegeTeamManager({
 
   const handleResend = async (invitationId: string) => {
     setProcessingId(invitationId)
-    const res = await resendCollegeMemberInvite(invitationId)
+    const res = await resendAgencyMemberInvite(invitationId)
     setProcessingId(null)
     if (res.error) {
       toast.error(res.error)
@@ -134,7 +134,7 @@ export function CollegeTeamManager({
       confirmText: 'Revoke',
       onConfirm: async () => {
         setProcessingId(invitationId)
-        const res = await revokeCollegeMemberInvite(invitationId)
+        const res = await revokeAgencyMemberInvite(invitationId)
         setProcessingId(null)
         if (res.error) {
           toast.error(res.error)
@@ -145,9 +145,9 @@ export function CollegeTeamManager({
     })
   }
 
-  const handleRoleToggle = async (member: CollegeMember) => {
-    const newRole = member.role === 'college_admin' ? 'college_staff' : 'college_admin'
-    const newRoleLabel = newRole === 'college_admin' ? 'College Administrator' : 'College Staff'
+  const handleRoleToggle = async (member: AgencyMember) => {
+    const newRole = member.role === 'agency_admin' ? 'agency_staff' : 'agency_admin'
+    const newRoleLabel = newRole === 'agency_admin' ? 'Agency Administrator' : 'Agency Staff'
 
     setConfirmDialog({
       title: 'Change Role',
@@ -155,7 +155,7 @@ export function CollegeTeamManager({
       confirmText: 'Change Role',
       onConfirm: async () => {
         setProcessingId(member.id)
-        const res = await updateCollegeMemberRole({
+        const res = await updateAgencyMemberRole({
           targetUserId: member.id,
           newRole,
         })
@@ -169,7 +169,7 @@ export function CollegeTeamManager({
     })
   }
 
-  const handleStatusToggle = async (member: CollegeMember) => {
+  const handleStatusToggle = async (member: AgencyMember) => {
     const newStatus = !member.is_active
     const actionLabel = newStatus ? 'reactivate' : 'deactivate'
 
@@ -179,7 +179,7 @@ export function CollegeTeamManager({
       confirmText: newStatus ? 'Reactivate' : 'Deactivate',
       onConfirm: async () => {
         setProcessingId(member.id)
-        const res = await toggleCollegeMemberStatus({
+        const res = await toggleAgencyMemberStatus({
           targetUserId: member.id,
           isActive: newStatus,
         })
@@ -214,7 +214,7 @@ export function CollegeTeamManager({
         <Card className="shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-zinc-500 font-medium">College Administrators</p>
+              <p className="text-xs text-zinc-500 font-medium">Agency Administrators</p>
               <h3 className="text-2xl font-bold mt-1 text-purple-700 dark:text-purple-300">
                 {adminCount}
               </h3>
@@ -310,7 +310,8 @@ export function CollegeTeamManager({
                         .map((p) => p[0]?.toUpperCase())
                         .join('') || 'TM'
                     const isSelf = member.id === currentUserId
-                    const isAdmin = member.role === 'college_admin'
+                    const isAdmin = member.role === 'agency_admin'
+                    const isOwner = member.role === 'superadmin'
 
                     return (
                       <TableRow key={member.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
@@ -319,7 +320,9 @@ export function CollegeTeamManager({
                           <div className="flex items-center gap-3">
                             <div
                               className={`h-9 w-9 rounded-full font-bold text-xs flex items-center justify-center shrink-0 border ${
-                                isAdmin
+                                isOwner
+                                  ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300'
+                                  : isAdmin
                                   ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300'
                                   : 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300'
                               }`}
@@ -344,15 +347,20 @@ export function CollegeTeamManager({
 
                         {/* Role Badge */}
                         <TableCell>
-                          {isAdmin ? (
+                          {isOwner ? (
+                            <Badge className="bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 text-[10px] font-semibold gap-1">
+                              <ShieldCheck className="h-3 w-3" />
+                              Admin Owner
+                            </Badge>
+                          ) : isAdmin ? (
                             <Badge className="bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 text-[10px] font-semibold gap-1">
                               <ShieldCheck className="h-3 w-3" />
-                              College Admin
+                              Agency Admin
                             </Badge>
                           ) : (
                             <Badge className="bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-semibold gap-1">
                               <Users className="h-3 w-3" />
-                              College Staff
+                              Agency Staff
                             </Badge>
                           )}
                         </TableCell>
@@ -389,7 +397,10 @@ export function CollegeTeamManager({
                         {/* Actions */}
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {!isSelf && (
+                            {isOwner && !isSelf && (
+                              <span className="text-[10px] text-zinc-400 italic px-2">Owner</span>
+                            )}
+                            {!isSelf && !isOwner && (
                               <>
                                 <Button
                                   variant="outline"
@@ -459,7 +470,7 @@ export function CollegeTeamManager({
                 ) : (
                   filteredInvitations.map((inv) => {
                     const fullName = `${inv.first_name || ''} ${inv.last_name || ''}`.trim() || 'Invited User'
-                    const isAdmin = inv.role === 'college_admin'
+                    const isAdmin = inv.role === 'agency_admin'
 
                     return (
                       <TableRow key={inv.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
@@ -476,12 +487,12 @@ export function CollegeTeamManager({
                           {isAdmin ? (
                             <Badge className="bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 text-[10px] font-semibold gap-1">
                               <ShieldCheck className="h-3 w-3" />
-                              College Admin
+                              Agency Admin
                             </Badge>
                           ) : (
                             <Badge className="bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-semibold gap-1">
                               <Users className="h-3 w-3" />
-                              College Staff
+                              Agency Staff
                             </Badge>
                           )}
                         </TableCell>

@@ -17,7 +17,8 @@ import {
   IndianRupee, 
   ShieldCheck, 
   FileText, 
-  Download, 
+  Download,
+  Sparkles,
   GraduationCap, 
   Clock, 
   Layers, 
@@ -25,7 +26,6 @@ import {
   CheckCircle2, 
   AlertTriangle,
   Briefcase,
-  Sparkles,
   Info
 } from 'lucide-react'
 
@@ -51,6 +51,7 @@ export interface JobDetailsData {
   drive_mode?: string | null
   jd_attachment_url?: string | null
   jd_attachment_name?: string | null
+  ideal_for?: string | null
   compensation_ctc?: number | null
   compensation_fixed?: number | null
   compensation_variable?: number | null
@@ -388,6 +389,17 @@ export function JobDetailsModal({
                 )}
               </div>
 
+              {job.ideal_for && (
+                <div className="p-4 rounded-xl border bg-amber-50/50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-1.5">
+                    <Sparkles className="h-3.5 w-3.5" /> Ideal For
+                  </div>
+                  <div className="text-zinc-700 dark:text-zinc-300 text-xs leading-relaxed">
+                    {job.ideal_for}
+                  </div>
+                </div>
+              )}
+
               {/* Full Description */}
               <div className="p-4 rounded-xl border bg-white dark:bg-zinc-950 space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-zinc-500">
@@ -434,3 +446,4 @@ export function JobDetailsModal({
     </Dialog>
   )
 }
+

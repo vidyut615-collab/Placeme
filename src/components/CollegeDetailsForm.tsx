@@ -30,6 +30,7 @@ interface CollegeDetailsFormProps {
   initialData: {
     name: string
     website?: string | null
+    city?: string | null
     location?: string | null
     description?: string | null
     contact_email?: string | null
@@ -313,14 +314,25 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="location" className="text-xs font-semibold">City / District (Optional)</Label>
-                <Input 
-                  id="location" 
-                  name="location" 
-                  placeholder="e.g. Mumbai" 
-                  defaultValue={initialData.location || ''} 
-                  className="text-sm" 
-                />
+                <Label className="text-xs font-semibold text-zinc-500">City (Hub) - Configured by Agency</Label>
+                  <Input 
+                    value={initialData.city || 'Not Specified'} 
+                    disabled
+                    readOnly
+                    className="text-sm bg-zinc-50 dark:bg-zinc-900/50 cursor-not-allowed text-zinc-500" 
+                  />
+                  {/* Keep city value in form if needed, though updateCollege uses what agency set anyway if we don't pass it, but better safe. Actually updateCollege action reads 'city'. Let's not pass it so college admin can't overwrite it. */}
+                </div>
+                
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label htmlFor="location" className="text-xs font-semibold">Campus Location / Address</Label>
+                  <Input 
+                    id="location" 
+                    name="location" 
+                    placeholder="e.g. Powai, Mumbai, Maharashtra" 
+                    defaultValue={initialData.location || ''} 
+                    className="text-sm" 
+                  />
               </div>
 
               <div className="space-y-1.5">
@@ -709,3 +721,5 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
     </form>
   )
 }
+
+

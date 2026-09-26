@@ -10,13 +10,14 @@ export async function addCollege(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized. Only Agency staff can create colleges.' }
   }
 
   const name = (formData.get('name') as string)?.trim()
   const adminEmail = (formData.get('adminEmail') as string)?.trim()
   const website = (formData.get('website') as string)?.trim() || null
+  const city = (formData.get('city') as string)?.trim() || null
   const location = (formData.get('location') as string)?.trim() || null
   const description = (formData.get('description') as string)?.trim() || null
   const contact_email = (formData.get('contact_email') as string)?.trim() || null
@@ -52,6 +53,7 @@ export async function addCollege(formData: FormData) {
       .insert({
         name,
         website,
+        city,
         location,
         description,
         contact_email,
@@ -147,13 +149,14 @@ export async function updateCollege(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized.' }
   }
 
   const id = formData.get('id') as string
   const name = (formData.get('name') as string)?.trim()
   const website = (formData.get('website') as string)?.trim() || null
+  const city = (formData.get('city') as string)?.trim() || null
   const location = (formData.get('location') as string)?.trim() || null
   const description = (formData.get('description') as string)?.trim() || null
   const contact_email = (formData.get('contact_email') as string)?.trim() || null
@@ -161,15 +164,41 @@ export async function updateCollege(formData: FormData) {
 
   if (!id || !name) return { error: 'College Name is required.' }
 
-  const adminClient = getAdminClient()
-  const { error } = await adminClient.from('colleges').update({
+  const updatePayload: Record<string, any> = {
     name,
     website,
+    city,
     location,
     description,
     contact_email,
-    contact_phone
-  }).eq('id', id)
+    contact_phone,
+  }
+
+  // Support extended profile fields if submitted from full edit form
+  if (formData.has('logo_url')) updatePayload.logo_url = (formData.get('logo_url') as string) || null
+  if (formData.has('banner_url')) updatePayload.banner_url = (formData.get('banner_url') as string) || null
+  if (formData.has('brochure_url')) updatePayload.brochure_url = (formData.get('brochure_url') as string) || null
+  if (formData.has('address_street')) updatePayload.address_street = (formData.get('address_street') as string)?.trim() || null
+  if (formData.has('address_state')) updatePayload.address_state = (formData.get('address_state') as string)?.trim() || null
+  if (formData.has('address_pincode')) updatePayload.address_pincode = (formData.get('address_pincode') as string)?.trim() || null
+  if (formData.has('naac_grade')) updatePayload.naac_grade = (formData.get('naac_grade') as string)?.trim() || null
+  if (formData.has('nba_accreditation')) updatePayload.nba_accreditation = (formData.get('nba_accreditation') as string)?.trim() || null
+  if (formData.has('aishe_code')) updatePayload.aishe_code = (formData.get('aishe_code') as string)?.trim() || null
+  if (formData.has('university_affiliation')) updatePayload.university_affiliation = (formData.get('university_affiliation') as string)?.trim() || null
+  if (formData.has('nirf_rank')) updatePayload.nirf_rank = (formData.get('nirf_rank') as string)?.trim() || null
+  if (formData.has('establishment_year')) updatePayload.establishment_year = (formData.get('establishment_year') as string)?.trim() || null
+  if (formData.has('lab_capacity')) updatePayload.lab_capacity = (formData.get('lab_capacity') as string)?.trim() || null
+  if (formData.has('auditorium_capacity')) updatePayload.auditorium_capacity = (formData.get('auditorium_capacity') as string)?.trim() || null
+  if (formData.has('interview_cabins')) updatePayload.interview_cabins = (formData.get('interview_cabins') as string)?.trim() || null
+  if (formData.has('nearest_airport')) updatePayload.nearest_airport = (formData.get('nearest_airport') as string)?.trim() || null
+  if (formData.has('nearest_railway')) updatePayload.nearest_railway = (formData.get('nearest_railway') as string)?.trim() || null
+  if (formData.has('campus_guest_house')) updatePayload.campus_guest_house = (formData.get('campus_guest_house') as string)?.trim() || null
+  if (formData.has('highest_ctc')) updatePayload.highest_ctc = (formData.get('highest_ctc') as string)?.trim() || null
+  if (formData.has('average_ctc')) updatePayload.average_ctc = (formData.get('average_ctc') as string)?.trim() || null
+  if (formData.has('total_companies_visited')) updatePayload.total_companies_visited = (formData.get('total_companies_visited') as string)?.trim() || null
+
+  const adminClient = getAdminClient()
+  const { error } = await adminClient.from('colleges').update(updatePayload).eq('id', id)
 
   if (error) return { error: error.message }
   
@@ -182,7 +211,7 @@ export async function addCollegeAdmin(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized.' }
   }
 
@@ -305,7 +334,7 @@ export async function createGlobalJob(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized.' }
   }
 
@@ -387,10 +416,16 @@ export async function createGlobalJob(formData: FormData) {
   const jd_attachment_url = (formData.get('jd_attachment_url') as string)?.trim() || null
   const jd_attachment_name = (formData.get('jd_attachment_name') as string)?.trim() || null
 
+  const ideal_for = (formData.get('ideal_for') as string)?.trim() || null
+  const target_type = formData.get('target_type') as string || 'all'
+  const is_all_colleges = target_type === 'all'
+  const target_cities_raw = formData.get('target_cities') as string || '[]'
+  const target_colleges_raw = formData.get('target_colleges') as string || '[]'
+
   if (!title || !description || !status || !company_name) return { error: 'Missing required fields.' }
 
   const adminClient = getAdminClient()
-  const { error } = await adminClient.from('jobs').insert({
+  const { data: jobData, error } = await adminClient.from('jobs').insert({
     title,
     description,
     status,
@@ -419,10 +454,32 @@ export async function createGlobalJob(formData: FormData) {
     drive_mode,
     jd_attachment_url,
     jd_attachment_name,
+    ideal_for,
+    is_all_colleges,
     created_by: user.id
-  })
+  }).select('id').single()
 
   if (error) return { error: error.message }
+
+  // Handle Distribution
+  if (jobData && !is_all_colleges) {
+    let finalCollegeIds: string[] = []
+    
+    if (target_type === 'city') {
+      const cities = JSON.parse(target_cities_raw) as string[]
+      if (cities.length > 0) {
+        const { data: collegesInCities } = await adminClient.from('colleges').select('id').in('city', cities)
+        if (collegesInCities) finalCollegeIds = collegesInCities.map(c => c.id)
+      }
+    } else if (target_type === 'specific') {
+      finalCollegeIds = JSON.parse(target_colleges_raw) as string[]
+    }
+    
+    if (finalCollegeIds.length > 0) {
+      const insertPayload = finalCollegeIds.map(cid => ({ job_id: jobData.id, college_id: cid }))
+      await adminClient.from('job_target_colleges').insert(insertPayload)
+    }
+  }
 
   revalidatePath('/agency/jobs')
   return { success: 'Global job created successfully!' }
@@ -432,7 +489,7 @@ export async function inviteStudent(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized. Only Agency staff can invite students.' }
   }
 
@@ -458,7 +515,18 @@ export async function inviteStudent(formData: FormData) {
 
     if (authError) {
       if (authError.message.includes('already registered') || authError.status === 422) {
-        // Check if they are fully onboarded or still pending
+        // Check if they are fully onboarded in users table
+        const { data: existingUser } = await adminClient
+          .from('users')
+          .select('id')
+          .eq('email', studentEmail)
+          .maybeSingle()
+          
+        if (existingUser) {
+          return { error: 'User is already fully registered and active in the system.' }
+        }
+
+        // Check if they are fully onboarded or still pending in invitations
         const { data: existingInvite } = await adminClient
           .from('invitations')
           .select('status')
@@ -528,7 +596,7 @@ export async function updateCollegeOnboardingFields(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized.' }
   }
 
@@ -610,7 +678,7 @@ export async function checkExistingStudentEmails(emails: string[]) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized.' }
   }
 
@@ -667,7 +735,7 @@ export async function bulkInviteStudents({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata.role !== 'superadmin' && user.app_metadata.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized. Only Agency staff can invite students.' }
   }
 
@@ -699,6 +767,19 @@ export async function bulkInviteStudents({
 
       if (authError) {
         if (authError.message.includes('already registered') || authError.status === 422) {
+          // Check if they are fully onboarded in users table
+          const { data: existingUser } = await adminClient
+            .from('users')
+            .select('id')
+            .eq('email', studentEmail)
+            .maybeSingle()
+            
+          if (existingUser) {
+            failedList.push({ email: studentEmail, reason: 'Already registered and active in system' })
+            continue
+          }
+
+          // Check if they are fully onboarded or still pending in invitations table
           const { data: existingInvite } = await adminClient
             .from('invitations')
             .select('status')
@@ -805,7 +886,7 @@ export async function resendStudentInvite({
     const adminCheck = getAdminClient()
     const { data: dbUser } = await adminCheck.from('users').select('college_id, role').eq('id', user.id).maybeSingle()
     const isDbCollegeStaff = (dbUser?.role === 'college_admin' || dbUser?.role === 'college_staff') && dbUser?.college_id === collegeId
-    if (!isDbCollegeStaff && dbUser?.role !== 'superadmin' && dbUser?.role !== 'agency_staff') {
+    if (!isDbCollegeStaff && dbUser?.role !== 'superadmin' && dbUser?.role !== 'agency_staff' && dbUser?.role !== 'agency_admin') {
       return { error: 'Unauthorized to resend student invite for this college.' }
     }
   }
@@ -946,7 +1027,7 @@ export async function deleteStudentAccount({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || (user.app_metadata?.role !== 'superadmin' && user.app_metadata?.role !== 'agency_staff')) {
+  if (!user || (user.app_metadata?.role !== 'superadmin' && user.app_metadata?.role !== 'agency_staff' && user.app_metadata.role !== 'agency_admin')) {
     return { error: 'Unauthorized. Only Agency SuperAdmins and Staff can delete students.' }
   }
 
@@ -1029,6 +1110,10 @@ export async function deleteStudentAccount({
     return { error: err.message || 'Failed to delete student account.' }
   }
 }
+
+
+
+
 
 
 

@@ -21,11 +21,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { updateCollege, addCollegeAdmin, deleteCollege } from '@/app/(dashboards)/agency/actions'
+
+import { INDIAN_CITIES } from '@/lib/cities-data'
 import { toast } from 'sonner'
 
 export interface CollegeDetails {
   name: string
   website?: string | null
+  city?: string | null
   location?: string | null
   description?: string | null
   contact_email?: string | null
@@ -108,7 +111,23 @@ export function CollegeActionsMenu({ collegeId, collegeName, collegeDetails }: C
                 <Input id="edit-website" name="website" type="url" placeholder="https://college.edu" defaultValue={collegeDetails?.website || ''} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-location">Location / City</Label>
+                <Label htmlFor="edit-city">City (Hub)</Label>
+                <Input 
+                  name="city" 
+                  list="indian-cities" 
+                  defaultValue={collegeDetails?.city || 'Bengaluru / Bangalore'} 
+                  placeholder="Search or select a city..." 
+                  required 
+                  autoComplete="off"
+                />
+                <datalist id="indian-cities">
+                  {INDIAN_CITIES.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-location">Campus Location / Address</Label>
                 <Input id="edit-location" name="location" placeholder="e.g. Mumbai, MH" defaultValue={collegeDetails?.location || ''} />
               </div>
             </div>
@@ -192,3 +211,6 @@ export function CollegeActionsMenu({ collegeId, collegeName, collegeDetails }: C
     </>
   )
 }
+
+
+

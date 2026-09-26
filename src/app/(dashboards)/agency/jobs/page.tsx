@@ -10,14 +10,19 @@ export default async function AgencyJobsPage() {
   const [
     { data: jobs },
     { data: appCounts },
+    { data: colleges }
   ] = await Promise.all([
     supabase
       .from('jobs')
-      .select('*, colleges(name)')
+      .select('*, colleges!jobs_college_id_fkey(name)')
       .order('created_at', { ascending: false }),
     supabase
       .from('applications')
       .select('job_id'),
+    supabase
+      .from('colleges')
+      .select('id, name, city')
+      .order('name')
   ])
 
   // Build a count map: { job_id -> count }
@@ -41,6 +46,8 @@ export default async function AgencyJobsPage() {
         </div>
         <CreateJobModal
           action={createGlobalJob}
+          isAgency={true}
+          colleges={colleges || []}
           title="Post Global Job"
           description="Create a job that will be visible to every student on the platform."
         />

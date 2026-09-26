@@ -1,18 +1,23 @@
-import { AgencySidebar, agencyNavigation } from '@/components/AgencySidebar'
-import { BottomNav } from '@/components/BottomNav'
+import { AgencySidebar } from '@/components/AgencySidebar'
+import { AgencyBottomNav } from '@/components/AgencyBottomNav'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { MobileUserMenu } from '@/components/MobileUserMenu'
+import { createClient } from '@/utils/supabase/server'
 
-export default function AgencyLayout({
+export default async function AgencyLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.app_metadata?.role || 'agency_staff'
+
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex">
-        <AgencySidebar />
+        <AgencySidebar role={role} />
       </div>
       
       {/* Main Content Area */}
@@ -32,7 +37,7 @@ export default function AgencyLayout({
           {children}
         </main>
 
-        <BottomNav items={agencyNavigation} />
+        <AgencyBottomNav role={role} />
       </div>
     </div>
   )

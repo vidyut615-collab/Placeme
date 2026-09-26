@@ -58,6 +58,8 @@ interface CreateJobModalProps {
     types?: string[]
     years?: string[]
   }
+  isAgency?: boolean
+  colleges?: Array<{ id: string; name: string; city: string | null }>
 }
 
 export function CreateJobModal({
@@ -65,11 +67,18 @@ export function CreateJobModal({
   title,
   description,
   placementCycles = [],
-  academicFields = { departments: [], types: [], years: [] }
+  academicFields = { departments: [], types: [], years: [] },
+  isAgency = false,
+  colleges = []
 }: CreateJobModalProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const [step, setStep] = useState(1)
+  const [targetType, setTargetType] = useState<'all' | 'city' | 'specific'>('all')
+  const [targetCities, setTargetCities] = useState<string[]>([])
+  const [targetColleges, setTargetColleges] = useState<string[]>([])
 
   // Selected multi-select academic options
   const [selectedDepts, setSelectedDepts] = useState<string[]>([])
@@ -193,6 +202,12 @@ export function CreateJobModal({
       formData.set('eligibility_allowed_years', selectedYears.join(','))
     }
 
+    if (isAgency) {
+      formData.set('target_type', targetType)
+      formData.set('target_cities', JSON.stringify(targetCities))
+      formData.set('target_colleges', JSON.stringify(targetColleges))
+    }
+
     startTransition(async () => {
       const res = await action(formData)
       if (res.error) {
@@ -247,8 +262,10 @@ export function CreateJobModal({
             </div>
           )}
 
-          {/* Form structured in a clean, legible long-form layout */}
-          <form id="create-job-form" action={handleSubmit} className="max-w-3xl mx-auto space-y-6 pb-6">
+          {/* Form structured in a clean, legible long-form layout but utilizing the 16:9 width */}
+          <form id="create-job-form" action={handleSubmit} className="pb-6">
+            <div className={step === 1 ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'hidden'}>
+            <div className="space-y-6">
 
             {/* 1. ROLE & LOCATION SPECIFICS */}
             <div className="p-5 rounded-xl border bg-white dark:bg-zinc-900/60 space-y-4 shadow-xs">
@@ -287,7 +304,7 @@ export function CreateJobModal({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="workplace_mode" className="text-xs font-semibold">
                       Workplace Mode <span className="text-red-500">*</span>
@@ -428,7 +445,7 @@ export function CreateJobModal({
                       Internship Terms ({employmentType})
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <div className="space-y-1.5">
                         <Label htmlFor="internship_stipend" className="text-xs font-semibold">
                           Monthly Stipend (₹/month) <span className="text-red-500">*</span>
@@ -460,7 +477,7 @@ export function CreateJobModal({
                   <Label className="text-xs font-semibold">
                     {isInternshipType && employmentType === 'Intern+PPO' ? 'PPO Conversion CTC Package (LPA)' : 'Compensation Package (CTC in LPA)'}
                   </Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="compensation_ctc" className="text-[11px] text-zinc-500">Total CTC (LPA)</Label>
                       <Input id="compensation_ctc" name="compensation_ctc" type="number" step="0.01" placeholder="e.g. 14.5" className="h-9 text-sm" />
@@ -518,7 +535,7 @@ export function CreateJobModal({
 
                 {hasBond && (
                   <div className="p-4 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <div className="space-y-1.5">
                         <Label htmlFor="bond_duration" className="text-xs font-semibold">Bond Duration</Label>
                         <Input 
@@ -545,7 +562,11 @@ export function CreateJobModal({
                   </div>
                 )}
               </div>
+              </div>
             </div>
+            
+            {/* Right Column */}
+            <div className="space-y-6">
 
             {/* 4. REQUIRED SKILLS & OFFICIAL JD PDF */}
             <div className="p-5 rounded-xl border bg-white dark:bg-zinc-900/60 space-y-4 shadow-xs">
@@ -653,7 +674,7 @@ export function CreateJobModal({
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="eligibility_min_gpa" className="text-xs font-semibold">Minimum CGPA (0 - 10)</Label>
                     <Input id="eligibility_min_gpa" name="eligibility_min_gpa" type="number" step="0.01" min="0" max="10" placeholder="e.g. 7.50" className="h-9 text-sm" />
@@ -804,7 +825,7 @@ export function CreateJobModal({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="status" className="text-xs font-semibold">Listing Status</Label>
                     <Select name="status" defaultValue="active">
@@ -844,7 +865,7 @@ export function CreateJobModal({
                 <p className="text-[11px] text-zinc-400 mt-0.5">Configure interview progression phases for this employer</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="stage_1_name" className="text-xs font-semibold">Stage 1</Label>
                   <Input id="stage_1_name" name="stage_1_name" placeholder="e.g. Online Assessment" className="h-9 text-xs" />
@@ -880,26 +901,183 @@ export function CreateJobModal({
                   className="min-h-[140px] text-sm"
                 />
               </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ideal_for" className="text-xs font-semibold flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  Ideal For (Optional)
+                </Label>
+                <p className="text-[10px] text-zinc-500 leading-tight">
+                  A descriptive tag to help students decide if this job is for them, without hard-blocking anyone from applying.
+                </p>
+                <Input 
+                  id="ideal_for" 
+                  name="ideal_for" 
+                  placeholder="e.g. Ideal for CS/IT students with strong React skills" 
+                  className="text-sm"
+                />
+              </div>
             </div>
+
+            </div>
+            {/* END STEP 1 WRAPPER */}
+            </div>
+
+            {/* START STEP 2 WRAPPER */}
+            <div className={step === 2 ? 'block space-y-6 max-w-2xl mx-auto mt-4' : 'hidden'}>
+              <div className="p-6 rounded-xl border bg-white dark:bg-zinc-900/60 shadow-sm text-center">
+                <div className="mx-auto h-12 w-12 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 flex items-center justify-center mb-4">
+                  <MapPin className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Distribution & Targeting</h3>
+                <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
+                  Who should see this job? You can broadcast it to everyone, target specific educational hubs, or hand-pick individual partner colleges.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6 text-left">
+                  <div 
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${targetType === 'all' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'}`}
+                    onClick={() => setTargetType('all')}
+                  >
+                    <div className="font-semibold text-sm mb-1 text-zinc-900 dark:text-zinc-100">Broadcast All</div>
+                    <p className="text-[10px] text-zinc-500">Every college on the platform gets this job.</p>
+                  </div>
+                  <div 
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${targetType === 'city' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'}`}
+                    onClick={() => setTargetType('city')}
+                  >
+                    <div className="font-semibold text-sm mb-1 text-zinc-900 dark:text-zinc-100">Target Cities</div>
+                    <p className="text-[10px] text-zinc-500">Only colleges in selected cities get this job.</p>
+                  </div>
+                  <div 
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${targetType === 'specific' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'}`}
+                    onClick={() => setTargetType('specific')}
+                  >
+                    <div className="font-semibold text-sm mb-1 text-zinc-900 dark:text-zinc-100">Hand-Pick</div>
+                    <p className="text-[10px] text-zinc-500">Manually select specific colleges to receive it.</p>
+                  </div>
+                </div>
+
+                {targetType === 'city' && (
+                  <div className="mt-6 text-left p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800">
+                    <Label className="text-xs font-semibold mb-2 block">Select Target Cities</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {INDIAN_CITIES.map(city => {
+                        const isSelected = targetCities.includes(city)
+                        return (
+                          <button
+                            key={city}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) setTargetCities(targetCities.filter(c => c !== city))
+                              else setTargetCities([...targetCities, city])
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                              isSelected 
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                                : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                            }`}
+                          >
+                            {city}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {targetType === 'specific' && (
+                  <div className="mt-6 text-left p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 max-h-[250px] overflow-y-auto">
+                    <Label className="text-xs font-semibold mb-3 block">Select Specific Colleges</Label>
+                    <div className="space-y-2">
+                      {colleges?.map(college => {
+                        const isSelected = targetColleges.includes(college.id)
+                        return (
+                          <label key={college.id} className="flex items-start gap-3 p-2.5 rounded-md hover:bg-white dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) setTargetColleges([...targetColleges, college.id])
+                                else setTargetColleges(targetColleges.filter(id => id !== college.id))
+                              }}
+                              className="mt-0.5 rounded border-zinc-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{college.name}</div>
+                              {college.city && <div className="text-[10px] text-zinc-500">{college.city}</div>}
+                            </div>
+                          </label>
+                        )
+                      })}
+                      {(!colleges || colleges.length === 0) && (
+                        <div className="text-xs text-zinc-500 py-4 text-center">No colleges registered yet.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800/50 flex justify-center">
+                   <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-100 dark:border-blue-800/30">
+                     <Sparkles className="h-3.5 w-3.5" />
+                     {targetType === 'all' && <span>This will broadcast to <strong>{colleges?.length || 0} colleges</strong>.</span>}
+                     {targetType === 'city' && <span>This will broadcast to colleges in <strong>{targetCities.length} cities</strong>.</span>}
+                     {targetType === 'specific' && <span>This will broadcast to <strong>{targetColleges.length} selected colleges</strong>.</span>}
+                   </div>
+                </div>
+              </div>
+            </div>
+            {/* END STEP 2 WRAPPER */}
 
           </form>
         </div>
 
         <div className="flex justify-end pt-3 border-t gap-3 flex-shrink-0">
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button 
-            type="submit" 
-            form="create-job-form" 
-            size="sm" 
-            disabled={isPending} 
-            className="bg-blue-600 hover:bg-blue-700 text-white min-w-[130px]"
-          >
-            {isPending ? 'Publishing Drive...' : 'Publish Job Drive'}
-          </Button>
+          {step === 1 ? (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              {isAgency ? (
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  onClick={() => setStep(2)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm min-w-[130px]"
+                >
+                  Next: Distribution <span className="ml-1">→</span>
+                </Button>
+              ) : (
+                <Button 
+                  type="submit" 
+                  form="create-job-form" 
+                  size="sm" 
+                  disabled={isPending}
+                  className="bg-blue-600 hover:bg-blue-700 text-white min-w-[130px]"
+                >
+                  {isPending ? 'Publishing Drive...' : 'Publish Job Drive'}
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={() => setStep(1)} disabled={isPending}>
+                <span className="mr-1">←</span> Back
+              </Button>
+              <Button 
+                type="submit" 
+                form="create-job-form" 
+                size="sm" 
+                disabled={isPending || (targetType === 'city' && targetCities.length === 0) || (targetType === 'specific' && targetColleges.length === 0)}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm min-w-[130px]"
+              >
+                {isPending ? 'Publishing Drive...' : 'Publish Job Drive'}
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   )
 }
+

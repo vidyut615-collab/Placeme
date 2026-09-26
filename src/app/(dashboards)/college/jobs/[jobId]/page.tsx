@@ -44,7 +44,7 @@ export default async function CollegeJobDetailsPage({
       .from('jobs')
       .select(`
         *,
-        colleges(name),
+        colleges!jobs_college_id_fkey(name),
         job_types(name),
         placement_levels(name),
         placement_categories(name),
@@ -62,6 +62,7 @@ export default async function CollegeJobDetailsPage({
   ])
 
   if (jobError || !job) {
+    console.error('Job fetch error:', jobError, 'Job ID:', jobId, 'User college ID:', user.app_metadata.college_id)
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold">Job Not Found</h1>

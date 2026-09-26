@@ -21,7 +21,7 @@ export default async function AgencyJobDetailsPage({
   // Fetch the job details
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('*, colleges(name)')
+    .select('*, colleges!jobs_college_id_fkey(name)')
     .eq('id', jobId)
     .single()
 

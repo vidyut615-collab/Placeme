@@ -4,11 +4,10 @@ import Link from 'next/link'
 import { InviteStudentModal } from '@/components/InviteStudentModal'
 import { BulkUploadStudentsModal } from '@/components/BulkUploadStudentsModal'
 import { AcademicConfigManager } from '@/components/AcademicConfigManager'
-import { EditCollegeDetailsModal } from '@/components/EditCollegeDetailsModal'
+import { AgencyCollegeInformationTab } from '@/components/AgencyCollegeInformationTab'
 import { AgencyCollegeStudentsTable, type CollegeStudentItem } from '@/components/AgencyCollegeStudentsTable'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Building2, Globe, MapPin, Mail, Phone, ArrowLeft, Users, GraduationCap, Info } from 'lucide-react'
+import { Building2, ArrowLeft, Users, GraduationCap } from 'lucide-react'
 
 export default async function CollegeProfilePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -116,91 +115,7 @@ export default async function CollegeProfilePage(props: { params: Promise<{ id: 
 
         {/* TAB 1: COLLEGE INFORMATION & CONTACTS */}
         <TabsContent value="details" className="space-y-6">
-          <Card className="shadow-sm border">
-            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                  College Profile & Public Contacts
-                </CardTitle>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  General and contact information visible to students and placement coordinators.
-                </p>
-              </div>
-              <EditCollegeDetailsModal college={college} />
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
-                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                    <Globe className="h-4 w-4 text-blue-600" /> Official Website
-                  </div>
-                  <div>
-                    {college.website ? (
-                      <a 
-                        href={college.website.startsWith('http') ? college.website : `https://${college.website}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-blue-600 hover:underline font-medium break-all block"
-                      >
-                        {college.website}
-                      </a>
-                    ) : (
-                      <span className="text-zinc-400 italic">Not provided</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
-                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 text-blue-600" /> Location / Campus
-                  </div>
-                  <div className="font-medium text-zinc-800 dark:text-zinc-200">
-                    {college.location || <span className="text-zinc-400 italic font-normal">Not provided</span>}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
-                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                    <Mail className="h-4 w-4 text-blue-600" /> Placement Email
-                  </div>
-                  <div className="font-medium text-zinc-800 dark:text-zinc-200 break-all">
-                    {college.contact_email ? (
-                      <a href={`mailto:${college.contact_email}`} className="text-zinc-700 hover:text-blue-600 dark:text-zinc-300">
-                        {college.contact_email}
-                      </a>
-                    ) : (
-                      <span className="text-zinc-400 italic font-normal">Not provided</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
-                  <div className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                    <Phone className="h-4 w-4 text-blue-600" /> Contact Phone
-                  </div>
-                  <div className="font-medium text-zinc-800 dark:text-zinc-200">
-                    {college.contact_phone || <span className="text-zinc-400 italic font-normal">Not provided</span>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border">
-                <div className="text-xs font-medium text-zinc-500 mb-2 flex items-center gap-1.5">
-                  <Info className="h-4 w-4 text-blue-600" /> About the Institution
-                </div>
-                {college.description ? (
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-line leading-relaxed">
-                    {college.description}
-                  </p>
-                ) : (
-                  <p className="text-sm text-zinc-400 italic">
-                    No description provided yet. Click &quot;Edit Details&quot; to add institutional highlights.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <AgencyCollegeInformationTab college={college} />
         </TabsContent>
 
         {/* TAB 2: ACADEMIC CONFIGURATION (Batches, Degrees, Departments) */}
@@ -228,3 +143,5 @@ export default async function CollegeProfilePage(props: { params: Promise<{ id: 
     </div>
   )
 }
+
+

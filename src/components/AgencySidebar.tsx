@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, GraduationCap, Briefcase, Users, Settings } from 'lucide-react'
+import { LayoutDashboard, GraduationCap, Briefcase, Users, Settings, ShieldCheck, Database } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
@@ -13,11 +13,29 @@ export const agencyNavigation = [
   { name: 'Colleges', href: '/agency/colleges', icon: GraduationCap },
   { name: 'Global Jobs', href: '/agency/jobs', icon: Briefcase },
   { name: 'Students', href: '/agency/students', icon: Users },
+  { name: 'Manage Roles', href: '/agency/roles', icon: ShieldCheck },
+  { name: 'Manage Lists', href: '/agency/manage-lists', icon: Database },
   { name: 'Settings', href: '/agency/settings', icon: Settings },
 ]
 
-export function AgencySidebar() {
+export function AgencySidebar({ 
+  role = 'agency_staff'
+}: { 
+  role?: string 
+}) {
   const pathname = usePathname()
+
+  const filteredNav = agencyNavigation.filter(item => {
+    if (item.name === 'Manage Roles' && role !== 'superadmin') return false
+    return true
+  })
+
+  const roleLabel = role === 'superadmin' ? 'Admin Owner' 
+                  : role === 'agency_admin' ? 'Agency Admin' 
+                  : 'Agency Staff'
+  const initials = role === 'superadmin' ? 'AO' 
+                 : role === 'agency_admin' ? 'AA' 
+                 : 'AS'
 
   return (
     <div className="flex h-full w-full md:w-64 flex-col border-r bg-white dark:bg-zinc-950">
@@ -25,7 +43,7 @@ export function AgencySidebar() {
         <span className="text-lg font-bold tracking-tight">Placeme Agency</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {agencyNavigation.map((item) => {
+        {filteredNav.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link
@@ -58,11 +76,11 @@ export function AgencySidebar() {
         {/* User profile snippet */}
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">SA</span>
+            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{initials}</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-medium">Super Admin</span>
-            <span className="text-xs text-zinc-500">Agency Role</span>
+            <span className="text-sm font-medium leading-tight">{roleLabel}</span>
+            <span className="text-[11px] text-zinc-500">Agency Role</span>
           </div>
         </div>
         <LogoutButton />

@@ -1,8 +1,8 @@
 export async function sendZeptoMail(toEmail: string, subject: string, htmlBody: string) {
-  const url = process.env.ZEPTOMAIL_API_URL
-  const token = process.env.ZEPTOMAIL_SEND_TOKEN
-  const fromAddress = process.env.ZEPTOMAIL_FROM_ADDRESS
-  const fromName = process.env.ZEPTOMAIL_FROM_NAME
+  const url = process.env.ZEPTOMAIL_API_URL?.replace(/^"|"$/g, '')
+  const token = process.env.ZEPTOMAIL_SEND_TOKEN?.replace(/^"|"$/g, '')
+  const fromAddress = process.env.ZEPTOMAIL_FROM_ADDRESS?.replace(/^"|"$/g, '')
+  const fromName = process.env.ZEPTOMAIL_FROM_NAME?.replace(/^"|"$/g, '')
 
   if (!url || !token || !fromAddress) {
     console.error('Missing ZeptoMail environment variables')

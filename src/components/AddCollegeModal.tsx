@@ -19,6 +19,8 @@ import { addCollege } from '@/app/(dashboards)/agency/actions'
 import { Plus, X, Building2, GraduationCap, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { INDIAN_CITIES } from '@/lib/cities-data'
+
 export function AddCollegeModal() {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -158,11 +160,28 @@ export function AddCollegeModal() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="location">Location / City & State</Label>
+                  <Label htmlFor="city">City (Hub) <span className="text-red-500">*</span></Label>
+                  <Input 
+                    name="city" 
+                    list="indian-cities" 
+                    defaultValue="Bengaluru / Bangalore" 
+                    placeholder="Search or select a city..." 
+                    required 
+                    autoComplete="off"
+                  />
+                  <datalist id="indian-cities">
+                    {INDIAN_CITIES.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="location">Campus Location / Address</Label>
                   <Input 
                     id="location" 
                     name="location" 
-                    placeholder="e.g. Mumbai, Maharashtra" 
+                    placeholder="e.g. Powai, Mumbai, Maharashtra" 
                   />
                 </div>
 
@@ -298,3 +317,5 @@ export function AddCollegeModal() {
     </Dialog>
   )
 }
+
+

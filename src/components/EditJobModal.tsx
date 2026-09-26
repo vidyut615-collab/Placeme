@@ -312,7 +312,8 @@ export function EditJobModal({
             </div>
           )}
 
-          <form id="edit-job-form" onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6 pb-6">
+          <form id="edit-job-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+            <div className="space-y-6">
             {/* 1. ROLE & LOCATION SPECIFICS */}
               <div className="p-4 rounded-xl border bg-white dark:bg-zinc-900/60 space-y-4 shadow-xs">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
@@ -320,7 +321,7 @@ export function EditJobModal({
                   Role &amp; Location Specifics
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-1 sm:col-span-2">
                     <Label htmlFor="edit-title" className="text-xs font-semibold flex items-center gap-1">
                       Job Title / Designation
@@ -488,7 +489,7 @@ export function EditJobModal({
                         Internship Terms ({employmentType})
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-3">
                         <div className="space-y-1">
                           <Label className="text-xs font-semibold">Monthly Stipend (₹/month)</Label>
                           <Input 
@@ -520,7 +521,7 @@ export function EditJobModal({
                     <Label className="text-xs font-semibold">
                       {isInternshipType && employmentType === 'Intern+PPO' ? 'PPO Conversion CTC Package (LPA)' : 'Compensation Package (CTC in LPA)'}
                     </Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-3">
                       <div className="space-y-1">
                         <Label className="text-[11px] text-zinc-500">Total CTC</Label>
                         <Input 
@@ -607,7 +608,7 @@ export function EditJobModal({
                   </div>
 
                   {hasBond && (
-                    <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 space-y-3">
                       <div className="space-y-1">
                         <Label className="text-xs font-semibold">Bond Duration</Label>
                         <Input 
@@ -633,6 +634,10 @@ export function EditJobModal({
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
 
               {/* 4. REQUIRED SKILLS & ATTACHMENT */}
               <div className="p-4 rounded-xl border bg-white dark:bg-zinc-900/60 space-y-4 shadow-xs">
@@ -721,7 +726,7 @@ export function EditJobModal({
                   Window &amp; Status
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Listing Status</Label>
                     <Select value={status} onValueChange={(val) => setStatus(val || 'active')}>
@@ -780,7 +785,7 @@ export function EditJobModal({
                   <span className="text-[11px] text-zinc-400">Always editable</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-3">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-semibold">Round 1 Name</Label>
                     <Input 
@@ -821,7 +826,7 @@ export function EditJobModal({
                   className="min-h-[220px] text-sm"
                 />
               </div>
-
+            </div>
           </form>
         </div>
 

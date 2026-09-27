@@ -2,15 +2,20 @@ import { createClient } from '@/utils/supabase/server'
 import { CreateJobModal } from '@/components/CreateJobModal'
 import { createGlobalJob } from '@/app/(dashboards)/agency/actions'
 import { AgencyJobsTable } from '@/components/AgencyJobsTable'
+import { GlobalSettingsModal } from '@/components/GlobalSettingsModal'
 
 export default async function AgencyJobsPage() {
   const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  const isSuperadmin = user?.app_metadata?.role === 'superadmin'
 
   // Fetch all jobs and application counts in parallel
   const [
     { data: jobs },
     { data: appCounts },
-    { data: colleges }
+    { data: colleges },
+    { data: platformSettings }
   ] = await Promise.all([
     supabase
       .from('jobs')
@@ -22,8 +27,14 @@ export default async function AgencyJobsPage() {
     supabase
       .from('colleges')
       .select('id, name, city')
-      .order('name')
+      .order('name'),
+    supabase
+      .from('platform_settings')
+      .select('max_global_applications_per_student')
+      .single()
   ])
+
+  const globalLimit = platformSettings?.max_global_applications_per_student || 10
 
   // Build a count map: { job_id -> count }
   const countMap: Record<string, number> = {}
@@ -44,13 +55,16 @@ export default async function AgencyJobsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Unified Job Board</h1>
           <p className="text-zinc-500 mt-2">Manage global agency jobs and oversee all local college postings.</p>
         </div>
-        <CreateJobModal
-          action={createGlobalJob}
-          isAgency={true}
-          colleges={colleges || []}
-          title="Post Global Job"
-          description="Create a job that will be visible to every student on the platform."
-        />
+        <div className="flex items-center gap-2">
+          {isSuperadmin && <GlobalSettingsModal currentLimit={globalLimit} />}
+          <CreateJobModal
+            action={createGlobalJob}
+            isAgency={true}
+            colleges={colleges || []}
+            title="Post Global Job"
+            description="Create a job that will be visible to every student on the platform."
+          />
+        </div>
       </div>
 
       <AgencyJobsTable jobs={jobsWithCounts} />

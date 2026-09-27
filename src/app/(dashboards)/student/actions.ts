@@ -70,28 +70,53 @@ export async function applyForJob(jobId: string) {
     const config = policyDoc?.config || {}
 
     // --- POLICY ENGINE: APPLICATION LIMITS CHECK ---
-    const appLimits = config.application_limit
-    if (appLimits?.enabled) {
-      if (appLimits.max_active !== null && appLimits.max_active !== undefined) {
-        const { count: activeCount } = await supabase
-          .from('applications')
-          .select('id', { count: 'exact', head: true })
-          .eq('student_id', student.id)
-          .not('status', 'in', '("rejected","withdrawn","closed")')
+    const isGlobalJob = job.college_id === null;
 
-        if (activeCount !== null && activeCount >= appLimits.max_active) {
-          return { error: `Concurrent active application limit reached (${appLimits.max_active}). Please wait for current applications to conclude.` }
-        }
+    if (isGlobalJob) {
+      // 1. Fetch Global Settings & Enforce Global Quota
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('max_global_applications_per_student')
+        .single()
+      
+      const maxGlobal = platformSettings?.max_global_applications_per_student || 10
+
+      const { count: globalCount } = await supabase
+        .from('applications')
+        .select('id, jobs!inner(college_id)', { count: 'exact', head: true })
+        .eq('student_id', student.id)
+        .is('jobs.college_id', null)
+
+      if (globalCount !== null && globalCount >= maxGlobal) {
+        return { error: `Global application limit reached (${maxGlobal}). You cannot apply to any more global agency jobs this season.` }
       }
+    } else {
+      // 2. Enforce Local College Quotas (excluding global jobs)
+      const appLimits = config.application_limit
+      if (appLimits?.enabled) {
+        if (appLimits.max_active !== null && appLimits.max_active !== undefined) {
+          const { count: activeCount } = await supabase
+            .from('applications')
+            .select('id, jobs!inner(college_id)', { count: 'exact', head: true })
+            .eq('student_id', student.id)
+            .eq('jobs.college_id', student.college_id)
+            .not('status', 'in', '("rejected","withdrawn","closed")')
 
-      if (appLimits.max_total !== null && appLimits.max_total !== undefined) {
-        const { count: totalCount } = await supabase
-          .from('applications')
-          .select('id', { count: 'exact', head: true })
-          .eq('student_id', student.id)
+          if (activeCount !== null && activeCount >= appLimits.max_active) {
+            return { error: `Concurrent active application limit reached (${appLimits.max_active}). Please wait for current applications to conclude.` }
+          }
+        }
 
-        if (totalCount !== null && totalCount >= appLimits.max_total) {
-          return { error: `Season application limit reached (${appLimits.max_total}). You cannot apply for additional drives.` }
+        if (appLimits.max_total !== null && appLimits.max_total !== undefined) {
+          const { count: totalCount } = await supabase
+            .from('applications')
+            .select('id, jobs!inner(college_id)', { count: 'exact', head: true })
+            .eq('student_id', student.id)
+            .eq('jobs.college_id', student.college_id)
+
+          if (totalCount !== null && totalCount >= appLimits.max_total) {
+            return { error: `Season application limit reached (${appLimits.max_total}). You cannot apply for additional drives.` }
+          }
         }
       }
     }
@@ -108,45 +133,51 @@ export async function applyForJob(jobId: string) {
     let counterFieldToIncrement: string | null = null
 
     if (isOfficiallyPlaced) {
-      const counters = student.policy_counters || {}
-      const maxCurrentCtc = Math.max(...approvedOffers.map(o => o.compensation_ctc || 0))
-      const jobCtc = job.compensation_ctc || 0
+      const offerLimitConfig = config.offer_limit || { enabled: false, max_offers_total: 1 }
+      
+      // If 1-Offer Policy is explicitly disabled, skip the lock
+      if (offerLimitConfig.enabled) {
+        const counters = student.policy_counters || {}
+        const maxCurrentCtc = Math.max(...approvedOffers.map(o => o.compensation_ctc || 0))
+        const jobCtc = job.compensation_ctc || 0
 
-      const superDreamConfig = config.super_dream || { enabled: false, min_ctc: 20, max_attempts: 2 }
-      const dreamConfig = config.dream || { enabled: false, min_ctc: 10, max_dream_attempts: 3 }
-      const upgradeConfig = config.upgrade || { enabled: false, min_multiplier: 1, max_allowed: 1 }
+        const superDreamConfig = config.super_dream || { enabled: false, min_ctc: 20, max_attempts: 2 }
+        const dreamConfig = config.dream || { enabled: false, min_ctc: 10, max_dream_attempts: 3 }
+        const upgradeConfig = config.upgrade || { enabled: false, min_increment_pct: null, max_upgrade_attempts: null }
 
-      if (superDreamConfig.enabled && jobCtc >= (superDreamConfig.min_ctc || 20)) {
-        // Super Dream upgrade opportunity
-        const maxAttempts = superDreamConfig.max_attempts || 2
-        const attemptsUsed = counters.super_dream_attempts || 0
-        if (attemptsUsed >= maxAttempts) {
-          return { error: `You have reached the maximum allowed Super Dream upgrade attempts (${maxAttempts}).` }
+        if (superDreamConfig.enabled && superDreamConfig.min_ctc && jobCtc >= superDreamConfig.min_ctc) {
+          // Super Dream upgrade opportunity
+          const maxAttempts = superDreamConfig.max_attempts || 2
+          const attemptsUsed = counters.super_dream_attempts || 0
+          if (attemptsUsed >= maxAttempts) {
+            return { error: `You have reached the maximum allowed Super Dream upgrade attempts (${maxAttempts}).` }
+          }
+          counterFieldToIncrement = 'super_dream_attempts'
+        } else if (dreamConfig.enabled && dreamConfig.min_ctc && jobCtc >= dreamConfig.min_ctc) {
+          // Dream upgrade opportunity
+          const maxAttempts = dreamConfig.max_dream_attempts || 3
+          const attemptsUsed = counters.dream_attempts || 0
+          if (attemptsUsed >= maxAttempts) {
+            return { error: `You have reached the maximum allowed Dream upgrade attempts (${maxAttempts}).` }
+          }
+          counterFieldToIncrement = 'dream_attempts'
+        } else if (upgradeConfig.enabled) {
+          // General upgrade check
+          const maxUpgrades = upgradeConfig.max_upgrade_attempts || 1
+          const upgradesUsed = counters.upgrades_used || 0
+          if (upgradesUsed >= maxUpgrades) {
+            return { error: `You have reached the maximum allowed upgrade attempts (${maxUpgrades}).` }
+          }
+          const pct = upgradeConfig.min_increment_pct || 0
+          const multiplier = 1 + (pct / 100)
+          const requiredCtc = maxCurrentCtc * multiplier
+          if (jobCtc <= maxCurrentCtc || (multiplier > 1 && jobCtc > 0 && jobCtc < requiredCtc)) {
+            return { error: `Under 1-Offer Policy, you may only apply for higher upgrade opportunities (Required CTC: ₹${requiredCtc} LPA, Job CTC: ₹${jobCtc} LPA).` }
+          }
+          counterFieldToIncrement = 'upgrades_used'
+        } else {
+          return { error: 'You are already officially placed. Under the college 1-Offer Policy, you cannot apply for standard campus placement drives.' }
         }
-        counterFieldToIncrement = 'super_dream_attempts'
-      } else if (dreamConfig.enabled && jobCtc >= (dreamConfig.min_ctc || 10)) {
-        // Dream upgrade opportunity
-        const maxAttempts = dreamConfig.max_dream_attempts || 3
-        const attemptsUsed = counters.dream_attempts || 0
-        if (attemptsUsed >= maxAttempts) {
-          return { error: `You have reached the maximum allowed Dream upgrade attempts (${maxAttempts}).` }
-        }
-        counterFieldToIncrement = 'dream_attempts'
-      } else if (upgradeConfig.enabled) {
-        // General upgrade check
-        const maxUpgrades = upgradeConfig.max_allowed || 1
-        const upgradesUsed = counters.upgrades_used || 0
-        if (upgradesUsed >= maxUpgrades) {
-          return { error: `You have reached the maximum allowed upgrade attempts (${maxUpgrades}).` }
-        }
-        const multiplier = upgradeConfig.min_multiplier || 1
-        const requiredCtc = maxCurrentCtc * multiplier
-        if (jobCtc <= maxCurrentCtc || (multiplier > 1 && jobCtc < requiredCtc)) {
-          return { error: `Under 1-Offer Policy, you may only apply for higher upgrade opportunities (Required CTC: ₹${requiredCtc} LPA, Job CTC: ₹${jobCtc} LPA).` }
-        }
-        counterFieldToIncrement = 'upgrades_used'
-      } else {
-        return { error: 'You are already officially placed. Under the college 1-Offer Policy, you cannot apply for standard campus placement drives.' }
       }
     }
     // -------------------------------------------------------------
@@ -265,10 +296,14 @@ export async function withdrawApplication(
       studentUpdatePayload.blacklist_reason = autoBlacklistReason
     }
 
-    await supabase
+    const { error: studentUpdateError } = await supabase
       .from('students')
       .update(studentUpdatePayload)
       .eq('id', student.id)
+      
+    if (studentUpdateError) {
+      throw new Error(`Failed to update student: ${studentUpdateError.message}`)
+    }
 
     revalidatePath('/student/applications')
     revalidatePath('/student/dashboard')

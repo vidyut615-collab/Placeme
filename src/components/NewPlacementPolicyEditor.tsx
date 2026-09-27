@@ -246,20 +246,7 @@ export function NewPlacementPolicyEditor({
               </CardHeader>
               <CardContent>
                 <div className={`grid gap-4 mt-4 transition-opacity ${!config?.offer_limit?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <div className="flex items-center justify-between p-3 border rounded-lg bg-zinc-50 dark:bg-zinc-900/50">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm font-medium">Debar from regular drives once placed</Label>
-                      <p className="text-xs text-zinc-500">Automatically block applications to standard drives after offer approval.</p>
-                    </div>
-                    <Switch 
-                      disabled={!isAdmin}
-                      checked={config?.offer_limit?.debar_on_hired ?? true}
-                      onCheckedChange={(c) => setConfig({
-                        ...config,
-                        offer_limit: { ...config?.offer_limit, debar_on_hired: c }
-                      })}
-                    />
-                  </div>
+
                   <div className="grid gap-2">
                     <Label>Maximum Standard Offers Allowed</Label>
                     <Input 

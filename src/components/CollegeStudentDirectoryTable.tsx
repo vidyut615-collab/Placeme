@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Table,
   TableBody,
@@ -44,6 +45,7 @@ export function CollegeStudentDirectoryTable({
   query,
   collegeId
 }: CollegeStudentDirectoryTableProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'active' | 'blacklisted'>('active')
   const [activePage, setActivePage] = useState(1)
   const [blacklistedPage, setBlacklistedPage] = useState(1)
@@ -179,7 +181,15 @@ export function CollegeStudentDirectoryTable({
               <TableBody>
                 {paginatedActiveList.length > 0 ? (
                   paginatedActiveList.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow 
+                      key={item.id}
+                      onClick={() => {
+                        if (!item.isInvite) {
+                          router.push(`/college/students/${item.id}`)
+                        }
+                      }}
+                      className={!item.isInvite ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors" : ""}
+                    >
                       <TableCell>
                         <div className="font-medium text-zinc-900 dark:text-zinc-100">{item.name}</div>
                         {item.counters && Object.keys(item.counters).length > 0 && (
@@ -298,7 +308,15 @@ export function CollegeStudentDirectoryTable({
               <TableBody>
                 {paginatedBlacklistedList.length > 0 ? (
                   paginatedBlacklistedList.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow 
+                      key={item.id}
+                      onClick={() => {
+                        if (!item.isInvite) {
+                          router.push(`/college/students/${item.id}`)
+                        }
+                      }}
+                      className={!item.isInvite ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors" : ""}
+                    >
                       <TableCell className="font-medium text-zinc-900 dark:text-zinc-100">
                         {item.name}
                       </TableCell>

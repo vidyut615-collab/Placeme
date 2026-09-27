@@ -1117,3 +1117,33 @@ export async function deleteStudentAccount({
 
 
 
+export async function updateGlobalApplicationLimit(limit: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user || user.app_metadata.role !== 'superadmin') {
+    return { error: 'Unauthorized. Only SuperAdmins can update the global application limit.' }
+  }
+
+  const adminClient = getAdminClient()
+  
+  const { error } = await adminClient
+    .from('platform_settings')
+    .update({ max_global_applications_per_student: limit })
+    .eq('id', (await adminClient.from('platform_settings').select('id').single()).data?.id)
+
+  if (error) {
+    // If no row exists yet, insert it
+    const { error: insertError } = await adminClient
+      .from('platform_settings')
+      .insert({ max_global_applications_per_student: limit })
+    
+    if (insertError) {
+      return { error: insertError.message }
+    }
+  }
+
+  revalidatePath('/agency/jobs')
+  revalidatePath('/student/policies')
+  return { success: 'Global limit updated successfully.' }
+}

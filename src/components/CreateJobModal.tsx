@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@/utils/supabase/client'
 import { useState, useTransition, useMemo, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -132,7 +133,7 @@ export function CreateJobModal({
   }, [skillsInput])
 
   // PDF Attachment (Strict 500 KB limit)
-  const [attachedPdf, setAttachedPdf] = useState<{ name: string; url: string; sizeKb: number } | null>(null)
+  const [attachedPdf, setAttachedPdf] = useState<{ name: string; url?: string; sizeKb: number; file?: File } | null>(null)
   const [pdfError, setPdfError] = useState<string | null>(null)
 
   const filteredCities = useMemo(() => {
@@ -167,15 +168,11 @@ export function CreateJobModal({
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      setAttachedPdf({
-        name: file.name,
-        url: reader.result as string,
-        sizeKb: Math.round(file.size / 1024)
-      })
-    }
-    reader.readAsDataURL(file)
+    setAttachedPdf({
+      name: file.name,
+      sizeKb: Math.round(file.size / 1024),
+      file: file
+    })
   }
 
   const removePdf = () => {
@@ -186,11 +183,6 @@ export function CreateJobModal({
   const handleSubmit = (formData: FormData) => {
     setErrorMsg(null)
     formData.set('job_location', selectedCity)
-
-    if (attachedPdf) {
-      formData.set('jd_attachment_url', attachedPdf.url)
-      formData.set('jd_attachment_name', attachedPdf.name)
-    }
 
     if (selectedDepts.length > 0) {
       formData.set('eligibility_allowed_departments', selectedDepts.join(','))
@@ -209,16 +201,53 @@ export function CreateJobModal({
     }
 
     startTransition(async () => {
-      const res = await action(formData)
-      if (res.error) {
-        setErrorMsg(res.error)
-      } else {
-        setOpen(false)
-        setSelectedDepts([])
-        setSelectedDegrees([])
-        setSelectedYears([])
-        setAttachedPdf(null)
-        setSkillsInput('')
+      try {
+        let finalAttachmentUrl = attachedPdf?.url || null
+
+        if (attachedPdf?.file) {
+          const supabase = createClient()
+          const fileName = `${Date.now()}_${attachedPdf.name.replace(/\s+/g, '_')}`
+          
+          const { error } = await supabase.storage
+            .from('documents')
+            .upload(`jobs/${fileName}`, attachedPdf.file, {
+              cacheControl: '3600',
+              upsert: false
+            })
+            
+          if (error) {
+            setErrorMsg(`Failed to upload document: ${error.message}. Make sure the 'documents' bucket exists in Supabase.`)
+            return
+          }
+          
+          const { data: publicUrlData } = supabase.storage
+            .from('documents')
+            .getPublicUrl(`jobs/${fileName}`)
+            
+          finalAttachmentUrl = publicUrlData.publicUrl
+        }
+
+        if (finalAttachmentUrl && attachedPdf) {
+          formData.set('jd_attachment_url', finalAttachmentUrl)
+          formData.set('jd_attachment_name', attachedPdf.name)
+        } else {
+          formData.delete('jd_attachment_url')
+          formData.delete('jd_attachment_name')
+        }
+
+        const res = await action(formData)
+        if (res.error) {
+          setErrorMsg(res.error)
+        } else {
+          setOpen(false)
+          setSelectedDepts([])
+          setSelectedDegrees([])
+          setSelectedYears([])
+          setAttachedPdf(null)
+          setSkillsInput('')
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message || 'An unexpected error occurred.')
       }
     })
   }

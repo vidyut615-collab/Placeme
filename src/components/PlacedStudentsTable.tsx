@@ -234,15 +234,20 @@ export function PlacedStudentsTable({
 
                     <TableCell className="text-right pr-4">
                       {offer.offer_letter_url ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewingOffer(offer)}
-                          className="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 gap-1"
+                        <a
+                          href={
+                            offer.offer_letter_url.startsWith('data:') 
+                              ? offer.offer_letter_url 
+                              : `${offer.offer_letter_url}${offer.offer_letter_url.includes('?') ? '&' : '?'}download=Offer_Letter_${offer.company_name.replace(/\s+/g, '_')}_${offer.students?.profile_data?.full_name?.replace(/\s+/g, '_') || 'Student'}.${offer.offer_letter_url.toLowerCase().includes('.pdf') ? 'pdf' : 'png'}`
+                          }
+                          download={`Offer_Letter_${offer.company_name.replace(/\s+/g, '_')}_${offer.students?.profile_data?.full_name?.replace(/\s+/g, '_') || 'Student'}.${offer.offer_letter_url.toLowerCase().includes('.pdf') ? 'pdf' : 'png'}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 h-8 text-xs text-blue-600 hover:!text-blue-700 hover:!bg-blue-50 dark:hover:!bg-blue-950/30 gap-1 px-3"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </Button>
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </a>
                       ) : (
                         <span className="text-[11px] text-zinc-400">None</span>
                       )}
@@ -270,7 +275,7 @@ export function PlacedStudentsTable({
 
           <div className="flex-1 overflow-y-auto py-4 flex items-center justify-center min-h-[300px] bg-zinc-50 dark:bg-zinc-900 rounded-lg border">
             {viewingOffer?.offer_letter_url ? (
-              viewingOffer.offer_letter_url.startsWith('data:application/pdf') ? (
+              viewingOffer.offer_letter_url.startsWith('data:application/pdf') || viewingOffer.offer_letter_url.toLowerCase().includes('.pdf') ? (
                 <iframe
                   src={viewingOffer.offer_letter_url}
                   className="w-full h-[500px] rounded border"

@@ -321,7 +321,7 @@ export async function declareStudentOffer({
   compensationCtc,
   offerType,
   jobId,
-  offerLetterBase64,
+  offerLetterUrl,
   password,
 }: {
   companyName: string
@@ -329,7 +329,7 @@ export async function declareStudentOffer({
   compensationCtc: number
   offerType: 'on_campus' | 'off_campus'
   jobId?: string | null
-  offerLetterBase64?: string | null
+  offerLetterUrl?: string | null
   password: string
 }) {
   try {
@@ -348,14 +348,11 @@ export async function declareStudentOffer({
       return { error: 'Company Name, Job Role, and CTC are required.' }
     }
 
-    if (!offerLetterBase64) {
+    if (!offerLetterUrl) {
       return { error: 'Please upload a copy of your Offer Letter (max 500KB).' }
     }
 
-    // 500KB base64 size check (~685KB with base64 overhead)
-    if (offerLetterBase64.length > 750 * 1024) {
-      return { error: 'Offer Letter file size exceeds the 500KB limit. Please upload a smaller PDF or image.' }
-    }
+    // No base64 check needed since we upload to Storage client-side
 
     // Cryptographic verification of student's account password
     const { error: authErr } = await supabase.auth.signInWithPassword({
@@ -419,7 +416,7 @@ export async function declareStudentOffer({
         job_role: jobRole.trim(),
         compensation_ctc: compensationCtc,
         offer_type: offerType,
-        offer_letter_url: offerLetterBase64,
+        offer_letter_url: offerLetterUrl,
         status: 'pending',
         student_confirmed_at: new Date().toISOString()
       })

@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@/utils/supabase/client'
 import { useState } from 'react'
 import {
   Dialog,
@@ -68,6 +69,7 @@ export function DeclareHiredModal({
   // File Upload
   const [fileName, setFileName] = useState<string | null>(null)
   const [fileBase64, setFileBase64] = useState<string | null>(null)
+  const [fileObj, setFileObj] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
 
   // Consents
@@ -109,6 +111,7 @@ export function DeclareHiredModal({
     }
 
     setFileName(file.name)
+    setFileObj(file)
     const reader = new FileReader()
     reader.onload = () => {
       setFileBase64(reader.result as string)
@@ -135,7 +138,7 @@ export function DeclareHiredModal({
       return
     }
 
-    if (!fileBase64) {
+    if (!fileObj && !fileBase64) {
       toast.error('Please upload your Offer Letter document (PDF or Image, max 500KB).')
       return
     }
@@ -152,32 +155,65 @@ export function DeclareHiredModal({
 
     setIsSubmitting(true)
 
-    const res = await declareStudentOffer({
-      companyName: companyName.trim(),
-      jobRole: jobRole.trim(),
-      compensationCtc: ctcNumber,
-      offerType,
-      jobId: offerType === 'on_campus' && selectedJobId ? selectedJobId : null,
-      offerLetterBase64: fileBase64,
-      password,
-    })
+    try {
+      let finalOfferLetterUrl = fileBase64 || null
+      
+      if (fileObj) {
+        const supabase = createClient()
+        const ext = fileObj.name.split('.').pop()
+        const storageFileName = `${Date.now()}_offer_${companyName.replace(/\s+/g, '_')}.${ext}`
+        
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(`offers/${storageFileName}`, fileObj, {
+            cacheControl: '3600',
+            upsert: false
+          })
+          
+        if (uploadError) {
+          toast.error(`Failed to upload offer letter: ${uploadError.message}. Make sure 'documents' bucket exists.`)
+          setIsSubmitting(false)
+          return
+        }
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(`offers/${storageFileName}`)
+          
+        finalOfferLetterUrl = publicUrlData.publicUrl
+      }
 
-    setIsSubmitting(false)
+      const res = await declareStudentOffer({
+        companyName: companyName.trim(),
+        jobRole: jobRole.trim(),
+        compensationCtc: ctcNumber,
+        offerType,
+        jobId: offerType === 'on_campus' && selectedJobId ? selectedJobId : null,
+        offerLetterUrl: finalOfferLetterUrl,
+        password,
+      })
 
-    if (res.error) {
-      toast.error(res.error)
-    } else {
-      toast.success(res.success || 'Offer declared successfully!')
-      setOpen(false)
-      // Reset form
-      setCompanyName('')
-      setJobRole('')
-      setCompensationCtc('')
-      setPassword('')
-      setFileName(null)
-      setFileBase64(null)
-      setConsentAuthentic(false)
-      setConsentPolicyLock(false)
+      setIsSubmitting(false)
+
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success(res.success || 'Offer declared successfully!')
+        setOpen(false)
+        // Reset form
+        setCompanyName('')
+        setJobRole('')
+        setCompensationCtc('')
+        setPassword('')
+        setFileName(null)
+        setFileBase64(null)
+        setFileObj(null)
+        setConsentAuthentic(false)
+        setConsentPolicyLock(false)
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'An unexpected error occurred.')
+      setIsSubmitting(false)
     }
   }
 

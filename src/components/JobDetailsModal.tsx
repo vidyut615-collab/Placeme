@@ -284,7 +284,11 @@ export function JobDetailsModal({
                     </div>
                   </div>
                   <a
-                    href={job.jd_attachment_url}
+                    href={
+                      job.jd_attachment_url.startsWith('data:') 
+                        ? job.jd_attachment_url 
+                        : `${job.jd_attachment_url}${job.jd_attachment_url.includes('?') ? '&' : '?'}download=${encodeURIComponent(job.jd_attachment_name || 'Job_Description.pdf')}`
+                    }
                     download={job.jd_attachment_name || 'Job_Description.pdf'}
                     target="_blank"
                     rel="noreferrer"

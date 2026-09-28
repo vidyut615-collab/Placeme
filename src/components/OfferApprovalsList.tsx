@@ -661,7 +661,11 @@ export function OfferApprovalsList({
                             Open Full
                           </Button>
                           <a
-                            href={viewingOffer.offer_letter_url}
+                            href={
+                              viewingOffer.offer_letter_url.startsWith('data:') 
+                                ? viewingOffer.offer_letter_url 
+                                : `${viewingOffer.offer_letter_url}${viewingOffer.offer_letter_url.includes('?') ? '&' : '?'}download=Offer_Letter_${viewingOffer.company_name.replace(/\s+/g, '_')}_${viewingDetails.studentName.replace(/\s+/g, '_')}.${isPdf ? 'pdf' : 'png'}`
+                            }
                             download={`Offer_Letter_${viewingOffer.company_name.replace(/\s+/g, '_')}_${viewingDetails.studentName.replace(/\s+/g, '_')}.${isPdf ? 'pdf' : 'png'}`}
                             className="inline-flex items-center justify-center h-7 text-[11px] gap-1 px-2.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium text-zinc-900 dark:text-zinc-100 transition-colors"
                           >

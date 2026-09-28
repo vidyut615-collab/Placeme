@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@/utils/supabase/client'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -118,7 +119,7 @@ export function EditJobModal({
   const [skillsInput, setSkillsInput] = useState(job.skills_required || '')
 
   // PDF Attachment (Strict 500 KB limit)
-  const [attachedPdf, setAttachedPdf] = useState<{ name: string; url: string; sizeKb: number } | null>(
+  const [attachedPdf, setAttachedPdf] = useState<{ name: string; url?: string; sizeKb: number; file?: File } | null>(
     job.jd_attachment_url ? { name: job.jd_attachment_name || 'Official_JD.pdf', url: job.jd_attachment_url, sizeKb: 0 } : null
   )
   const [pdfError, setPdfError] = useState<string | null>(null)
@@ -195,15 +196,11 @@ export function EditJobModal({
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      setAttachedPdf({
-        name: file.name,
-        url: reader.result as string,
-        sizeKb: Math.round(file.size / 1024)
-      })
-    }
-    reader.readAsDataURL(file)
+    setAttachedPdf({
+      name: file.name,
+      sizeKb: Math.round(file.size / 1024),
+      file: file
+    })
   }
 
   const removePdf = () => {
@@ -229,8 +226,39 @@ export function EditJobModal({
     formData.set('drive_mode', driveMode)
     formData.set('skills_required', skillsInput.trim())
 
-    if (attachedPdf) {
-      formData.set('jd_attachment_url', attachedPdf.url)
+    let finalAttachmentUrl = attachedPdf?.url || null
+
+    if (attachedPdf?.file) {
+      try {
+        const supabase = createClient()
+        const fileName = `${Date.now()}_${attachedPdf.name.replace(/\s+/g, '_')}`
+        const { error } = await supabase.storage
+          .from('documents')
+          .upload(`jobs/${fileName}`, attachedPdf.file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+          
+        if (error) {
+          toast.error(`Failed to upload document: ${error.message}.`)
+          setIsSubmitting(false)
+          return
+        }
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(`jobs/${fileName}`)
+          
+        finalAttachmentUrl = publicUrlData.publicUrl
+      } catch (err: any) {
+        toast.error(err.message || 'Error uploading document.')
+        setIsSubmitting(false)
+        return
+      }
+    }
+
+    if (finalAttachmentUrl && attachedPdf) {
+      formData.set('jd_attachment_url', finalAttachmentUrl)
       formData.set('jd_attachment_name', attachedPdf.name)
     } else {
       formData.set('jd_attachment_url', '')

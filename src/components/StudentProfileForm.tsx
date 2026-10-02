@@ -13,6 +13,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { updateStudentProfile } from '@/app/(dashboards)/student/profile/actions'
 import { CheckCircle2, Loader2, Plus, Trash2 } from 'lucide-react'
 
@@ -33,6 +41,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const [formState, setFormState] = useState({
     first_name: profile.first_name || '',
@@ -97,22 +106,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSuccess(false)
-    setError('')
-    
-    // Check for CGPA validation error
-    const hasCgpaError = formState.education.some((edu: any) => {
-      const scoreNum = parseFloat(edu.score)
-      return !isNaN(scoreNum) && scoreNum > 0 && scoreNum <= 10
-    })
-    
-    if (hasCgpaError) {
-      setError('Please convert your CGPA to a percentage in the Education section before saving.')
-      return
-    }
-
+  const executeSubmit = () => {
     let finalData: any = { ...formState };
     
     // Automatically extract scores for job eligibility filters
@@ -134,8 +128,34 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     startTransition(async () => {
       const res = await updateStudentProfile(fd)
       if (res.error) setError(res.error)
-      else setSuccess(true)
+      else {
+        setSuccess(true)
+        setShowConfirm(false)
+      }
     })
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSuccess(false)
+    setError('')
+    
+    // Check for CGPA validation error
+    const hasCgpaError = formState.education.some((edu: any) => {
+      const scoreNum = parseFloat(edu.score)
+      return !isNaN(scoreNum) && scoreNum > 0 && scoreNum <= 10
+    })
+    
+    if (hasCgpaError) {
+      setError('Please convert your CGPA to a percentage in the Education section before saving.')
+      return
+    }
+
+    if (auditEnabled) {
+      setShowConfirm(true)
+    } else {
+      executeSubmit()
+    }
   }
 
   return (
@@ -429,6 +449,25 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
           {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving Profile...</> : 'Save Profile'}
         </Button>
       </div>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit Profile for Review?</DialogTitle>
+            <DialogDescription>
+              Make sure you have made all your updates across all tabs. Submitting now will lock your profile for college review, and you won't be able to make further edits until it is approved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirm(false)} type="button">
+              Cancel
+            </Button>
+            <Button onClick={executeSubmit} disabled={isPending} type="button">
+              {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</> : 'Yes, Submit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </form>
   )

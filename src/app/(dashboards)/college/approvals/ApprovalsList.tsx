@@ -529,6 +529,7 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
                             <span className="font-medium truncate block">{oldLinks.portfolio || '—'}</span>
                           </div>
                         </div>
+                      </div>
 
                       {/* 5. Education */}
                       <div className="space-y-2">
@@ -758,7 +759,6 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
                     </div>
                   </div>
                 </div>
-              </div>
 
                 {/* Modal Footer with Direct Actions */}
                 <div className="pt-3 mt-auto border-t flex items-center justify-between flex-wrap gap-2">

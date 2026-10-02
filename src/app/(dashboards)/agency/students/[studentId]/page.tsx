@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { DigiProfileModal } from '@/components/DigiProfileModal'
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   applied:      { label: 'Applied',      className: 'bg-zinc-100 text-zinc-800' },
@@ -43,7 +44,7 @@ export default async function AgencyStudentDetailPage({
       created_at,
       profile_data,
       users ( email ),
-      colleges ( name )
+      colleges ( name, logo_url )
     `)
     .eq('id', studentId)
     .single()
@@ -91,14 +92,22 @@ export default async function AgencyStudentDetailPage({
           <ChevronLeft className="mr-1 h-4 w-4" />
           Back to Student Directory
         </Link>
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-xl font-bold text-blue-600 dark:text-blue-300">
-            {(profile.full_name?.[0] || email?.[0] || 'S').toUpperCase()}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-xl font-bold text-blue-600 dark:text-blue-300">
+              {(profile.full_name?.[0] || email?.[0] || 'S').toUpperCase()}
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">{profile.full_name || email}</h1>
+              <p className="text-zinc-500 mt-1">{collegeName}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{profile.full_name || email}</h1>
-            <p className="text-zinc-500 mt-1">{collegeName}</p>
-          </div>
+          <DigiProfileModal 
+            profile={profile}
+            email={email}
+            collegeName={collegeName}
+            collegeLogoUrl={(student.colleges as any)?.logo_url || ''}
+          />
         </div>
       </div>
 

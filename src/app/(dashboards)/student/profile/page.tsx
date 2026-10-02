@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { StudentProfileForm } from '@/components/StudentProfileForm'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { DeclareHiredModal } from '@/components/DeclareHiredModal'
+import { DigiProfileModal } from '@/components/DigiProfileModal'
 
 export default async function StudentProfilePage() {
   const supabase = await createClient()
@@ -21,6 +22,7 @@ export default async function StudentProfilePage() {
       profile_data,
       colleges (
         name,
+        logo_url,
         onboarding_fields
       )
     `)
@@ -73,7 +75,13 @@ export default async function StudentProfilePage() {
           </p>
         </div>
 
-        <div>
+        <div className="flex items-center gap-3">
+          <DigiProfileModal 
+            profile={profile}
+            email={user.email || ''}
+            collegeName={college?.name || ''}
+            collegeLogoUrl={college?.logo_url || ''}
+          />
           <DeclareHiredModal 
             appliedJobs={appliedJobs || []} 
             hasPendingOffer={!!pendingOffer}

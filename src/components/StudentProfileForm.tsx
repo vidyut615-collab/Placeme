@@ -22,7 +22,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { updateStudentProfile } from '@/app/(dashboards)/student/profile/actions'
-import { CheckCircle2, Loader2, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
+import Image from 'next/image'
+import { ImageCropperModal } from './ImageCropperModal'
 
 type OnboardingFields = {
   years: string[]
@@ -42,6 +45,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const [formState, setFormState] = useState({
     first_name: profile.first_name || '',
@@ -59,6 +63,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     active_backlogs: profile.active_backlogs || '',
     historical_backlogs: profile.historical_backlogs || '',
     academic_gap_years: profile.academic_gap_years || '',
+    profile_picture: profile.profile_picture || '',
     
     // NEW EXPANDED FIELDS
     education: profile.education || [],
@@ -98,6 +103,8 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     }))
   }
 
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
+
   const removeArrayItem = (category: 'education' | 'experience' | 'projects', index: number) => {
     setFormState(s => {
       const newArray = [...s[category]]
@@ -106,8 +113,62 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     })
   }
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      setCropImageSrc(reader.result?.toString() || null)
+    })
+    reader.readAsDataURL(file)
+    
+    // reset input so the same file can be selected again if needed
+    e.target.value = ''
+  }
+
+  const handleCroppedUpload = async (croppedFile: File) => {
+    if (croppedFile.size > 500 * 1024) {
+      setError('Cropped image is too large. Please keep it under 500KB.')
+      return
+    }
+
+    setIsUploadingImage(true)
+    setError('')
+    
+    try {
+      const supabase = createClient()
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) throw new Error('User not found')
+
+      const fileName = `profiles/${userData.user.id}-${Date.now()}.png`
+      const { data, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, croppedFile, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: publicUrlData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(data.path)
+
+      setFormState(s => ({ ...s, profile_picture: publicUrlData.publicUrl }))
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Failed to upload image.')
+    } finally {
+      setIsUploadingImage(false)
+      setCropImageSrc(null)
+    }
+  }
+
   const executeSubmit = () => {
-    let finalData: any = { ...formState };
+    const finalData: any = { ...formState };
     
     // Automatically extract scores for job eligibility filters
     const extractScore = (levelName: string) => {
@@ -172,6 +233,63 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
       )}
 
       <div className="space-y-6">
+        
+        {/* Profile Picture Upload Section */}
+        <div className="flex items-center gap-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800">
+          <div className="relative h-20 w-20 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 flex-shrink-0 border-2 border-white shadow-sm">
+            {formState.profile_picture ? (
+              <Image src={formState.profile_picture} alt="Profile" fill className="object-cover" />
+            ) : (
+              <div className="flex items-center justify-center h-full w-full text-zinc-400">
+                <Upload className="h-6 w-6" />
+              </div>
+            )}
+            {isUploadingImage && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 space-y-1">
+            <h3 className="font-medium text-sm">Profile Picture</h3>
+            <p className="text-xs text-zinc-500">Must be a PNG image under 500KB. This will appear on your DigiProfile.</p>
+              <div className="flex items-center gap-2 mt-2">
+              <div className="relative">
+                <Button type="button" variant="outline" size="sm" disabled={isUploadingImage} className="cursor-pointer">
+                  {isUploadingImage ? 'Uploading...' : 'Upload Image'}
+                </Button>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageSelect} 
+                  disabled={isUploadingImage}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                />
+              </div>
+              {formState.profile_picture && (
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setFormState(s => ({...s, profile_picture: ''}))}
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                >
+                  <X className="h-4 w-4 mr-1" /> Remove
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {cropImageSrc && (
+          <ImageCropperModal 
+            isOpen={!!cropImageSrc}
+            imageSrc={cropImageSrc}
+            onClose={() => setCropImageSrc(null)}
+            onCropComplete={handleCroppedUpload}
+          />
+        )}
+
         <Tabs defaultValue="basic" className="w-full">
         <TabsList className="mb-4 flex flex-wrap h-auto p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
           <TabsTrigger value="basic" className="flex-1 min-w-[120px]">Basic & Academics</TabsTrigger>

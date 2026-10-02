@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateCollegeProfile } from '@/app/(dashboards)/college/actions'
+import { ImageCropperModal } from './ImageCropperModal'
 import { 
   Building2, 
   Globe, 
@@ -65,6 +66,7 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   // Media states with 2 MB limit (2 * 1024 * 1024 bytes)
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
   const [logoUrl, setLogoUrl] = useState<string>(initialData.logo_url || '')
   const [bannerUrl, setBannerUrl] = useState<string>(initialData.banner_url || '')
   const [brochureUrl, setBrochureUrl] = useState<string>(initialData.brochure_url || '')
@@ -105,14 +107,27 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result as string
-      if (type === 'logo') setLogoUrl(result)
-      if (type === 'banner') setBannerUrl(result)
-      if (type === 'brochure') {
-        setBrochureUrl(result)
-        setBrochureName(file.name)
+      if (type === 'logo') {
+        setCropImageSrc(result)
+      } else {
+        if (type === 'banner') setBannerUrl(result)
+        if (type === 'brochure') {
+          setBrochureUrl(result)
+          setBrochureName(file.name)
+        }
       }
     }
     reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const handleCroppedLogoUpload = (croppedFile: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoUrl(reader.result as string)
+      setCropImageSrc(null)
+    }
+    reader.readAsDataURL(croppedFile)
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -717,6 +732,15 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
             )}
           </Button>
         </div>
+      )}
+      
+      {cropImageSrc && (
+        <ImageCropperModal 
+          isOpen={!!cropImageSrc}
+          imageSrc={cropImageSrc}
+          onClose={() => setCropImageSrc(null)}
+          onCropComplete={handleCroppedLogoUpload}
+        />
       )}
     </form>
   )

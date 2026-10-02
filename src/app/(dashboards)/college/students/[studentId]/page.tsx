@@ -17,6 +17,7 @@ import { formatDate } from '@/lib/utils'
 import { PenaltyHistoryCard } from '@/components/PenaltyHistoryCard'
 import { PenaltySummaryCard } from '@/components/PenaltySummaryCard'
 import { StudentPoliciesViewer } from '@/components/StudentPoliciesViewer'
+import { DigiProfileModal } from '@/components/DigiProfileModal'
 import { PolicyConfig, DEFAULT_POLICY_CONFIG } from '@/lib/policy-engine'
 
 export default async function StudentProfileAuditPage({ params }: { params: Promise<{ studentId: string }> }) {
@@ -40,7 +41,8 @@ export default async function StudentProfileAuditPage({ params }: { params: Prom
       onboarding_status,
       created_at,
       profile_data,
-      users!inner ( email )
+      users!inner ( email ),
+      colleges ( name, logo_url )
     `)
     .eq('id', studentId)
     .single()
@@ -263,6 +265,12 @@ export default async function StudentProfileAuditPage({ params }: { params: Prom
         </div>
 
         <div className="flex flex-col gap-2 md:items-end">
+          <DigiProfileModal 
+            profile={profile}
+            email={(student.users as any)?.email || ''}
+            collegeName={(student.colleges as any)?.name || 'College'}
+            collegeLogoUrl={(student.colleges as any)?.logo_url || ''}
+          />
           <div className="flex items-center gap-2 text-sm text-blue-900 dark:text-blue-200 font-medium bg-white/60 dark:bg-black/20 px-3 py-1.5 rounded-md border border-blue-100/50 dark:border-blue-900/30 w-fit">
             <GraduationCap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             {profile.type || 'N/A'} • {profile.department || 'N/A'}

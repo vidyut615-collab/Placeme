@@ -391,6 +391,21 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
             const newLinks = newData.links || {}
             const linksDiff = JSON.stringify(oldLinks) !== JSON.stringify(newLinks)
 
+            // Education helper
+            const oldEdu = Array.isArray(oldData.education) ? oldData.education : []
+            const newEdu = Array.isArray(newData.education) ? newData.education : []
+            const eduDiff = JSON.stringify(oldEdu) !== JSON.stringify(newEdu)
+
+            // Experience helper
+            const oldExp = Array.isArray(oldData.experience) ? oldData.experience : []
+            const newExp = Array.isArray(newData.experience) ? newData.experience : []
+            const expDiff = JSON.stringify(oldExp) !== JSON.stringify(newExp)
+
+            // Projects helper
+            const oldProj = Array.isArray(oldData.projects) ? oldData.projects : []
+            const newProj = Array.isArray(newData.projects) ? newData.projects : []
+            const projDiff = JSON.stringify(oldProj) !== JSON.stringify(newProj)
+
             // Academic fields nodes
             const academicFieldRows = ACADEMIC_KEYS.map((key) =>
               renderFieldCompare(key, FIELD_LABELS[key] || key)
@@ -514,6 +529,53 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
                             <span className="font-medium truncate block">{oldLinks.portfolio || '—'}</span>
                           </div>
                         </div>
+
+                      {/* 5. Education */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                          <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+                          Detailed Education
+                        </div>
+                        <div className="space-y-2">
+                          {oldEdu.length === 0 ? <p className="text-xs text-zinc-500 italic">No education added.</p> : oldEdu.map((edu: any, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg border bg-white dark:bg-zinc-900 space-y-1 text-xs">
+                              <div className="font-semibold">{edu.level} • {edu.institution}</div>
+                              <div className="text-[11px] text-zinc-500">{edu.board} • {edu.passing_year} • {edu.score}%</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 6. Experience */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                          <Briefcase className="h-3.5 w-3.5 text-blue-600" />
+                          Experience
+                        </div>
+                        <div className="space-y-2">
+                          {oldExp.length === 0 ? <p className="text-xs text-zinc-500 italic">No experience added.</p> : oldExp.map((exp: any, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg border bg-white dark:bg-zinc-900 space-y-1 text-xs">
+                              <div className="font-semibold">{exp.role} @ {exp.company}</div>
+                              <div className="text-[11px] text-zinc-500">{exp.start_date} - {exp.end_date}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 7. Projects */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                          <FileText className="h-3.5 w-3.5 text-blue-600" />
+                          Projects
+                        </div>
+                        <div className="space-y-2">
+                          {oldProj.length === 0 ? <p className="text-xs text-zinc-500 italic">No projects added.</p> : oldProj.map((proj: any, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg border bg-white dark:bg-zinc-900 space-y-1 text-xs">
+                              <div className="font-semibold">{proj.title}</div>
+                              <div className="text-[11px] text-zinc-500 truncate">{proj.tech}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -624,9 +686,79 @@ export function ApprovalsList({ requests }: { requests: RequestItem[] }) {
                           </div>
                         </div>
                       </div>
+
+                      {/* 5. Education */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                            <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
+                            Detailed Education
+                          </div>
+                          {eduDiff && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-emerald-600 text-white font-bold">
+                              Modified
+                            </Badge>
+                          )}
+                        </div>
+                        <div className={`space-y-2 ${eduDiff ? 'p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/50' : ''}`}>
+                          {newEdu.length === 0 ? <p className="text-xs text-zinc-500 italic p-1">No education added.</p> : newEdu.map((edu: any, i: number) => (
+                            <div key={i} className={`p-2.5 rounded-lg border space-y-1 text-xs ${eduDiff ? 'bg-white dark:bg-zinc-900 border-emerald-300 dark:border-emerald-700' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}>
+                              <div className="font-bold">{edu.level} • {edu.institution}</div>
+                              <div className="text-[11px] text-zinc-500">{edu.board} • {edu.passing_year} • {edu.score}%</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 6. Experience */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                            <Briefcase className="h-3.5 w-3.5 text-emerald-600" />
+                            Experience
+                          </div>
+                          {expDiff && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-emerald-600 text-white font-bold">
+                              Modified
+                            </Badge>
+                          )}
+                        </div>
+                        <div className={`space-y-2 ${expDiff ? 'p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/50' : ''}`}>
+                          {newExp.length === 0 ? <p className="text-xs text-zinc-500 italic p-1">No experience added.</p> : newExp.map((exp: any, i: number) => (
+                            <div key={i} className={`p-2.5 rounded-lg border space-y-1 text-xs ${expDiff ? 'bg-white dark:bg-zinc-900 border-emerald-300 dark:border-emerald-700' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}>
+                              <div className="font-bold">{exp.role} @ {exp.company}</div>
+                              <div className="text-[11px] text-zinc-500">{exp.start_date} - {exp.end_date}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 7. Projects */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                            <FileText className="h-3.5 w-3.5 text-emerald-600" />
+                            Projects
+                          </div>
+                          {projDiff && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-emerald-600 text-white font-bold">
+                              Modified
+                            </Badge>
+                          )}
+                        </div>
+                        <div className={`space-y-2 ${projDiff ? 'p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/50' : ''}`}>
+                          {newProj.length === 0 ? <p className="text-xs text-zinc-500 italic p-1">No projects added.</p> : newProj.map((proj: any, i: number) => (
+                            <div key={i} className={`p-2.5 rounded-lg border space-y-1 text-xs ${projDiff ? 'bg-white dark:bg-zinc-900 border-emerald-300 dark:border-emerald-700' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}>
+                              <div className="font-bold">{proj.title}</div>
+                              <div className="text-[11px] text-zinc-500 truncate">{proj.tech}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
 
                 {/* Modal Footer with Direct Actions */}
                 <div className="pt-3 mt-auto border-t flex items-center justify-between flex-wrap gap-2">

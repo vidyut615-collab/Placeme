@@ -102,10 +102,31 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     setSuccess(false)
     setError('')
     
-    const finalData = {
-      ...formState,
-      full_name: `${formState.first_name.trim()} ${formState.middle_name ? formState.middle_name.trim() + ' ' : ''}${formState.last_name.trim()}`.trim()
+    // Check for CGPA validation error
+    const hasCgpaError = formState.education.some((edu: any) => {
+      const scoreNum = parseFloat(edu.score)
+      return !isNaN(scoreNum) && scoreNum > 0 && scoreNum <= 10
+    })
+    
+    if (hasCgpaError) {
+      setError('Please convert your CGPA to a percentage in the Education section before saving.')
+      return
     }
+
+    let finalData: any = { ...formState };
+    
+    // Automatically extract scores for job eligibility filters
+    const extractScore = (levelName: string) => {
+      const entry = finalData.education.find((e: any) => e.level === levelName);
+      return entry && entry.score ? parseFloat(entry.score) || null : null;
+    };
+
+    finalData.academic_10th = extractScore('10th') || finalData.academic_10th;
+    finalData.academic_12th = extractScore('12th') || finalData.academic_12th;
+    finalData.diploma_percentage = extractScore('Diploma') || finalData.diploma_percentage;
+    finalData.graduation_percentage = extractScore('UG (UnderGrad)') || finalData.graduation_percentage;
+
+    finalData.full_name = `${finalData.first_name.trim()} ${finalData.middle_name ? finalData.middle_name.trim() + ' ' : ''}${finalData.last_name.trim()}`.trim();
     
     const fd = new FormData()
     fd.append('profile_data_json', JSON.stringify(finalData))
@@ -134,7 +155,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
         <Tabs defaultValue="basic" className="w-full">
         <TabsList className="mb-4 flex flex-wrap h-auto p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
           <TabsTrigger value="basic" className="flex-1 min-w-[120px]">Basic & Academics</TabsTrigger>
-          <TabsTrigger value="education" className="flex-1 min-w-[120px]">Past Education</TabsTrigger>
+          <TabsTrigger value="education" className="flex-1 min-w-[120px]">Education</TabsTrigger>
           <TabsTrigger value="experience" className="flex-1 min-w-[120px]">Experience</TabsTrigger>
           <TabsTrigger value="projects" className="flex-1 min-w-[120px]">Projects</TabsTrigger>
           <TabsTrigger value="skills" className="flex-1 min-w-[120px]">Skills & Links</TabsTrigger>
@@ -221,28 +242,6 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
         </TabsContent>
 
         <TabsContent value="education" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6 p-4 bg-zinc-50 dark:bg-zinc-900 rounded-md border">
-            <div className="col-span-full mb-2">
-              <h4 className="font-medium text-sm">Quick Fill (Legacy)</h4>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="academic_10th">10th %</Label>
-              <Input id="academic_10th" type="number" step="0.01" value={formState.academic_10th} onChange={handleChange('academic_10th')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="academic_12th">12th %</Label>
-              <Input id="academic_12th" type="number" step="0.01" value={formState.academic_12th} onChange={handleChange('academic_12th')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="diploma_percentage">Diploma %</Label>
-              <Input id="diploma_percentage" type="number" step="0.01" value={formState.diploma_percentage} onChange={handleChange('diploma_percentage')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="graduation_percentage">UG %</Label>
-              <Input id="graduation_percentage" type="number" step="0.01" value={formState.graduation_percentage} onChange={handleChange('graduation_percentage')} />
-            </div>
-          </div>
-
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Detailed Education History</h3>
@@ -250,37 +249,58 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
                 <Plus className="h-4 w-4 mr-2" /> Add Education
               </Button>
             </div>
-            {formState.education.map((edu: any, i: number) => (
-              <div key={i} className="p-4 border rounded-md relative bg-white dark:bg-zinc-950">
-                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeArrayItem('education', i)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <div className="grid gap-4 md:grid-cols-2 mt-2">
-                  <div className="space-y-2">
-                    <Label>Level</Label>
-                    <Input placeholder="e.g. 10th, 12th, Diploma, UG" value={edu.level} onChange={(e) => handleArrayChange('education', i, 'level', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Institution Name</Label>
-                    <Input placeholder="e.g. Delhi Public School" value={edu.institution} onChange={(e) => handleArrayChange('education', i, 'institution', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Board / University</Label>
-                    <Input placeholder="e.g. CBSE" value={edu.board} onChange={(e) => handleArrayChange('education', i, 'board', e.target.value)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+            {formState.education.map((edu: any, i: number) => {
+              const scoreNum = parseFloat(edu.score);
+              const showScoreWarning = !isNaN(scoreNum) && scoreNum > 0 && scoreNum <= 10;
+              return (
+                <div key={i} className="p-4 border rounded-md relative bg-white dark:bg-zinc-950">
+                  <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeArrayItem('education', i)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <div className="grid gap-4 md:grid-cols-2 mt-2">
                     <div className="space-y-2">
-                      <Label>Passing Year</Label>
-                      <Input placeholder="2020" value={edu.passing_year} onChange={(e) => handleArrayChange('education', i, 'passing_year', e.target.value)} />
+                      <Label>Level</Label>
+                      <Select value={edu.level} onValueChange={(v) => handleArrayChange('education', i, 'level', v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10th">10th</SelectItem>
+                          <SelectItem value="12th">12th</SelectItem>
+                          <SelectItem value="Diploma">Diploma</SelectItem>
+                          <SelectItem value="UG (UnderGrad)">UG (UnderGrad)</SelectItem>
+                          <SelectItem value="PG (PostGrad)">PG (PostGrad)</SelectItem>
+                          <SelectItem value="PhD">PhD</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Score (%)</Label>
-                      <Input placeholder="95" value={edu.score} onChange={(e) => handleArrayChange('education', i, 'score', e.target.value)} />
+                      <Label>Institution Name</Label>
+                      <Input placeholder="e.g. Delhi Public School" value={edu.institution} onChange={(e) => handleArrayChange('education', i, 'institution', e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Board / University</Label>
+                      <Input placeholder="e.g. CBSE" value={edu.board} onChange={(e) => handleArrayChange('education', i, 'board', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Passing Year</Label>
+                        <Input placeholder="2020" value={edu.passing_year} onChange={(e) => handleArrayChange('education', i, 'passing_year', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Score (%)</Label>
+                        <Input placeholder="95" type="number" step="0.01" value={edu.score} onChange={(e) => handleArrayChange('education', i, 'score', e.target.value)} />
+                        {showScoreWarning && (
+                          <p className="text-[11px] text-red-500 leading-tight">
+                            Please convert your CGPA to a percentage (e.g. 85 instead of 8.5).
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {formState.education.length === 0 && <p className="text-sm text-zinc-500 italic">No detailed education added yet.</p>}
           </div>
         </TabsContent>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Briefcase, FileText, UserCircle, FileCheck, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Briefcase, FileText, UserCircle, FileCheck, CreditCard, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
@@ -13,6 +13,7 @@ export const studentNavigation = [
   { name: 'Jobs', href: '/student/jobs', icon: Briefcase },
   { name: 'Applications', href: '/student/applications', icon: FileText },
   { name: 'My Profile', href: '/student/profile', icon: UserCircle },
+  { name: 'AI Resume', href: '/student/ai-resume', icon: Sparkles },
   { name: 'Policies', href: '/student/policies', icon: FileCheck },
   { name: 'Billing', href: '/student/billing', icon: CreditCard },
 ]

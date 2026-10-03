@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -524,18 +525,18 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
 
         <TabsContent value="skills" className="space-y-6">
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Technical Skills</h3>
+            <h3 className="text-lg font-medium">Skills</h3>
             <div className="space-y-2">
-              <Label>Programming Languages</Label>
-              <Input placeholder="e.g. Python, Java, C++" value={formState.skills.languages} onChange={(e) => handleNestedChange('skills', 'languages', e.target.value)} />
+              <Label>Domain & Core Skills</Label>
+              <TagInput placeholder="e.g. Financial Modeling, Python, Content Marketing, SEO..." value={formState.skills.languages} onChange={(val) => handleNestedChange('skills', 'languages', val)} />
             </div>
             <div className="space-y-2">
-              <Label>Frameworks & Libraries</Label>
-              <Input placeholder="e.g. React, Next.js, Spring Boot" value={formState.skills.frameworks} onChange={(e) => handleNestedChange('skills', 'frameworks', e.target.value)} />
+              <Label>Tools & Software</Label>
+              <TagInput placeholder="e.g. Microsoft Excel, Salesforce, AutoCAD, React, Figma..." value={formState.skills.frameworks} onChange={(val) => handleNestedChange('skills', 'frameworks', val)} />
             </div>
             <div className="space-y-2">
-              <Label>Tools & Platforms</Label>
-              <Input placeholder="e.g. Git, Docker, AWS" value={formState.skills.tools} onChange={(e) => handleNestedChange('skills', 'tools', e.target.value)} />
+              <Label>Soft Skills & Spoken Languages</Label>
+              <TagInput placeholder="e.g. Public Speaking, Leadership, English, Spanish..." value={formState.skills.tools} onChange={(val) => handleNestedChange('skills', 'tools', val)} />
             </div>
           </div>
 
@@ -593,5 +594,53 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
       </Dialog>
       </fieldset>
     </form>
+  )
+}
+
+function TagInput({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder: string }) {
+  const [inputValue, setInputValue] = useState('')
+  const tags = value.split(',').map(t => t.trim()).filter(t => t.length > 0)
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      const newTag = inputValue.trim().replace(/,/g, '')
+      if (newTag && !tags.includes(newTag)) {
+        onChange([...tags, newTag].join(', '))
+        setInputValue('')
+      }
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    onChange(tags.filter(t => t !== tagToRemove).join(', '))
+  }
+
+  return (
+    <div className="space-y-3 p-3 border rounded-md bg-white dark:bg-zinc-950">
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tag, i) => (
+          <Badge key={i} variant="secondary" className="px-2 py-1 text-sm font-medium">
+            {tag}
+            <button
+              type="button"
+              className="ml-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full text-zinc-500"
+              onClick={() => removeTag(tag)}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </Badge>
+        ))}
+        {tags.length === 0 && <span className="text-sm text-zinc-500 py-1">No skills added yet.</span>}
+      </div>
+      <Input
+        placeholder={placeholder}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="bg-transparent border-dashed"
+      />
+      <p className="text-xs text-zinc-500">Press Enter or Comma to add a skill.</p>
+    </div>
   )
 }

@@ -447,7 +447,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
         <TabsContent value="experience" className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium">Work Experience & Internships</h3>
-            <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('experience', { type: 'internship', company: '', role: '', start_date: '', end_date: '', description: '' })}>
+            <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('experience', { type: 'internship', company: '', role: '', start_date: '', end_date: '', tech: '', description: '' })}>
               <Plus className="h-4 w-4 mr-2" /> Add Experience
             </Button>
           </div>
@@ -472,6 +472,10 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
                 <div className="space-y-2">
                   <Label>End Date</Label>
                   <Input placeholder="MM/YYYY or Present" value={exp.end_date} onChange={(e) => handleArrayChange('experience', i, 'end_date', e.target.value)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Technologies Used <span className="text-zinc-500 font-normal">(Optional)</span></Label>
+                  <Input placeholder="e.g. React, Node.js, AWS" value={exp.tech || ''} onChange={(e) => handleArrayChange('experience', i, 'tech', e.target.value)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Description</Label>

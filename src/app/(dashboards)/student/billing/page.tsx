@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertCircle, Clock, Zap, Coins } from 'lucide-react'
 import { CheckoutButton } from './CheckoutButton'
 

@@ -71,6 +71,8 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     education: profile.education || [],
     experience: profile.experience || [],
     projects: profile.projects || [],
+    activities: profile.activities || [],
+    recognitions: profile.recognitions || [],
     skills: profile.skills || { languages: '', frameworks: '', tools: '' },
     links: profile.links || { linkedin: '', github: '', portfolio: '' }
   })
@@ -90,7 +92,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
   }
 
   // Array handlers
-  const handleArrayChange = (category: 'education' | 'experience' | 'projects', index: number, field: string, value: string) => {
+  const handleArrayChange = (category: 'education' | 'experience' | 'projects' | 'activities' | 'recognitions', index: number, field: string, value: string) => {
     setFormState(s => {
       const newArray = [...s[category]]
       newArray[index] = { ...newArray[index], [field]: value }
@@ -98,7 +100,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
     })
   }
 
-  const addArrayItem = (category: 'education' | 'experience' | 'projects', template: any) => {
+  const addArrayItem = (category: 'education' | 'experience' | 'projects' | 'activities' | 'recognitions', template: any) => {
     setFormState(s => ({
       ...s,
       [category]: [...s[category], template]
@@ -107,7 +109,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
 
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
 
-  const removeArrayItem = (category: 'education' | 'experience' | 'projects', index: number) => {
+  const removeArrayItem = (category: 'education' | 'experience' | 'projects' | 'activities' | 'recognitions', index: number) => {
     setFormState(s => {
       const newArray = [...s[category]]
       newArray.splice(index, 1)
@@ -298,6 +300,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
           <TabsTrigger value="education" className="flex-1 min-w-[120px]">Education</TabsTrigger>
           <TabsTrigger value="experience" className="flex-1 min-w-[120px]">Experience</TabsTrigger>
           <TabsTrigger value="projects" className="flex-1 min-w-[120px]">Projects</TabsTrigger>
+          <TabsTrigger value="activities" className="flex-1 min-w-[120px]">Activities & Awards</TabsTrigger>
           <TabsTrigger value="skills" className="flex-1 min-w-[120px]">Skills & Links</TabsTrigger>
         </TabsList>
 
@@ -521,6 +524,88 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
             </div>
           ))}
           {formState.projects.length === 0 && <p className="text-sm text-zinc-500 italic">No projects added yet.</p>}
+        </TabsContent>
+
+        <TabsContent value="activities" className="space-y-8">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">Extracurricular Activities</h3>
+                <p className="text-xs text-zinc-500">Clubs, sports, volunteering, or student organizations.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('activities', { org: '', role: '', start_date: '', end_date: '', description: '' })}>
+                <Plus className="h-4 w-4 mr-2" /> Add Activity
+              </Button>
+            </div>
+            {formState.activities.map((act: any, i: number) => (
+              <div key={i} className="p-4 border rounded-md relative bg-white dark:bg-zinc-950">
+                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeArrayItem('activities', i)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <div className="grid gap-4 md:grid-cols-2 mt-2">
+                  <div className="space-y-2">
+                    <Label>Organization / Club Name <span className="text-red-500">*</span></Label>
+                    <Input placeholder="e.g. University Tech Club" value={act.org} onChange={(e) => handleArrayChange('activities', i, 'org', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role / Title</Label>
+                    <Input placeholder="e.g. President, Event Coordinator" value={act.role} onChange={(e) => handleArrayChange('activities', i, 'role', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input placeholder="MM/YYYY" value={act.start_date} onChange={(e) => handleArrayChange('activities', i, 'start_date', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input placeholder="MM/YYYY or Present" value={act.end_date} onChange={(e) => handleArrayChange('activities', i, 'end_date', e.target.value)} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Description</Label>
+                    <Textarea placeholder="What did you do? What was the impact?" value={act.description} onChange={(e) => handleArrayChange('activities', i, 'description', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {formState.activities.length === 0 && <p className="text-sm text-zinc-500 italic">No activities added yet.</p>}
+          </div>
+
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">Awards & Recognitions</h3>
+                <p className="text-xs text-zinc-500">Olympiads, hackathons, scholarships, or academic awards.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('recognitions', { award: '', issuer: '', date: '', description: '' })}>
+                <Plus className="h-4 w-4 mr-2" /> Add Award
+              </Button>
+            </div>
+            {formState.recognitions.map((rec: any, i: number) => (
+              <div key={i} className="p-4 border rounded-md relative bg-white dark:bg-zinc-950">
+                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeArrayItem('recognitions', i)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <div className="grid gap-4 md:grid-cols-2 mt-2">
+                  <div className="space-y-2">
+                    <Label>Award / Recognition Name <span className="text-red-500">*</span></Label>
+                    <Input placeholder="e.g. Gold Medalist, 1st Place Winner" value={rec.award} onChange={(e) => handleArrayChange('recognitions', i, 'award', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Issuer / Event Name</Label>
+                    <Input placeholder="e.g. National Math Olympiad" value={rec.issuer} onChange={(e) => handleArrayChange('recognitions', i, 'issuer', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Date Received</Label>
+                    <Input placeholder="MM/YYYY or YYYY" value={rec.date} onChange={(e) => handleArrayChange('recognitions', i, 'date', e.target.value)} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Description</Label>
+                    <Textarea placeholder="Ranked top 1% out of 50,000 participants..." value={rec.description} onChange={(e) => handleArrayChange('recognitions', i, 'description', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {formState.recognitions.length === 0 && <p className="text-sm text-zinc-500 italic">No awards added yet.</p>}
+          </div>
         </TabsContent>
 
         <TabsContent value="skills" className="space-y-6">

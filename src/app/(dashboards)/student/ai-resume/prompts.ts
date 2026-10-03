@@ -1,37 +1,69 @@
-export const PROMPT_SHORTEN_JD = `Rewrite Job Description in Structured and Concise manner, Under 250 Words. While Re-writing Focus more on Responsibilities, Skills, tools & Required Knowledge mentioned in Job description and curate and re-write job description based on that.  Make Sure you are keeping all the context with related to same.
-"Include soft skills such as teamwork, problem-solving, and strategic thinking" or "Ensure the rewritten description includes all essential qualities, both hard and soft skills, mentioned in the original."
-"Ensure the rewritten description emphasizes the candidate's ability to work independently and as part of a team, and their strategic thinking skills."
-Provide only the rewritten job description in simple text format, without any supportive text.
+﻿export const PROMPT_SHORTEN_JD = `Rewrite the Job Description concisely in under 250 words. Focus strictly on responsibilities, hard/soft skills, tools, and required knowledge. Ensure it emphasizes teamwork, problem-solving, strategic thinking, and independence if mentioned in the original.
+Provide ONLY the rewritten text, with no introductory or supporting text.
 
-Job Description as follows:
-[
-{{JOB_DESCRIPTION}}
-]`;
+[Job Description]
+{{JOB_DESCRIPTION}}`;
 
-export const PROMPT_WORK_HISTORY = `Generate 3 Suggestions for work history in json format. Focus on specific achievements and skills, instead of general statements, emphasize quantifiable results and specific skills. Use a more formal and concise tone: Avoid using contractions or colloquial language. Highlight key metrics and results, Quantify your achievements whenever possible. Use bullet points and Tailor your summary to the specific job you are applying for. Proofread carefully, ensure that there are no grammatical or spelling errors. Use active voice: Instead of passive voice, use active voice to make your summary more engaging. Use strong verbs, choose strong verbs that convey your accomplishments effectively. Use conversational language and show humane personality in your response. Avoid Writing any additional line.
+export const PROMPT_WORK_HISTORY = `Generate 3 distinct, ATS-friendly suggestions for a resume work history entry. 
+Format: Output valid JSON exactly like this: {"options": ["option 1...", "option 2...", "option 3..."]}
 
-Provide only the JSON array containing the 3 work history texts, without any additional explanation or formatting. Return an array of strings like: ["option 1 text...", "option 2 text...", "option 3 text..."]
+Guidelines:
+- FORMAT AS BULLET POINTS: Each option string MUST be a bulleted list (use the - character and \n newlines). Do not write a continuous paragraph.
+- Focus on specific achievements, quantifiable metrics, and hard skills.
+- Use a formal, concise tone with active voice and strong action verbs.
+- Avoid contractions, colloquial language, or general fluff.
+- Tailor the summary directly to the Target Job Description.
+- Ensure perfect grammar and spelling.
 
-[Past Job Details]
-Past Job Title: {{JOB_TITLE}}
-Past Company Name: {{COMPANY_NAME}}
-Technology Used: {{TECHNOLOGY_USED}}
+[Past Job]
+Title: {{JOB_TITLE}}
+Company: {{COMPANY_NAME}}
+Tech Used: {{TECHNOLOGY_USED}}
 
-Applying Job Description
-[
-{{SHORTENED_JD}}
-]`;
+[Target Job Description]
+{{SHORTENED_JD}}`;
 
-export const PROMPT_PROJECT = `Generate 3 Suggestions for project history in json format. Focus on project details mentioned, instead of general statements, emphasize quantifiable results and specific skills. Use a more formal and concise tone: Avoid using contractions or colloquial language. Highlight key metrics and results, Quantify your achievements whenever possible, if any. Use and Tailor your Project summary to the specific job you are applying for. Proofread carefully, ensure that there are no grammatical or spelling errors. Use active voice: Instead of passive voice, use active voice to make your summary more engaging. Use strong verbs, choose strong verbs that convey your accomplishments effectively. Use conversational language and show humane personality in your response. Avoid Writing any additional line.
+export const PROMPT_PROJECT = `Generate 3 distinct, ATS-friendly suggestions for a resume project entry.
+Format: Output valid JSON exactly like this: {"options": ["option 1...", "option 2...", "option 3..."]}
 
-Provide only the JSON array containing the 3 Project Summary texts, without any additional explanation or formatting. Return an array of strings like: ["option 1 text...", "option 2 text...", "option 3 text..."]
+Guidelines:
+- FORMAT AS BULLET POINTS: Each option string MUST be a bulleted list (use the - character and \n newlines). Do not write a continuous paragraph.
+- Emphasize project details, tech stack, and quantifiable results.
+- Use a formal, concise tone with active voice and strong action verbs.
+- Avoid contractions, colloquial language, or general fluff.
+- Tailor the summary directly to the Target Job Description.
+- Ensure perfect grammar and spelling.
 
 [Project Details]
-Project Title: {{PROJECT_TITLE}}
-Technology used: {{TECHNOLOGY_USED}}
-Project Description: {{PROJECT_DESCRIPTION}}
+Title: {{PROJECT_TITLE}}
+Tech Used: {{TECHNOLOGY_USED}}
+Description: {{PROJECT_DESCRIPTION}}
 
-Applying Job Description
-[
-{{SHORTENED_JD}}
-]`;
+[Target Job Description]
+{{SHORTENED_JD}}`;
+
+export const PROMPT_CAREER_OBJECTIVE = `Generate 3 distinct, ATS-friendly Career Objective suggestions tailored to the target job.
+Format: Output valid JSON exactly like this: {"options": ["option 1...", "option 2...", "option 3..."]}
+
+Guidelines:
+- FORMAT AS BULLET POINTS: Each option string MUST be a bulleted list (use the - character and \n newlines). Do not write a continuous paragraph.
+- Word count: 50-70 words per option.
+- Opening: Start with a strong action adjective and state the candidate's title with total years of experience (calculated from their work histories).
+- Experience & Skills: Highlight key skills aligned with the job description using powerful vocabulary (max 18 words).
+- Objective: Clearly state the desire to contribute to {{COMPANY_NAME}}.
+- Impact: Include up to 2 key quantified achievements from their past to demonstrate impact.
+- Tone: Professional, humanized, concise. Avoid overused buzzwords.
+
+[Candidate Data]
+Work Histories: 
+{{WORK_HISTORIES}}
+Core Skills: {{DOMAIN_SKILLS}}
+Tools: {{TOOLS_SKILLS}}
+Soft Skills: {{SOFT_SKILLS}}
+
+[Target Role]
+Role: {{JOB_ROLE}}
+Company: {{COMPANY_NAME}}
+
+[Target Job Description]
+{{SHORTENED_JD}}`;

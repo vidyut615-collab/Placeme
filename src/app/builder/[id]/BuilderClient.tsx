@@ -1,16 +1,111 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Lock, Save, Edit3, Briefcase, FileCode, CheckCircle2 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
+import { ChevronDown, ChevronRight, Lock, Save, Edit3, Briefcase, FileCode, CheckCircle2, Loader2 } from 'lucide-react'
+import { generateCareerObjectiveAction } from '@/app/(dashboards)/student/ai-resume/actions'
 
 export default function BuilderClient({ resume, profileData }: { resume: any, profileData: any }) {
   const [activeTab, setActiveTab] = useState<string>('personal')
+  const [isGeneratingObjective, setIsGeneratingObjective] = useState(false)
+
+  const handleGenerateObjective = async () => {
+    setIsGeneratingObjective(true)
+    try {
+      const workDump = aiWorkHistories.map((w: any) => w.final_edited_text).filter(Boolean).join('\n\n')
+      const res = await generateCareerObjectiveAction(
+        workDump,
+        profileData.skills || {},
+        resume.job_role,
+        resume.company_name,
+        resume.jd_text
+      )
+      if (res.error) throw new Error(res.error)
+      
+      const newObjective = { is_generated: true, ai_options: res.options, final_edited_text: "" }
+      
+      setResumeData((prev: any) => {
+         const newData = { ...prev, career_objective: newObjective }
+         // Save to DB immediately
+         const supabase = createClient()
+         supabase.from('ai_resumes').update({ content: newData }).eq('id', resume.id).then(({error}) => {
+            if (error) console.error("Failed to save objective:", error)
+         })
+         return newData
+      })
+      
+      import('sonner').then(m => m.toast.success('Career Objective Generated!'))
+    } catch (err: any) {
+      import('sonner').then(m => m.toast.error(err.message))
+    } finally {
+      setIsGeneratingObjective(false)
+    }
+  }
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
   // Parse JSON state
-  const content = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
-  const aiWorkHistories = content.work_histories || []
-  const aiProjects = content.projects || []
+  const initialContent = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
+  const [resumeData, setResumeData] = useState(initialContent)
+  
+  const [editorText, setEditorText] = useState<Record<string, string>>(() => {
+    const state: Record<string, string> = {}
+    if (initialContent.career_objective?.final_edited_text) state['objective'] = initialContent.career_objective.final_edited_text
+    initialContent.work_histories?.forEach((w: any, i: number) => { if (w.final_edited_text) state[`work_${i}`] = w.final_edited_text })
+    initialContent.projects?.forEach((p: any, i: number) => { if (p.final_edited_text) state[`proj_${i}`] = p.final_edited_text })
+    return state
+  })
+  
+
+
+  const aiWorkHistories = resumeData.work_histories || []
+  const aiProjects = resumeData.projects || []
+  
+  const handleSelectOption = (text: string) => {
+    setEditorText(prev => ({ ...prev, [activeTab]: text }))
+  }
+
+  const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditorText(prev => ({ ...prev, [activeTab]: e.target.value }))
+  }
+
+  const handleSave = async () => {
+    if (!editorText[activeTab] || editorText[activeTab].trim() === '') {
+      import('sonner').then(m => m.toast.error('Editor cannot be empty'))
+      return
+    }
+
+    let updatedContent = {}
+    
+    setResumeData((prev: any) => {
+       const newData = { ...prev }
+       if (activeTab === 'objective') {
+         newData.career_objective = { ...newData.career_objective, final_edited_text: editorText[activeTab] }
+       } else if (activeTab.startsWith('work_')) {
+         const idx = parseInt(activeTab.split('_')[1])
+         newData.work_histories[idx] = { ...newData.work_histories[idx], final_edited_text: editorText[activeTab] }
+       } else if (activeTab.startsWith('proj_')) {
+         const idx = parseInt(activeTab.split('_')[1])
+         newData.projects[idx] = { ...newData.projects[idx], final_edited_text: editorText[activeTab] }
+       }
+       updatedContent = newData
+       return newData
+    })
+    
+    // Save directly to database
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('ai_resumes')
+        .update({ content: updatedContent })
+        .eq('id', resume.id)
+        
+      if (error) throw error
+      import('sonner').then(m => m.toast.success('Saved to Database!'))
+    } catch (err: any) {
+      import('sonner').then(m => m.toast.error('Failed to save to database'))
+      console.error(err)
+    }
+  }
   
   const handleTabClick = (tabId: string) => {
     setActiveTab(tabId)
@@ -53,6 +148,20 @@ export default function BuilderClient({ resume, profileData }: { resume: any, pr
             Skills
           </button>
 
+          <button 
+            onClick={() => handleTabClick('activities')}
+            className={`w-full text-left px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'activities' ? 'bg-white dark:bg-zinc-800 shadow-sm border' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-transparent'}`}
+          >
+            Activities
+          </button>
+
+          <button 
+            onClick={() => handleTabClick('recognitions')}
+            className={`w-full text-left px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'recognitions' ? 'bg-white dark:bg-zinc-800 shadow-sm border' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-transparent'}`}
+          >
+            Awards & Recognitions
+          </button>
+
           {/* AI Accordion: Work History */}
           <div className="pt-2">
             <button 
@@ -77,7 +186,7 @@ export default function BuilderClient({ resume, profileData }: { resume: any, pr
                       className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${activeTab === tabId ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
                     >
                       <span className="truncate">{exp.company || 'Experience ' + (i+1)}</span>
-                      {aiWorkHistories[i]?.selected_option && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                      {!!aiWorkHistories[i]?.final_edited_text && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
                     </button>
                   )
                 })}
@@ -109,7 +218,7 @@ export default function BuilderClient({ resume, profileData }: { resume: any, pr
                       className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${activeTab === tabId ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
                     >
                       <span className="truncate">{proj.title || 'Project ' + (i+1)}</span>
-                      {aiProjects[i]?.selected_option && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                      {!!aiProjects[i]?.final_edited_text && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
                     </button>
                   )
                 })}
@@ -117,74 +226,208 @@ export default function BuilderClient({ resume, profileData }: { resume: any, pr
             )}
           </div>
 
-        </div>
-
-        {/* Career Objective (Locked at bottom) */}
-        <div className="mt-auto p-4 border-t bg-zinc-50 dark:bg-zinc-950">
-           <button 
-            onClick={() => handleTabClick('objective')}
-            disabled={false} // TODO: Add logic to lock unless all Work/Projects are saved
-            className={`w-full text-left px-3 py-3 rounded-md text-sm font-medium transition-colors flex items-center justify-between ${activeTab === 'objective' ? 'bg-black text-white shadow-md' : 'bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700'}`}
+          <button 
+            onClick={() => {
+              // Since we don't have selected_option saving fully implemented yet,
+              // we temporarily simulate the lock by strictly checking if they are not null.
+              // Since they are null by default, this will visually lock the user out for now as requested.
+              const isAllWorkSaved = aiWorkHistories.every((w: any) => !!w.final_edited_text)
+              const isAllProjSaved = aiProjects.every((p: any) => !!p.final_edited_text)
+              if (!isAllWorkSaved || !isAllProjSaved) {
+                import('sonner').then(m => m.toast.error('Please save an AI option for all Work Histories and Projects first.'))
+                return
+              }
+              handleTabClick('objective')
+            }}
+            className={`w-full text-left px-3 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center justify-between ${activeTab === 'objective' ? 'bg-white dark:bg-zinc-800 shadow-sm border' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-transparent'} ${(!aiWorkHistories.every((w: any) => !!w.final_edited_text) || !aiProjects.every((p: any) => !!p.final_edited_text)) ? 'opacity-50' : ''}`}
           >
             <span>Career Objective</span>
-            <Lock className="w-4 h-4 opacity-50" />
+            {(!aiWorkHistories.every((w: any) => !!w.final_edited_text) || !aiProjects.every((p: any) => !!p.final_edited_text)) && <Lock className="w-3 h-3 opacity-50" />}
           </button>
         </div>
       </div>
 
+      {(() => {
+        let currentAiOptions: string[] = []
+        let headerTitle = activeTab.replace('_', ' ')
+        
+        if (activeTab === 'objective') {
+          currentAiOptions = resumeData.career_objective?.ai_options || []
+          headerTitle = 'Career Objective'
+        } else if (activeTab.startsWith('work_')) {
+          const idx = parseInt(activeTab.split('_')[1])
+          currentAiOptions = aiWorkHistories[idx]?.ai_options || []
+          const w = profileData.experience?.[idx]
+          headerTitle = w ? `${w.role} at ${w.company}` : `Work History ${idx + 1}`
+        } else if (activeTab.startsWith('proj_')) {
+          const idx = parseInt(activeTab.split('_')[1])
+          currentAiOptions = aiProjects[idx]?.ai_options || []
+          const p = profileData.projects?.[idx]
+          headerTitle = p ? (p.title || `Project ${idx + 1}`) : `Project ${idx + 1}`
+        }
 
-      {/* COLUMN 2: EDITOR WORKSPACE (40%) */}
-      <div className="w-[40%] border-r bg-white dark:bg-zinc-900 flex flex-col overflow-y-auto">
-        <div className="p-6 border-b flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/50 sticky top-0 z-10">
-          <div>
-            <h2 className="text-xl font-bold capitalize">{activeTab.replace('_', ' ')}</h2>
-            <p className="text-sm text-zinc-500">Edit and customize this section</p>
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">
-            <Save className="w-4 h-4" /> Save
-          </button>
-        </div>
+        return (
+          <>
+            {/* COLUMN 2: EDITOR WORKSPACE (40%) */}
+            <div className="w-[40%] border-r bg-white dark:bg-zinc-900 flex flex-col overflow-y-auto">
+              <div className="p-6 border-b flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/50 sticky top-0 z-10">
+                <div>
+                  <h2 className="text-xl font-bold capitalize">{headerTitle}</h2>
+                  <p className="text-sm text-zinc-500">Edit and customize this section</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {activeTab === 'objective' && (
+                    <button 
+                      onClick={handleGenerateObjective}
+                      disabled={isGeneratingObjective}
+                      className="flex items-center gap-2 px-4 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 active:scale-95 text-zinc-700 dark:text-zinc-200 rounded-md text-sm font-medium transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingObjective ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit3 className="w-4 h-4" />} 
+                      {isGeneratingObjective ? 'Generating...' : 'Generate using AI'}
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleSave}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-md text-sm font-medium transition-all shadow-sm cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" /> Save
+                  </button>
+                </div>
+              </div>
         
         <div className="p-6">
           {/* Static Editor Placeholder */}
           {!activeTab.startsWith('work_') && !activeTab.startsWith('proj_') && activeTab !== 'objective' && (
             <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-yellow-50 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-500 text-sm border border-yellow-200 dark:border-yellow-900/50">
-                This information is synced from your DigiProfile. You can tweak it here just for this resume.
+              <div className="p-4 rounded-lg bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 text-sm border border-blue-200 dark:border-blue-900/50 flex items-center gap-2">
+                <span className="font-semibold">Synced Data:</span> This information is pulled directly from your DigiProfile and cannot be edited here.
               </div>
-              <textarea 
-                className="w-full h-64 p-4 border rounded-md bg-zinc-50 dark:bg-zinc-950 font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                defaultValue={JSON.stringify(profileData, null, 2)}
-              />
+
+              {activeTab === 'personal' && (
+                <div className="grid gap-4 md:grid-cols-2 p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950">
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Full Name</label>
+                    <div className="mt-1 font-medium">{profileData.basic?.full_name || profileData.full_name || (profileData.first_name + ' ' + profileData.last_name)}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Phone</label>
+                    <div className="mt-1 font-medium">{profileData.phone || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Email</label>
+                    <div className="mt-1 font-medium">{profileData.email || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">LinkedIn</label>
+                    <div className="mt-1 font-medium text-blue-600">{profileData.links?.linkedin || 'N/A'}</div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'academic' && (
+                <div className="grid gap-4 md:grid-cols-2 p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950">
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Degree Type</label>
+                    <div className="mt-1 font-medium">{profileData.type || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Graduation Year</label>
+                    <div className="mt-1 font-medium">{profileData.year || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Department</label>
+                    <div className="mt-1 font-medium">{profileData.department || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Current GPA</label>
+                    <div className="mt-1 font-medium">{profileData.gpa || 'N/A'}</div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'skills' && (
+                <div className="p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950 space-y-4">
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider block mb-2">Core Skills</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(profileData.skills?.languages || '').split(',').map((s: string, i: number) => s.trim() && (
+                        <span key={i} className="px-2 py-1 bg-white dark:bg-zinc-900 border rounded-md text-sm">{s.trim()}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider block mb-2">Tools & Tech</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(profileData.skills?.tools || '').split(',').map((s: string, i: number) => s.trim() && (
+                        <span key={i} className="px-2 py-1 bg-white dark:bg-zinc-900 border rounded-md text-sm">{s.trim()}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'activities' && (
+                <div className="space-y-3">
+                  {(!profileData.activities || profileData.activities.length === 0) ? (
+                    <div className="p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-500 italic text-sm">No activities listed in DigiProfile.</div>
+                  ) : profileData.activities.map((act: any, i: number) => (
+                    <div key={i} className="p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950">
+                      <div className="font-semibold text-lg">{act.org}</div>
+                      <div className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">{act.role} | {act.start_date} - {act.end_date}</div>
+                      <div className="text-sm">{act.description}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeTab === 'recognitions' && (
+                <div className="space-y-3">
+                  {(!profileData.recognitions || profileData.recognitions.length === 0) ? (
+                    <div className="p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-500 italic text-sm">No awards listed in DigiProfile.</div>
+                  ) : profileData.recognitions.map((rec: any, i: number) => (
+                    <div key={i} className="p-4 border rounded-lg bg-zinc-50 dark:bg-zinc-950">
+                      <div className="font-semibold text-lg">{rec.award}</div>
+                      <div className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">{rec.issuer} | {rec.date}</div>
+                      <div className="text-sm">{rec.description}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* AI Editor Placeholder (3 Options) */}
           {(activeTab.startsWith('work_') || activeTab.startsWith('proj_') || activeTab === 'objective') && (
             <div className="space-y-6">
-               <div className="grid gap-4">
-                  {[1, 2, 3].map((opt) => (
-                    <div key={opt} className="p-4 border-2 border-transparent hover:border-blue-500 rounded-xl bg-zinc-50 dark:bg-zinc-950 cursor-pointer transition-all">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">AI Option {opt}</span>
-                        <input type="radio" name="ai_selection" className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                        {/* Placeholder for AI Generated Text */}
-                        Successfully led the implementation of cloud-native microservices architecture, reducing system latency by 45% and increasing overall platform scalability to support 100k+ concurrent users. Collaborated seamlessly across cross-functional teams to deliver critical infrastructure upgrades within the Q3 deadline.
-                      </p>
-                    </div>
-                  ))}
-               </div>
-               
-               <div className="pt-4 border-t">
+               <div className="pb-4">
                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                   <Edit3 className="w-4 h-4" /> Rich Text Editor
+                   <Edit3 className="w-4 h-4" /> Editor
                  </label>
                  <textarea 
-                  className="w-full h-48 p-4 border rounded-md bg-white dark:bg-zinc-900 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="Select an option above to edit it here..."
+                  className="w-full h-32 p-4 border rounded-md bg-white dark:bg-zinc-900 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="Select a recommendation below to edit it here..."
+                  value={editorText[activeTab] || ''}
+                  onChange={handleEditorChange}
                  />
+               </div>
+               
+               <div className="grid gap-2 pt-4 border-t">
+                  {currentAiOptions.length > 0 ? currentAiOptions.map((optText, idx) => (
+                                        <div 
+                      key={idx} 
+                      onClick={() => handleSelectOption(optText)}
+                      className="p-3 border-2 rounded-xl bg-zinc-50 dark:bg-zinc-950 cursor-pointer transition-all border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">AI Recommendation {idx + 1}</span>
+                      </div>
+                      <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                        {optText}
+                      </p>
+                    </div>
+                  )) : (
+                    <div className="text-sm text-zinc-500 italic p-4 text-center">No AI options generated for this section yet.</div>
+                  )}
                </div>
             </div>
           )}
@@ -224,7 +467,26 @@ export default function BuilderClient({ resume, profileData }: { resume: any, pr
           </div>
         </div>
       </div>
-
+          </>
+        )
+      })()}
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

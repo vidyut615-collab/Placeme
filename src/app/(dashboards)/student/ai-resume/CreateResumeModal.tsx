@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Sparkles, Loader2, AlertCircle } from 'lucide-react'
+import { Sparkles, Loader2, AlertCircle, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -50,10 +50,6 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
       toast.error('Access Locked', { description: 'Please purchase a subscription to use AI tools.' })
       return
     }
-    if (!hasProfileData) {
-      toast.error('Profile Empty', { description: 'Please add at least one Work History or Project to your DigiProfile first!' })
-      return
-    }
     if (creditBalance < AI_RESUME_CREDIT_COST) {
       toast.error('Insufficient Credits', { description: `You need ${AI_RESUME_CREDIT_COST} credits to generate an AI Resume. Please top up in the Billing tab.` })
       return
@@ -86,8 +82,8 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
       toast.success('AI Resume Generation Started!')
       setOpen(false)
       setShowConfirm(false)
-      // Redirect to builder
-      router.push(`/student/ai-resume/builder/${result.resumeId}`)
+      // Redirect to full-screen builder
+      router.push(`/builder/${result.resumeId}`)
       
     } catch (error: any) {
       toast.error('An unexpected error occurred')
@@ -97,15 +93,14 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button onClick={handleOpenClick} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
-          <Plus className="w-4 h-4 mr-2" />
-          Create New Resume
-        </Button>
-      </DialogTrigger>
-      
-      <DialogContent className="sm:max-w-[600px]">
+    <>
+      <Button onClick={handleOpenClick} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
+        <Plus className="w-4 h-4 mr-2" />
+        Create New Resume
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[600px]">
         {!showConfirm ? (
           <form onSubmit={handlePreSubmit}>
             <DialogHeader>
@@ -114,6 +109,16 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
                 Provide the target job details. Our AI will align your profile to match the employer's exact needs.
               </DialogDescription>
             </DialogHeader>
+
+            {!hasProfileData && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800 leading-relaxed">
+                  <span className="font-semibold block mb-1">Warning: Empty Profile</span>
+                  You have 0 Jobs, 0 Projects, and 0 Activities. If you proceed, the AI will generate a "Fresher" resume based solely on your Education and Skills.
+                </div>
+              </div>
+            )}
             
             <div className="grid gap-6 py-4">
               <div className="grid gap-2">
@@ -203,6 +208,7 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
           </div>
         )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

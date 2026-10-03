@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button'
 import { Sparkles, FileText, Calendar, Plus } from 'lucide-react'
 import { CreateResumeModal } from './CreateResumeModal'
+import { DeleteResumeButton } from './DeleteResumeButton'
+import Link from 'next/link'
 
 export default async function AIResumePage() {
   const supabase = await createClient()
@@ -13,10 +15,10 @@ export default async function AIResumePage() {
     redirect('/login')
   }
 
-  // 1. Fetch student credits & access
+  // 1. Fetch student credits, access, and profile JSON
   const { data: student } = await supabase
     .from('students')
-    .select('credit_balance, access_end_date')
+    .select('credit_balance, access_end_date, profile_data')
     .eq('user_id', user.id)
     .single()
 
@@ -32,18 +34,13 @@ export default async function AIResumePage() {
     .order('created_at', { ascending: false })
 
   // 3. Check if profile has enough data (at least 1 work history OR 1 project)
-  // For safety, we'll just check if they have at least *something* in their digiprofile
-  const { count: workCount } = await supabase
-    .from('student_work_histories')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-
-  const { count: projectCount } = await supabase
-    .from('student_projects')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-
-  const hasProfileData = (workCount || 0) > 0 || (projectCount || 0) > 0
+  const profileData = (student.profile_data as any) || {}
+  const workCount = profileData.experience?.length || 0
+  const projectCount = profileData.projects?.length || 0
+  const actCount = profileData.activities?.length || 0
+  const recCount = profileData.recognitions?.length || 0
+  
+  const hasProfileData = workCount > 0 || projectCount > 0 || actCount > 0 || recCount > 0
 
   // Check if they have active access
   const isActive = student.access_end_date && new Date(student.access_end_date) >= new Date()
@@ -83,7 +80,7 @@ export default async function AIResumePage() {
       {resumes && resumes.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {resumes.map((resume: any) => (
-            <Card key={resume.id} className="hover:shadow-md transition-shadow group flex flex-col">
+            <Card key={resume.id} className="hover:shadow-md transition-shadow group flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg line-clamp-1">{resume.title || 'Untitled Resume'}</CardTitle>
                 <CardDescription className="line-clamp-1">{resume.target_role || 'General Role'} at {resume.target_employer || 'Any Company'}</CardDescription>
@@ -94,12 +91,11 @@ export default async function AIResumePage() {
                   {new Date(resume.created_at).toLocaleDateString()}
                 </div>
               </CardContent>
-              <CardFooter className="pt-0">
-                <Button variant="secondary" className="w-full group-hover:bg-purple-600 group-hover:text-white transition-colors" asChild>
-                  <a href={`/student/ai-resume/builder/${resume.id}`}>
-                    <FileText className="w-4 h-4 mr-2" /> Open Builder
-                  </a>
-                </Button>
+              <CardFooter className="pt-0 flex gap-2">
+                <Link href={`/builder/${resume.id}`} className="inline-flex shrink-0 items-center justify-center rounded-md text-sm font-medium transition-colors flex-1 bg-zinc-100 text-zinc-900 hover:bg-purple-600 hover:text-white dark:bg-zinc-800 dark:text-zinc-100 h-10 gap-2 px-4 py-2">
+                  <FileText className="w-4 h-4 mr-2" /> Open
+                </Link>
+                <DeleteResumeButton resumeId={resume.id} />
               </CardFooter>
             </Card>
           ))}
@@ -116,6 +112,7 @@ export default async function AIResumePage() {
           <CreateResumeModal 
             creditBalance={student.credit_balance || 0} 
             isActive={isActive} 
+            hasProfileData={hasProfileData}
           />
         </div>
       )}

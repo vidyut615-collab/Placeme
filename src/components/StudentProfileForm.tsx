@@ -618,6 +618,13 @@ function TagInput({ value, onChange, placeholder }: { value: string, onChange: (
 
   return (
     <div className="space-y-3 p-3 border rounded-md bg-white dark:bg-zinc-950">
+      <Input
+        placeholder={placeholder}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="bg-transparent border-dashed"
+      />
       <div className="flex flex-wrap gap-2">
         {tags.map((tag, i) => (
           <Badge key={i} variant="secondary" className="px-2 py-1 text-sm font-medium">
@@ -633,13 +640,6 @@ function TagInput({ value, onChange, placeholder }: { value: string, onChange: (
         ))}
         {tags.length === 0 && <span className="text-sm text-zinc-500 py-1">No skills added yet.</span>}
       </div>
-      <Input
-        placeholder={placeholder}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        className="bg-transparent border-dashed"
-      />
       <p className="text-xs text-zinc-500">Press Enter or Comma to add a skill.</p>
     </div>
   )

@@ -38,9 +38,10 @@ type StudentProfileFormProps = {
   onboardingFields: OnboardingFields
   hasPendingRequest?: boolean
   auditEnabled?: boolean
+  accessStatus?: 'active' | 'expired' | 'unpaid'
 }
 
-export function StudentProfileForm({ profile, onboardingFields, hasPendingRequest, auditEnabled }: StudentProfileFormProps) {
+export function StudentProfileForm({ profile, onboardingFields, hasPendingRequest, auditEnabled, accessStatus = 'active' }: StudentProfileFormProps) {
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -232,7 +233,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
         </div>
       )}
 
-      <div className="space-y-6">
+      <fieldset disabled={accessStatus !== 'active'} className="space-y-6 border-0 p-0 m-0">
         
         {/* Profile Picture Upload Section */}
         <div className="flex items-center gap-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800">
@@ -586,7 +587,7 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </div>
+      </fieldset>
     </form>
   )
 }

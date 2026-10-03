@@ -23,6 +23,8 @@ export const metadata: Metadata = {
   description: "Secure, reliable health management dashboard",
 };
 
+import { Toaster } from 'sonner'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -38,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           {children}
+          <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>
     </html>

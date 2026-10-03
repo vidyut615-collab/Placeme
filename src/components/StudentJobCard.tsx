@@ -27,16 +27,23 @@ export function StudentJobCard({
   disabledReason,
   isUpgrade,
   statusBadge,
+  accessStatus = 'active'
 }: { 
   job: JobDetailsData; 
   hasApplied: boolean;
   disabledReason?: string;
   isUpgrade?: boolean;
   statusBadge?: { label: string; badgeColor: string };
+  accessStatus?: 'active' | 'expired' | 'unpaid';
 }) {
   const [isPending, startTransition] = useTransition()
 
   const handleApply = () => {
+    if (accessStatus === 'unpaid' || accessStatus === 'expired') {
+      alert("Your Placement Profile is locked or expired. Please renew your subscription to apply for jobs.")
+      return
+    }
+    
     startTransition(async () => {
       const res = await applyForJob(job.id)
       if (res.error) {
@@ -192,6 +199,8 @@ export function StudentJobCard({
           >
             {isPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : accessStatus !== 'active' ? (
+              <span className="flex items-center">🔒 Unlock to Apply</span>
             ) : hasApplied ? (
               'Applied'
             ) : isUpgrade ? (

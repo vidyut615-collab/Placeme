@@ -25,6 +25,7 @@ interface StudentJobsDirectoryProps {
   totalAppsCount: number
   config: any
   counters: any
+  accessStatus?: 'active' | 'expired' | 'unpaid'
 }
 
 export function StudentJobsDirectory({
@@ -37,6 +38,7 @@ export function StudentJobsDirectory({
   totalAppsCount,
   config,
   counters,
+  accessStatus = 'active'
 }: StudentJobsDirectoryProps) {
   const [search, setSearch] = useState('')
   const [workplaceFilter, setWorkplaceFilter] = useState('all')
@@ -208,6 +210,7 @@ export function StudentJobsDirectory({
                 hasApplied={hasApplied}
                 disabledReason={disabledReason}
                 isUpgrade={isUpgrade}
+                accessStatus={accessStatus}
                 statusBadge={{
                   label: displayStatus.label,
                   badgeColor: displayStatus.badgeColor,

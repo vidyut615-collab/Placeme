@@ -20,6 +20,7 @@ export default async function StudentProfilePage() {
       id,
       college_id,
       profile_data,
+      access_end_date,
       colleges (
         name,
         logo_url,
@@ -32,6 +33,13 @@ export default async function StudentProfilePage() {
   const profile = student?.profile_data || {}
   const college = student?.colleges as any
   const onboardingFields = college?.onboarding_fields || { years: [], types: [], departments: [] }
+
+  let accessStatus: 'active' | 'expired' | 'unpaid' = 'active'
+  if (!student?.access_end_date) {
+    accessStatus = 'unpaid'
+  } else if (new Date(student.access_end_date) < new Date()) {
+    accessStatus = 'expired'
+  }
 
   const [
     { data: pendingRequest },
@@ -76,12 +84,14 @@ export default async function StudentProfilePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <DigiProfileModal 
-            profile={profile}
-            email={user.email || ''}
-            collegeName={college?.name || ''}
-            collegeLogoUrl={college?.logo_url || ''}
-          />
+          {accessStatus !== 'unpaid' && (
+            <DigiProfileModal 
+              profile={profile}
+              email={user.email || ''}
+              collegeName={college?.name || ''}
+              collegeLogoUrl={college?.logo_url || ''}
+            />
+          )}
           <DeclareHiredModal 
             appliedJobs={appliedJobs || []} 
             hasPendingOffer={!!pendingOffer}
@@ -113,18 +123,33 @@ export default async function StudentProfilePage() {
         </div>
 
         {/* Edit form */}
-        <div className="flex-1 bg-white dark:bg-zinc-900 rounded-md border p-6 shadow-sm">
+        <div className="flex-1 bg-white dark:bg-zinc-900 rounded-md border p-6 shadow-sm relative">
+          {accessStatus === 'unpaid' && (
+            <div className="absolute inset-0 z-10 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center rounded-md">
+              <div className="text-center p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl max-w-sm">
+                <span className="text-4xl mb-3 block">🔒</span>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Profile Locked</h3>
+                <p className="text-sm text-zinc-500 mt-2">
+                  Your Placement Profile is currently locked. Please pay your subscription fee to start building your DigiProfile and applying to jobs.
+                </p>
+              </div>
+            </div>
+          )}
+          
           <h2 className="text-lg font-semibold mb-1">Edit Information</h2>
           <p className="text-sm text-zinc-500 mb-6">
-            {auditEnabled 
-              ? "Your college requires profile changes to be audited. Approvals may take up to 48 hours."
-              : "Changes are saved instantly and reflected on your applications."}
+            {accessStatus === 'expired' 
+              ? "⚠️ Your access has expired. Your profile is currently in read-only mode."
+              : auditEnabled 
+                ? "Your college requires profile changes to be audited. Approvals may take up to 48 hours."
+                : "Changes are saved instantly and reflected on your applications."}
           </p>
           <StudentProfileForm 
             profile={profile} 
             onboardingFields={onboardingFields} 
             hasPendingRequest={!!pendingRequest}
             auditEnabled={auditEnabled}
+            accessStatus={accessStatus}
           />
         </div>
       </div>

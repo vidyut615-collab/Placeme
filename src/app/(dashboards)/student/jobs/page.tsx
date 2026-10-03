@@ -11,15 +11,22 @@ export default async function StudentJobsPage() {
     redirect('/login')
   }
 
-  // Get student's college_id and blacklist status
+  // Get student's college_id, blacklist status, and access status
   const { data: student } = await supabase
     .from('students')
-    .select('id, college_id, is_blacklisted, policy_counters')
+    .select('id, college_id, is_blacklisted, policy_counters, access_end_date')
     .eq('user_id', user.id)
     .single()
 
   if (!student) {
     return <div>Error loading student profile.</div>
+  }
+
+  let accessStatus: 'active' | 'expired' | 'unpaid' = 'active'
+  if (!student.access_end_date) {
+    accessStatus = 'unpaid'
+  } else if (new Date(student.access_end_date) < new Date()) {
+    accessStatus = 'expired'
   }
 
   // Check if student has officially approved offers in student_offers
@@ -150,6 +157,7 @@ export default async function StudentJobsPage() {
         totalAppsCount={totalAppsCount}
         config={config}
         counters={counters}
+        accessStatus={accessStatus}
       />
     </div>
   )

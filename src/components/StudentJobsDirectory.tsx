@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, MapPin, Briefcase, Filter, X } from 'lucide-react'
+import { Search, MapPin, Briefcase, Filter, X, LayoutGrid, List } from 'lucide-react'
 import { StudentJobCard } from '@/components/StudentJobCard'
 import { getJobDisplayStatus } from '@/lib/job-status-helper'
 import { WORKPLACE_MODES, EMPLOYMENT_TYPES } from '@/lib/cities-data'
@@ -43,6 +43,7 @@ export function StudentJobsDirectory({
   const [search, setSearch] = useState('')
   const [workplaceFilter, setWorkplaceFilter] = useState('all')
   const [employmentFilter, setEmploymentFilter] = useState('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const appliedSet = useMemo(() => new Set(appliedJobIds), [appliedJobIds])
 

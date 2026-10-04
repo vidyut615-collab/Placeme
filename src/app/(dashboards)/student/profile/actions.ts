@@ -64,7 +64,24 @@ export async function updateStudentProfile(formData: FormData) {
     .eq('college_id', studentDoc.college_id)
     .maybeSingle()
 
-  const auditEnabled = policy?.config?.profile_audit_enabled !== false
+  const policyAuditEnabled = policy?.config?.profile_audit_enabled !== false
+
+  const CRITICAL_KEYS = [
+    'first_name', 'last_name', 'middle_name', 'phone', 
+    'gpa', 'year', 'type', 'department', 
+    'active_backlogs', 'historical_backlogs', 'academic_gap_years',
+    'academic_10th', 'academic_12th', 'diploma_percentage', 'graduation_percentage',
+    'education'
+  ]
+
+  const currentProfile = studentDoc.profile_data || {}
+  const hasCriticalChanges = CRITICAL_KEYS.some(key => {
+    const oldVal = currentProfile[key]
+    const newVal = profile_data[key]
+    return JSON.stringify(oldVal !== undefined ? oldVal : '') !== JSON.stringify(newVal !== undefined ? newVal : '')
+  })
+
+  const auditEnabled = policyAuditEnabled && hasCriticalChanges
 
   if (auditEnabled) {
     // Check if there's already a pending request

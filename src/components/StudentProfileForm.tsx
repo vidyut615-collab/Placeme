@@ -216,7 +216,20 @@ export function StudentProfileForm({ profile, onboardingFields, hasPendingReques
       return
     }
 
-    if (auditEnabled) {
+    const CRITICAL_KEYS = [
+      'first_name', 'last_name', 'middle_name', 'phone', 
+      'gpa', 'year', 'type', 'department', 
+      'active_backlogs', 'historical_backlogs', 'academic_gap_years',
+      'education'
+    ]
+
+    const hasCriticalChanges = CRITICAL_KEYS.some(key => {
+      const oldVal = profile[key]
+      const newVal = formState[key as keyof typeof formState]
+      return JSON.stringify(oldVal !== undefined ? oldVal : '') !== JSON.stringify(newVal !== undefined ? newVal : '')
+    })
+
+    if (auditEnabled && hasCriticalChanges) {
       setShowConfirm(true)
     } else {
       executeSubmit()

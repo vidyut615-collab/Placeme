@@ -27,7 +27,8 @@ export function StudentJobCard({
   disabledReason,
   isUpgrade,
   statusBadge,
-  accessStatus = 'active'
+  accessStatus = 'active',
+  viewMode = 'grid'
 }: { 
   job: JobDetailsData; 
   hasApplied: boolean;
@@ -35,6 +36,7 @@ export function StudentJobCard({
   isUpgrade?: boolean;
   statusBadge?: { label: string; badgeColor: string };
   accessStatus?: 'active' | 'expired' | 'unpaid';
+  viewMode?: 'grid' | 'list';
 }) {
   const [isPending, startTransition] = useTransition()
 
@@ -60,8 +62,8 @@ export function StudentJobCard({
     : []
 
   return (
-    <Card className="flex flex-col h-full hover:shadow-md transition-shadow border-zinc-200 dark:border-zinc-800">
-      <CardHeader className="pb-3">
+    <Card className={`flex hover:shadow-md transition-shadow border-zinc-200 dark:border-zinc-800 ${viewMode === 'grid' ? 'flex-col h-full' : 'flex-col sm:flex-row items-stretch'}`}>
+      <CardHeader className={viewMode === 'grid' ? "pb-3" : "pb-4 flex-1 min-w-0"}>
         <div className="flex justify-between items-start gap-3">
           <div className="space-y-1 min-w-0">
             <CardTitle className="text-lg font-bold truncate leading-tight" title={job.title}>
@@ -112,7 +114,7 @@ export function StudentJobCard({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 space-y-3 pb-3">
+      <CardContent className={viewMode === 'grid' ? "flex-1 space-y-3 pb-3" : "flex-1 flex flex-col justify-center sm:border-l sm:px-4 py-4 space-y-3"}>
         {/* Remuneration Highlight Banner */}
         <div className="p-2.5 rounded-lg border bg-zinc-50/60 dark:bg-zinc-900/40 flex items-center justify-between">
           <span className="text-xs text-zinc-500 font-medium flex items-center gap-1">
@@ -151,7 +153,7 @@ export function StudentJobCard({
         </p>
       </CardContent>
 
-      <CardFooter className="pt-3 border-t flex flex-col gap-2 items-start bg-zinc-50/20 dark:bg-zinc-900/20">
+      <CardFooter className={viewMode === 'grid' ? "pt-3 border-t flex flex-col gap-2 items-start bg-zinc-50/20 dark:bg-zinc-900/20" : "sm:w-[260px] flex flex-col justify-center gap-3 sm:border-l border-t sm:border-t-0 bg-zinc-50/20 dark:bg-zinc-900/20 p-4"}>
         <div className="w-full flex items-center justify-between text-[11px] text-zinc-500">
           {job.application_deadline ? (
             <div className="flex items-center gap-1" suppressHydrationWarning>

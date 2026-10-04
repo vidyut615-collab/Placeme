@@ -136,29 +136,48 @@ export function StudentJobsDirectory({
           </div>
         </div>
 
-        {/* Filter Summary & Quick Reset */}
+        {/* Filter Summary & View Toggle */}
         <div className="flex items-center justify-between text-xs text-zinc-500 pt-1">
-          <span>
-            Showing <strong>{filteredJobs.length}</strong> of {jobs.length} open drives
-          </span>
-          {hasActiveFilters && (
+          <div className="flex items-center gap-4">
+            <span>
+              Showing <strong>{filteredJobs.length}</strong> of {jobs.length} open drives
+            </span>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
+              >
+                <X className="h-3 w-3" /> Clear Filters
+              </button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border dark:border-zinc-700">
             <button
-              onClick={clearFilters}
-              className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              title="Grid View"
             >
-              <X className="h-3 w-3" /> Clear Filters
+              <LayoutGrid className="w-4 h-4" />
             </button>
-          )}
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              title="List View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Jobs Grid */}
+      {/* Jobs Container */}
       {filteredJobs.length === 0 ? (
         <div className="rounded-xl border border-dashed p-12 text-center text-sm text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/30">
           No job drives match your current search and filter criteria.
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className={viewMode === 'grid' ? "grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex flex-col gap-4"}>
           {filteredJobs.map((job) => {
             const hasApplied = appliedSet.has(job.id)
             const displayStatus = getJobDisplayStatus({ ...job, status: job.status || 'active' })
@@ -212,6 +231,7 @@ export function StudentJobsDirectory({
                 disabledReason={disabledReason}
                 isUpgrade={isUpgrade}
                 accessStatus={accessStatus}
+                viewMode={viewMode}
                 statusBadge={{
                   label: displayStatus.label,
                   badgeColor: displayStatus.badgeColor,

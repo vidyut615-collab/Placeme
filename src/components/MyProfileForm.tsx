@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -153,9 +154,11 @@ export function MyProfileForm({
             {/* Avatar / Photo */}
             <div className="relative group shrink-0">
               {avatarUrl ? (
-                <img 
+                <Image 
                   src={avatarUrl} 
                   alt={displayName} 
+                  width={80}
+                  height={80}
                   className="h-20 w-20 rounded-2xl object-cover border-2 border-white/20 shadow-md"
                 />
               ) : (
@@ -264,9 +267,11 @@ export function MyProfileForm({
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             {avatarUrl ? (
-              <img 
+              <Image 
                 src={avatarUrl} 
                 alt="Profile Preview" 
+                width={64}
+                height={64}
                 className="h-16 w-16 rounded-xl object-cover border shadow-xs"
               />
             ) : (

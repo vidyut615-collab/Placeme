@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -519,9 +520,8 @@ export function ApprovalLogTable({ logs }: { logs: any[] }) {
                           isPdf ? (
                             <iframe src={offer.offer_letter_url} className="w-full h-full rounded border-0 bg-white shadow-xs" title="Offer Letter PDF" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center overflow-auto p-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={offer.offer_letter_url} alt="Offer Letter" className="max-h-full max-w-full object-contain rounded-md shadow-md border bg-white" />
+                            <div className="w-full h-full flex items-center justify-center overflow-auto p-2 relative">
+                              <Image src={offer.offer_letter_url} alt="Offer Letter" fill className="object-contain rounded-md shadow-md border bg-white" />
                             </div>
                           )
                         ) : (

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   Table,
   TableBody,
@@ -16,12 +17,12 @@ import { formatDate } from '@/lib/utils'
 
 export interface AgencyStudentRow {
   id: string
-  studentId: string | null
+  student_id: string | null
   email: string
   name: string
   degree: string
   department: string
-  passingYear: string
+  passing_year: string
   status: string
   college: string
   date: string
@@ -30,76 +31,75 @@ export interface AgencyStudentRow {
 interface AgencyStudentsDirectoryTableProps {
   students: AgencyStudentRow[]
   query?: string
+  totalItems: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  availableColleges: string[]
+  availableDegrees: string[]
+  availableDepartments: string[]
+  availableYears: string[]
+  activeFilters: StudentFilterState
 }
 
 export function AgencyStudentsDirectoryTable({
   students,
-  query
+  query,
+  totalItems,
+  totalPages,
+  currentPage,
+  pageSize,
+  availableColleges,
+  availableDegrees,
+  availableDepartments,
+  availableYears,
+  activeFilters
 }: AgencyStudentsDirectoryTableProps) {
-  const [currentPage, setCurrentPage] = useState(1)
-  const [filters, setFilters] = useState<StudentFilterState>({
-    degrees: [],
-    departments: [],
-    years: [],
-    colleges: [],
-    statuses: []
-  })
-  const pageSize = 25
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  const availableColleges = useMemo(() => {
-    const set = new Set<string>()
-    students.forEach(s => {
-      if (s.college && s.college !== '—' && s.college !== 'Unknown') set.add(s.college)
-    })
-    return Array.from(set).sort()
-  }, [students])
+  const createQueryString = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString())
+      Object.entries(updates).forEach(([name, value]) => {
+        if (value === null || value === '') {
+          params.delete(name)
+        } else {
+          params.set(name, value)
+        }
+      })
+      return params.toString()
+    },
+    [searchParams]
+  )
 
-  const availableDegrees = useMemo(() => {
-    const set = new Set<string>()
-    students.forEach(s => {
-      if (s.degree && s.degree !== '—') set.add(s.degree)
-    })
-    return Array.from(set).sort()
-  }, [students])
+  const handlePageChange = (page: number) => {
+    router.push(pathname + '?' + createQueryString({ page: page.toString() }))
+  }
 
-  const availableDepartments = useMemo(() => {
-    const set = new Set<string>()
-    students.forEach(s => {
-      if (s.department && s.department !== '—') set.add(s.department)
-    })
-    return Array.from(set).sort()
-  }, [students])
+  const handleFilterChange = (newFilters: StudentFilterState) => {
+    const updates: Record<string, string | null> = { page: '1' } // reset to page 1
+    updates.colleges = (newFilters.colleges || []).length > 0 ? (newFilters.colleges || []).join(',') : null
+    updates.degrees = newFilters.degrees.length > 0 ? newFilters.degrees.join(',') : null
+    updates.departments = newFilters.departments.length > 0 ? newFilters.departments.join(',') : null
+    updates.years = newFilters.years.length > 0 ? newFilters.years.join(',') : null
+    updates.statuses = (newFilters.statuses || []).length > 0 ? (newFilters.statuses || []).join(',') : null
 
-  const availableYears = useMemo(() => {
-    const set = new Set<string>()
-    students.forEach(s => {
-      if (s.passingYear && s.passingYear !== '—') set.add(s.passingYear)
-    })
-    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-  }, [students])
+    router.push(pathname + '?' + createQueryString(updates))
+  }
 
-  const filteredStudents = useMemo(() => {
-    return students.filter(s => {
-      if (filters.colleges && filters.colleges.length > 0 && !filters.colleges.includes(s.college)) return false
-      if (filters.degrees.length > 0 && !filters.degrees.includes(s.degree)) return false
-      if (filters.departments.length > 0 && !filters.departments.includes(s.department)) return false
-      if (filters.years.length > 0 && !filters.years.includes(s.passingYear)) return false
-      if (filters.statuses && filters.statuses.length > 0) {
-        const isStudentActive = s.status === 'active'
-        const category = isStudentActive ? 'Active' : 'Pending'
-        if (!filters.statuses.includes(category)) return false
-      }
-      return true
-    })
-  }, [students, filters])
-
-  const totalPages = Math.ceil(filteredStudents.length / pageSize) || 1
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-
-  const paginatedStudents = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize
-    return filteredStudents.slice(start, start + pageSize)
-  }, [filteredStudents, safeCurrentPage, pageSize])
+  const handleClearFilters = () => {
+    const updates = {
+      page: '1',
+      colleges: null,
+      degrees: null,
+      departments: null,
+      years: null,
+      statuses: null
+    }
+    router.push(pathname + '?' + createQueryString(updates))
+  }
 
   return (
     <div className="rounded-md border bg-white dark:bg-zinc-900 shadow-sm">
@@ -109,15 +109,9 @@ export function AgencyStudentsDirectoryTable({
           availableDepartments={availableDepartments}
           availableYears={availableYears}
           availableColleges={availableColleges}
-          filters={filters}
-          onFilterChange={(newFilters) => {
-            setFilters(newFilters)
-            setCurrentPage(1)
-          }}
-          onClearFilters={() => {
-            setFilters({ degrees: [], departments: [], years: [], colleges: [], statuses: [] })
-            setCurrentPage(1)
-          }}
+          filters={activeFilters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
         />
       </div>
       <div className="overflow-x-auto">
@@ -136,8 +130,8 @@ export function AgencyStudentsDirectoryTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedStudents.length > 0 ? (
-              paginatedStudents.map((item) => (
+            {students.length > 0 ? (
+              students.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium text-zinc-900 dark:text-zinc-100">{item.name}</TableCell>
                   <TableCell className="text-zinc-600 dark:text-zinc-400 text-sm">{item.email}</TableCell>
@@ -151,7 +145,7 @@ export function AgencyStudentsDirectoryTable({
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-zinc-700 dark:text-zinc-300">{item.department}</TableCell>
-                  <TableCell className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{item.passingYear}</TableCell>
+                  <TableCell className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{item.passing_year}</TableCell>
                   <TableCell>
                     {item.status === 'active' ? (
                       <span className="inline-flex items-center rounded-full bg-green-50 dark:bg-green-950/50 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-300 ring-1 ring-inset ring-green-600/20">
@@ -168,9 +162,9 @@ export function AgencyStudentsDirectoryTable({
                   </TableCell>
                   <TableCell className="text-xs text-zinc-600 dark:text-zinc-400">{item.college}</TableCell>
                   <TableCell className="text-right">
-                    {item.studentId ? (
+                    {item.student_id ? (
                       <Link
-                        href={`/agency/students/${item.studentId}`}
+                        href={`/agency/students/${item.student_id}`}
                         className="text-xs text-blue-600 hover:underline dark:text-blue-400 font-medium"
                       >
                         View Profile
@@ -184,7 +178,7 @@ export function AgencyStudentsDirectoryTable({
             ) : (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-10 text-zinc-500 text-sm">
-                  {query || filters.degrees.length > 0 || filters.departments.length > 0 || filters.years.length > 0 || (filters.colleges && filters.colleges.length > 0) || (filters.statuses && filters.statuses.length > 0)
+                  {query || activeFilters.degrees.length > 0 || activeFilters.departments.length > 0 || activeFilters.years.length > 0 || (activeFilters.colleges && activeFilters.colleges.length > 0) || (activeFilters.statuses && activeFilters.statuses.length > 0)
                     ? 'No students found matching your search or filters.'
                     : 'No students found in the network.'}
                 </TableCell>
@@ -194,13 +188,13 @@ export function AgencyStudentsDirectoryTable({
         </Table>
       </div>
 
-      {filteredStudents.length > 0 && (
+      {totalItems > 0 && (
         <PaginationControls
-          currentPage={safeCurrentPage}
+          currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={filteredStudents.length}
+          totalItems={totalItems}
           pageSize={pageSize}
-          onPageChange={setCurrentPage}
+          onPageChange={handlePageChange}
           itemLabel="students"
         />
       )}

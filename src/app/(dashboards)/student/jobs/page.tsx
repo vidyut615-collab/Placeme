@@ -3,7 +3,21 @@ import { redirect } from 'next/navigation'
 import { StudentJobsDirectory } from '@/components/StudentJobsDirectory'
 import { JobDetailsData } from '@/components/JobDetailsModal'
 
-export default async function StudentJobsPage() {
+export default async function StudentJobsPage(props: {
+  searchParams?: Promise<{
+    page?: string
+    q?: string
+    workplace?: string
+    employment?: string
+  }>
+}) {
+  const searchParams = (await props.searchParams) || {}
+  const page = parseInt(searchParams.page || '1', 10)
+  const pageSize = 25
+  const q = searchParams.q?.toLowerCase() || ''
+  const workplace = searchParams.workplace || 'all'
+  const employment = searchParams.employment || 'all'
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -29,7 +43,7 @@ export default async function StudentJobsPage() {
     accessStatus = 'expired'
   }
 
-  // Check if student has officially approved offers in student_offers
+  // Check if student has officially approved offers
   const { data: approvedOffers } = await supabase
     .from('student_offers')
     .select('compensation_ctc, company_name, job_role')
@@ -64,7 +78,7 @@ export default async function StudentJobsPage() {
 
   const counters = student.policy_counters || {}
 
-  // Fetch active and paused jobs with extended job board fields
+  // Fetch active and paused jobs with server-side pagination and filtering
   const { data: targetedJobs } = await supabase
     .from('job_target_colleges')
     .select('job_id')
@@ -76,7 +90,7 @@ export default async function StudentJobsPage() {
     orQuery += `,id.in.(${targetedJobIds.join(',')})`
   }
 
-  const { data: jobs } = await supabase
+  let queryBuilder = supabase
     .from('jobs')
     .select(`
       id,
@@ -106,10 +120,31 @@ export default async function StudentJobsPage() {
       eligibility_criteria,
       custom_stages,
       ideal_for
-    `)
+    `, { count: 'exact' })
     .in('status', ['active', 'paused'])
     .or(orQuery)
+
+  if (q) {
+    queryBuilder = queryBuilder.or(`title.ilike.%${q}%,company_name.ilike.%${q}%,job_location.ilike.%${q}%,skills_required.ilike.%${q}%,job_domain.ilike.%${q}%`)
+  }
+  
+  if (workplace !== 'all') {
+    queryBuilder = queryBuilder.eq('workplace_mode', workplace)
+  }
+  
+  if (employment !== 'all') {
+    queryBuilder = queryBuilder.eq('employment_type', employment)
+  }
+
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const { data: jobs, count } = await queryBuilder
     .order('created_at', { ascending: false })
+    .range(from, to)
+
+  const totalItems = count || 0
+  const totalPages = Math.ceil(totalItems / pageSize) || 1
 
   return (
     <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6">
@@ -146,7 +181,6 @@ export default async function StudentJobsPage() {
         </div>
       )}
 
-      {/* Interactive Directory with Search, Filters, and Widescreen Cards */}
       <StudentJobsDirectory
         jobs={(jobs || []) as JobDetailsData[]}
         appliedJobIds={appliedJobIds}
@@ -158,6 +192,13 @@ export default async function StudentJobsPage() {
         config={config}
         counters={counters}
         accessStatus={accessStatus}
+        totalItems={totalItems}
+        totalPages={totalPages}
+        currentPage={page}
+        pageSize={pageSize}
+        searchQuery={q}
+        activeWorkplace={workplace}
+        activeEmployment={employment}
       />
     </div>
   )

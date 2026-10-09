@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -9,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, MapPin, Briefcase, Filter, X, LayoutGrid, List } from 'lucide-react'
+import { Search, X, LayoutGrid, List } from 'lucide-react'
 import { StudentJobCard } from '@/components/StudentJobCard'
 import { getJobDisplayStatus } from '@/lib/job-status-helper'
 import { WORKPLACE_MODES, EMPLOYMENT_TYPES } from '@/lib/cities-data'
 import { JobDetailsData } from '@/components/JobDetailsModal'
+import { PaginationControls } from '@/components/PaginationControls'
+import { useState, useMemo } from 'react'
 
 interface StudentJobsDirectoryProps {
   jobs: JobDetailsData[]
@@ -26,6 +29,13 @@ interface StudentJobsDirectoryProps {
   config: any
   counters: any
   accessStatus?: 'active' | 'expired' | 'unpaid'
+  totalItems: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  searchQuery: string
+  activeWorkplace: string
+  activeEmployment: string
 }
 
 export function StudentJobsDirectory({
@@ -38,11 +48,18 @@ export function StudentJobsDirectory({
   totalAppsCount,
   config,
   counters,
-  accessStatus = 'active'
+  accessStatus = 'active',
+  totalItems,
+  totalPages,
+  currentPage,
+  pageSize,
+  searchQuery,
+  activeWorkplace,
+  activeEmployment
 }: StudentJobsDirectoryProps) {
-  const [search, setSearch] = useState('')
-  const [workplaceFilter, setWorkplaceFilter] = useState('all')
-  const [employmentFilter, setEmploymentFilter] = useState('all')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const appliedSet = useMemo(() => new Set(appliedJobIds), [appliedJobIds])
@@ -52,42 +69,42 @@ export function StudentJobsDirectory({
   const superDreamConfig = config.super_dream || { enabled: false, min_ctc: 20, max_attempts: 2 }
   const appLimitConfig = config.application_limit || { enabled: false }
 
-  const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
-      // 1. Text Search (title, company, city, skills, domain)
-      if (search.trim()) {
-        const q = search.toLowerCase()
-        const matchesTitle = job.title?.toLowerCase().includes(q)
-        const matchesCompany = job.company_name?.toLowerCase().includes(q)
-        const matchesCity = job.job_location?.toLowerCase().includes(q)
-        const matchesSkills = job.skills_required?.toLowerCase().includes(q)
-        const matchesDomain = job.job_domain?.toLowerCase().includes(q)
-        if (!matchesTitle && !matchesCompany && !matchesCity && !matchesSkills && !matchesDomain) {
-          return false
+  const createQueryString = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString())
+      Object.entries(updates).forEach(([name, value]) => {
+        if (value === null || value === '' || value === 'all') {
+          params.delete(name)
+        } else {
+          params.set(name, value)
         }
-      }
+      })
+      return params.toString()
+    },
+    [searchParams]
+  )
 
-      // 2. Workplace Mode Filter
-      if (workplaceFilter !== 'all') {
-        if (job.workplace_mode !== workplaceFilter) return false
-      }
-
-      // 3. Employment Type Filter
-      if (employmentFilter !== 'all') {
-        if (job.employment_type !== employmentFilter) return false
-      }
-
-      return true
-    })
-  }, [jobs, search, workplaceFilter, employmentFilter])
-
-  const clearFilters = () => {
-    setSearch('')
-    setWorkplaceFilter('all')
-    setEmploymentFilter('all')
+  const handleSearch = (value: string) => {
+    router.push(pathname + '?' + createQueryString({ q: value, page: '1' }))
   }
 
-  const hasActiveFilters = search || workplaceFilter !== 'all' || employmentFilter !== 'all'
+  const handleWorkplaceChange = (val: string | null) => {
+    router.push(pathname + '?' + createQueryString({ workplace: val || '', page: '1' }))
+  }
+
+  const handleEmploymentChange = (val: string | null) => {
+    router.push(pathname + '?' + createQueryString({ employment: val || '', page: '1' }))
+  }
+
+  const handlePageChange = (page: number) => {
+    router.push(pathname + '?' + createQueryString({ page: page.toString() }))
+  }
+
+  const clearFilters = () => {
+    router.push(pathname + '?' + createQueryString({ q: null, workplace: null, employment: null, page: '1' }))
+  }
+
+  const hasActiveFilters = searchQuery || activeWorkplace !== 'all' || activeEmployment !== 'all'
 
   return (
     <div className="space-y-6">
@@ -99,15 +116,18 @@ export function StudentJobsDirectory({
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
             <Input
               placeholder="Search by job title, company, skills, or city..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              defaultValue={searchQuery}
+              onChange={(e) => {
+                const val = e.target.value
+                setTimeout(() => handleSearch(val), 300)
+              }}
               className="pl-9 h-9 text-sm"
             />
           </div>
 
           {/* Workplace Mode Filter */}
           <div className="sm:col-span-3">
-            <Select value={workplaceFilter} onValueChange={(val) => setWorkplaceFilter(val || 'all')}>
+            <Select value={activeWorkplace} onValueChange={handleWorkplaceChange}>
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="All Workplace Modes" />
               </SelectTrigger>
@@ -122,7 +142,7 @@ export function StudentJobsDirectory({
 
           {/* Employment Type Filter */}
           <div className="sm:col-span-3">
-            <Select value={employmentFilter} onValueChange={(val) => setEmploymentFilter(val || 'all')}>
+            <Select value={activeEmployment} onValueChange={handleEmploymentChange}>
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="All Employment Types" />
               </SelectTrigger>
@@ -140,7 +160,7 @@ export function StudentJobsDirectory({
         <div className="flex items-center justify-between text-xs text-zinc-500 pt-1">
           <div className="flex items-center gap-4">
             <span>
-              Showing <strong>{filteredJobs.length}</strong> of {jobs.length} open drives
+              Showing <strong>{jobs.length}</strong> of {totalItems} open drives
             </span>
             {hasActiveFilters && (
               <button
@@ -172,13 +192,13 @@ export function StudentJobsDirectory({
       </div>
 
       {/* Jobs Container */}
-      {filteredJobs.length === 0 ? (
+      {jobs.length === 0 ? (
         <div className="rounded-xl border border-dashed p-12 text-center text-sm text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/30">
           No job drives match your current search and filter criteria.
         </div>
       ) : (
         <div className={viewMode === 'grid' ? "grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex flex-col gap-4"}>
-          {filteredJobs.map((job) => {
+          {jobs.map((job) => {
             const hasApplied = appliedSet.has(job.id)
             const displayStatus = getJobDisplayStatus({ ...job, status: job.status || 'active' })
             let disabledReason = ''
@@ -240,6 +260,17 @@ export function StudentJobsDirectory({
             )
           })}
         </div>
+      )}
+
+      {totalItems > pageSize && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          itemLabel="jobs"
+        />
       )}
     </div>
   )

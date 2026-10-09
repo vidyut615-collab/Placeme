@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -223,7 +224,7 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
                 </Label>
                 <div className="flex items-center gap-3">
                   {logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="h-14 w-14 rounded-lg object-contain border bg-white p-1" />
+                    <Image src={logoUrl} alt="Logo" width={56} height={56} className="h-14 w-14 rounded-lg object-contain border bg-white p-1" />
                   ) : (
                     <div className="h-14 w-14 rounded-lg border border-dashed flex items-center justify-center text-zinc-400 bg-white dark:bg-zinc-900">
                       <Building2 className="h-6 w-6" />
@@ -272,7 +273,7 @@ export function CollegeDetailsForm({ initialData, isAdmin = true }: CollegeDetai
                 </Label>
                 <div className="flex items-center gap-3">
                   {bannerUrl ? (
-                    <img src={bannerUrl} alt="Banner" className="h-14 w-24 rounded-lg object-cover border" />
+                    <Image src={bannerUrl} alt="Banner" width={96} height={56} className="h-14 w-24 rounded-lg object-cover border" />
                   ) : (
                     <div className="h-14 w-24 rounded-lg border border-dashed flex items-center justify-center text-zinc-400 bg-white dark:bg-zinc-900 text-xs">
                       No Banner

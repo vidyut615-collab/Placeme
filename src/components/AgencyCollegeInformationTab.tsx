@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -226,10 +227,12 @@ export function AgencyCollegeInformationTab({ college }: AgencyCollegeInformatio
           <Card className="overflow-hidden border shadow-sm">
             {college.banner_url ? (
               <div className="h-44 sm:h-56 w-full relative overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-                <img 
+                <Image
                   src={college.banner_url} 
                   alt="Campus Banner" 
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 100vw"
+                  className="object-cover"
                 />
               </div>
             ) : (
@@ -239,11 +242,11 @@ export function AgencyCollegeInformationTab({ college }: AgencyCollegeInformatio
             <CardContent className="pt-0 relative px-6 pb-6">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-10 sm:-mt-12 mb-4">
                 <div className="flex items-end gap-4">
-                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl border-2 border-white dark:border-zinc-900 bg-white dark:bg-zinc-950 shadow-md p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
+                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl border-2 border-white dark:border-zinc-900 bg-white dark:bg-zinc-950 shadow-md p-1.5 shrink-0 flex items-center justify-center overflow-hidden relative">
                     {college.logo_url ? (
-                      <img src={college.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                      <Image src={college.logo_url} alt="Logo" fill sizes="96px" className="object-contain p-1.5" />
                     ) : (
-                      <Building2 className="h-10 w-10 text-blue-600" />
+                      <Building2 className="h-10 w-10 text-blue-600 relative z-10" />
                     )}
                   </div>
                   <div className="space-y-1">
@@ -601,7 +604,7 @@ export function AgencyCollegeInformationTab({ college }: AgencyCollegeInformatio
                   <div className="flex items-center gap-3">
                     <div className="h-14 w-14 rounded-xl border bg-white dark:bg-zinc-900 shadow-xs p-1 flex items-center justify-center shrink-0">
                       {logoUrl ? (
-                        <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+                        <Image src={logoUrl} alt="Logo" width={56} height={56} className="h-full w-full object-contain" />
                       ) : (
                         <Building2 className="h-6 w-6 text-zinc-400" />
                       )}
@@ -649,7 +652,7 @@ export function AgencyCollegeInformationTab({ college }: AgencyCollegeInformatio
                   </Label>
                   <div className="flex items-center gap-3">
                     {bannerUrl ? (
-                      <img src={bannerUrl} alt="Banner" className="h-14 w-24 rounded-lg object-cover border" />
+                      <Image src={bannerUrl} alt="Banner" width={96} height={56} className="h-14 w-24 rounded-lg object-cover border" />
                     ) : (
                       <div className="h-14 w-24 rounded-lg border border-dashed flex items-center justify-center text-zinc-400 bg-white dark:bg-zinc-900 text-xs">
                         No Banner

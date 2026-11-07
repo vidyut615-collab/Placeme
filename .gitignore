@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -23,6 +24,11 @@
 # misc
 .DS_Store
 *.pem
+supabase/.temp/
+matches.txt
+supabase_awaits.txt
+update_card.js
+scratch/
 
 # debug
 npm-debug.log*

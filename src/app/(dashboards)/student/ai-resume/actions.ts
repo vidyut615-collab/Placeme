@@ -28,11 +28,11 @@ function parseLLMJsonArray(text: string): string[] {
     
     try {
       const parsed = JSON.parse(cleanText)
-      // Check if it's the new {"options": [...]} format
+      // Check if it's the {"options": [...]} format
       if (parsed && Array.isArray(parsed.options)) return parsed.options
       if (Array.isArray(parsed)) return parsed
     } catch (e) {
-      // Smart Fallback: Extract everything between quotes if JSON fails (e.g. truncated JSON)
+      // Smart Fallback: Extract everything between quotes if JSON fails
       const stringMatches = cleanText.match(/"([^"\\]*(?:\\.[^"\\]*)*)"/g)
       if (stringMatches && stringMatches.length > 0) {
         return stringMatches.map(m => m.substring(1, m.length - 1))
@@ -58,13 +58,18 @@ function parseLLMJsonArray(text: string): string[] {
   }
 }
 
+/**
+ * Creates an AI Resume instantly by running ONLY the JD shortener upfront.
+ * Deducts 5 credits flat.
+ * Work histories and projects are initialized with the student's original profile text.
+ */
 export async function createAIResume(formData: { title: string, employer: string, role: string, jd: string }) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
-    // 1. Verify credits again on the server
+    // 1. Verify credits and active subscription
     const { data: student } = await supabase
       .from('students')
       .select('credit_balance, access_end_date, profile_data')
@@ -83,58 +88,43 @@ export async function createAIResume(formData: { title: string, employer: string
     const profileData: any = student.profile_data || {}
     const experience = profileData.experience || []
     const projects = profileData.projects || []
-    const skills = profileData.skills || {}
 
-    // 3. AI PIPELINE: Step A - Shorten JD
+    // 3. Run ONLY the JD Shortener upfront for fast creation
     const shortenPrompt = PROMPT_SHORTEN_JD.replace('{{JOB_DESCRIPTION}}', formData.jd)
     const shortenedJd = await callGroq(shortenPrompt)
 
-    // AI PIPELINE: Step B - Work Histories (Sequential to avoid 429 TPM rate limits)
-    const generatedWorkHistories = []
-    for (let i = 0; i < experience.length; i++) {
-      const w = experience[i]
-      const prompt = PROMPT_WORK_HISTORY
-        .replace('{{JOB_TITLE}}', w.role || '')
-        .replace('{{COMPANY_NAME}}', w.company || '')
-        .replace('{{TECHNOLOGY_USED}}', w.tech || '')
-        .replace('{{SHORTENED_JD}}', shortenedJd)
-
-      
-      const res = await callGroq(prompt, true)
-      const options = parseLLMJsonArray(res)
-      
-      generatedWorkHistories.push({
-        profile_work_id: `work_${i}`,
-        ai_options: options,
-        selected_option: null,
-        final_edited_text: ""
-      })
-    }
-
-    // AI PIPELINE: Step C - Projects (Sequential)
-    const generatedProjects = []
-    for (let i = 0; i < projects.length; i++) {
-      const p = projects[i]
-      const prompt = PROMPT_PROJECT
-        .replace('{{PROJECT_TITLE}}', p.title || '')
-        .replace('{{TECHNOLOGY_USED}}', p.tech || '')
-        .replace('{{PROJECT_DESCRIPTION}}', p.description || '')
-        .replace('{{SHORTENED_JD}}', shortenedJd)
-      
-      const res = await callGroq(prompt, true)
-      const options = parseLLMJsonArray(res)
-
-      generatedProjects.push({
-        profile_project_id: `proj_${i}`,
-        ai_options: options,
-        selected_option: null,
-        final_edited_text: ""
-      })
-    }
-
+    // 4. Initialize initial content structure with raw profile data
     const initialContent = {
-      work_histories: generatedWorkHistories,
-      projects: generatedProjects,
+      settings: {
+        template: 'classic', // 'classic' | 'modern' | 'executive'
+        fontFamily: 'Inter',
+        fontSize: 10,
+        lineHeight: 1.4,
+        margin: 14,
+        accentColor: '#1e3a8a',
+        pageFit: 'auto',
+      },
+      work_histories: experience.map((w: any, i: number) => ({
+        profile_work_id: `work_${i}`,
+        role: w.role || '',
+        company: w.company || '',
+        start_date: w.start_date || '',
+        end_date: w.end_date || '',
+        tech: w.tech || '',
+        original_description: w.description || '',
+        is_tailored: false,
+        ai_options: [],
+        final_edited_text: w.description || '' // initial default is original description
+      })),
+      projects: projects.map((p: any, i: number) => ({
+        profile_project_id: `proj_${i}`,
+        title: p.title || '',
+        tech: p.tech || '',
+        original_description: p.description || '',
+        is_tailored: false,
+        ai_options: [],
+        final_edited_text: p.description || '' // initial default is original description
+      })),
       career_objective: {
         is_generated: false,
         ai_options: [],
@@ -142,20 +132,20 @@ export async function createAIResume(formData: { title: string, employer: string
       }
     }
 
-    // 4. Deduct Credits
+    // 5. Deduct Credits (Flat 5 credits)
     await supabase
       .from('students')
       .update({ credit_balance: student.credit_balance - AI_RESUME_CREDIT_COST })
       .eq('user_id', user.id)
 
-    // 5. Log the deduction
+    // 6. Log the deduction
     await supabase.from('credit_ledgers').insert({
       user_id: user.id,
       amount: -AI_RESUME_CREDIT_COST,
-      description: `AI Resume Generation: ${formData.role} at ${formData.employer}`
+      description: `AI Resume Creation: ${formData.role} at ${formData.employer}`
     })
 
-    // 6. Create the Resume Record
+    // 7. Create the Resume Record
     const { data: resume, error: resumeError } = await supabase
       .from('ai_resumes')
       .insert({
@@ -180,27 +170,225 @@ export async function createAIResume(formData: { title: string, employer: string
   }
 }
 
-
-
-export async function generateCareerObjectiveAction(workHistoryDump: string, skills: any, jobRole: string, employer: string, jdText: string) {
+/**
+ * On-demand AI tailoring for a single work history.
+ * Strictly 1-time generation per work entry.
+ */
+export async function tailorSingleWorkHistoryAction(resumeId: string, workIndex: number) {
   try {
-    const shortenPrompt = PROMPT_SHORTEN_JD.replace('{{JOB_DESCRIPTION}}', jdText)
-    const shortenedJd = await callGroq(shortenPrompt)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
 
-    const objectivePrompt = PROMPT_CAREER_OBJECTIVE
-      .replace('{{WORK_HISTORIES}}', workHistoryDump || 'Fresher')
+    const { data: resume, error: fetchError } = await supabase
+      .from('ai_resumes')
+      .select('*')
+      .eq('id', resumeId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !resume) throw new Error('Resume not found')
+
+    const content = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
+    const workHistories = content.work_histories || []
+    const targetWork = workHistories[workIndex]
+
+    if (!targetWork) throw new Error('Work history item not found')
+
+    // Strict 1-time generation check
+    if (targetWork.is_tailored) {
+      return { success: false, error: 'This work experience has already been AI-generated. You can edit the text directly.' }
+    }
+
+    const prompt = PROMPT_WORK_HISTORY
+      .replace('{{JOB_TITLE}}', targetWork.role || '')
+      .replace('{{COMPANY_NAME}}', targetWork.company || '')
+      .replace('{{TECHNOLOGY_USED}}', targetWork.tech || '')
+      .replace('{{SHORTENED_JD}}', resume.shortened_jd || resume.job_description || '')
+
+    const rawResponse = await callGroq(prompt, true)
+    const options = parseLLMJsonArray(rawResponse)
+
+    // Update state
+    targetWork.is_tailored = true
+    targetWork.ai_options = options
+    if (!targetWork.final_edited_text || targetWork.final_edited_text === targetWork.original_description) {
+      targetWork.final_edited_text = options[0] || targetWork.original_description
+    }
+    workHistories[workIndex] = targetWork
+    content.work_histories = workHistories
+
+    // Persist to database
+    const { error: updateError } = await supabase
+      .from('ai_resumes')
+      .update({ content })
+      .eq('id', resumeId)
+
+    if (updateError) throw updateError
+
+    return { success: true, options, updatedContent: content }
+  } catch (err: any) {
+    console.error("tailorSingleWorkHistoryAction error:", err)
+    return { success: false, error: err.message || 'Failed to tailor work history' }
+  }
+}
+
+/**
+ * On-demand AI tailoring for a single project.
+ * Strictly 1-time generation per project entry.
+ */
+export async function tailorSingleProjectAction(resumeId: string, projectIndex: number) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const { data: resume, error: fetchError } = await supabase
+      .from('ai_resumes')
+      .select('*')
+      .eq('id', resumeId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !resume) throw new Error('Resume not found')
+
+    const content = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
+    const projects = content.projects || []
+    const targetProject = projects[projectIndex]
+
+    if (!targetProject) throw new Error('Project item not found')
+
+    // Strict 1-time generation check
+    if (targetProject.is_tailored) {
+      return { success: false, error: 'This project has already been AI-generated. You can edit the text directly.' }
+    }
+
+    const prompt = PROMPT_PROJECT
+      .replace('{{PROJECT_TITLE}}', targetProject.title || '')
+      .replace('{{TECHNOLOGY_USED}}', targetProject.tech || '')
+      .replace('{{PROJECT_DESCRIPTION}}', targetProject.original_description || '')
+      .replace('{{SHORTENED_JD}}', resume.shortened_jd || resume.job_description || '')
+
+    const rawResponse = await callGroq(prompt, true)
+    const options = parseLLMJsonArray(rawResponse)
+
+    // Update state
+    targetProject.is_tailored = true
+    targetProject.ai_options = options
+    if (!targetProject.final_edited_text || targetProject.final_edited_text === targetProject.original_description) {
+      targetProject.final_edited_text = options[0] || targetProject.original_description
+    }
+    projects[projectIndex] = targetProject
+    content.projects = projects
+
+    // Persist to database
+    const { error: updateError } = await supabase
+      .from('ai_resumes')
+      .update({ content })
+      .eq('id', resumeId)
+
+    if (updateError) throw updateError
+
+    return { success: true, options, updatedContent: content }
+  } catch (err: any) {
+    console.error("tailorSingleProjectAction error:", err)
+    return { success: false, error: err.message || 'Failed to tailor project' }
+  }
+}
+
+/**
+ * On-demand generation for Career Objective.
+ * Strictly 1-time generation.
+ */
+export async function generateCareerObjectiveAction(resumeId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    // Fetch resume & student profile
+    const { data: resume, error: fetchError } = await supabase
+      .from('ai_resumes')
+      .select('*')
+      .eq('id', resumeId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !resume) throw new Error('Resume not found')
+
+    const { data: student } = await supabase
+      .from('students')
+      .select('profile_data')
+      .eq('user_id', user.id)
+      .single()
+
+    const profileData: any = student?.profile_data || {}
+    const content = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
+
+    // Strict 1-time check
+    if (content.career_objective?.is_generated) {
+      return { success: false, error: 'Career Objective has already been AI-generated. You can edit the text directly.' }
+    }
+
+    const workDump = (content.work_histories || [])
+      .map((w: any) => `${w.role} at ${w.company}:\n${w.final_edited_text || w.original_description}`)
+      .filter(Boolean)
+      .join('\n\n')
+
+    const skills = profileData.skills || {}
+
+    const prompt = PROMPT_CAREER_OBJECTIVE
+      .replace('{{WORK_HISTORIES}}', workDump || 'Fresher with academic projects')
       .replace('{{DOMAIN_SKILLS}}', skills?.languages || '')
       .replace('{{TOOLS_SKILLS}}', skills?.tools || '')
       .replace('{{SOFT_SKILLS}}', skills?.frameworks || '')
-      .replace('{{JOB_ROLE}}', jobRole)
-      .replace('{{COMPANY_NAME}}', employer)
-      .replace('{{SHORTENED_JD}}', shortenedJd)
+      .replace('{{JOB_ROLE}}', resume.target_role || 'Candidate')
+      .replace('{{COMPANY_NAME}}', resume.target_employer || 'Company')
+      .replace('{{SHORTENED_JD}}', resume.shortened_jd || resume.job_description || '')
 
-    const objRes = await callGroq(objectivePrompt, true)
-    const objOptions = parseLLMJsonArray(objRes)
-    return { options: objOptions }
+    const rawResponse = await callGroq(prompt, true)
+    const options = parseLLMJsonArray(rawResponse)
+
+    // Update state
+    content.career_objective = {
+      is_generated: true,
+      ai_options: options,
+      final_edited_text: options[0] || ""
+    }
+
+    const { error: updateError } = await supabase
+      .from('ai_resumes')
+      .update({ content })
+      .eq('id', resumeId)
+
+    if (updateError) throw updateError
+
+    return { success: true, options, updatedContent: content }
   } catch (err: any) {
-    console.error(err)
-    return { error: err.message || 'Failed to generate career objective' }
+    console.error("generateCareerObjectiveAction error:", err)
+    return { success: false, error: err.message || 'Failed to generate career objective' }
+  }
+}
+
+/**
+ * Saves full resume content state (text edits, settings, etc.)
+ */
+export async function saveResumeContentAction(resumeId: string, content: any) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const { error } = await supabase
+      .from('ai_resumes')
+      .update({ content })
+      .eq('id', resumeId)
+      .eq('user_id', user.id)
+
+    if (error) throw error
+    return { success: true }
+  } catch (err: any) {
+    console.error("saveResumeContentAction error:", err)
+    return { success: false, error: err.message || 'Failed to save resume' }
   }
 }

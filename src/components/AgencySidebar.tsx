@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, GraduationCap, Briefcase, Users, Settings, ShieldCheck, Database } from 'lucide-react'
+import { LayoutDashboard, GraduationCap, Briefcase, Users, Settings, ShieldCheck, Database, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
@@ -12,6 +12,7 @@ export const agencyNavigation = [
   { name: 'Overview', href: '/agency/dashboard', icon: LayoutDashboard },
   { name: 'Colleges', href: '/agency/colleges', icon: GraduationCap },
   { name: 'Global Jobs', href: '/agency/jobs', icon: Briefcase },
+  { name: 'Market Intelligence', href: '/agency/market-intelligence', icon: Globe },
   { name: 'Students', href: '/agency/students', icon: Users },
   { name: 'Manage Roles', href: '/agency/roles', icon: ShieldCheck },
   { name: 'Manage Lists', href: '/agency/manage-lists', icon: Database },

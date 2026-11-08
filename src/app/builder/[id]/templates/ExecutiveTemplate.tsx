@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { ProfileData, ResumeDataState } from './types'
-import { formatBulletPoints } from './ClassicTemplate'
+import { formatBulletPoints, formatParagraph } from './ClassicTemplate'
 
 interface TemplateProps {
   profile: ProfileData
@@ -32,6 +32,7 @@ export default function ExecutiveTemplate({ profile, resumeData, settings }: Tem
   const careerObjective = resumeData.career_objective?.final_edited_text
   const activities = profile.activities || []
   const recognitions = profile.recognitions || []
+  const isOnePage = settings.pageFit === '1-page'
 
   return (
     <div 
@@ -43,7 +44,7 @@ export default function ExecutiveTemplate({ profile, resumeData, settings }: Tem
       }}
     >
       {/* Top Header */}
-      <header className="border-b pb-4 mb-4" style={{ borderColor: '#d4d4d8' }}>
+      <header className={`border-b ${isOnePage ? 'pb-2.5 mb-2.5' : 'pb-4 mb-4'}`} style={{ borderColor: '#d4d4d8' }}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-2">
           <div>
             <h1 
@@ -68,7 +69,7 @@ export default function ExecutiveTemplate({ profile, resumeData, settings }: Tem
       </header>
 
       {/* Main Content */}
-      <div className="space-y-4">
+      <div className={isOnePage ? "space-y-2.5" : "space-y-4"}>
         {/* Executive Summary */}
         {careerObjective && (
           <section>
@@ -78,7 +79,7 @@ export default function ExecutiveTemplate({ profile, resumeData, settings }: Tem
               Executive Summary
             </h2>
             <div className="text-[0.92em] text-zinc-700">
-              {formatBulletPoints(careerObjective)}
+              {formatParagraph(careerObjective)}
             </div>
           </section>
         )}
@@ -91,7 +92,7 @@ export default function ExecutiveTemplate({ profile, resumeData, settings }: Tem
             >
               Professional Experience
             </h2>
-            <div className="space-y-3">
+            <div className={isOnePage ? "space-y-2" : "space-y-3"}>
               {workHistories.map((work, idx) => (
                 <div key={idx} className="text-[0.92em]">
                   <div className="flex items-baseline justify-between">
@@ -127,7 +128,7 @@ export default function ExecutiveTemplate({ profile, resumeData, settings }: Tem
             >
               Selected Projects
             </h2>
-            <div className="space-y-3">
+            <div className={isOnePage ? "space-y-2" : "space-y-3"}>
               {projects.map((proj, idx) => (
                 <div key={idx} className="text-[0.92em]">
                   <div className="flex items-baseline justify-between">

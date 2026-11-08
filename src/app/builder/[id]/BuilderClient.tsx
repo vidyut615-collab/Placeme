@@ -115,14 +115,36 @@ export default function BuilderClient({ resume, profileData }: BuilderClientProp
     }
   })
 
-  // Live Auto-Save status
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  // Live Auto-Save status: 'idle' | 'unsaved' | 'saving' | 'saved'
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'unsaved' | 'saving' | 'saved'>('idle')
 
   // Keep a mutable ref of the freshest state to prevent race conditions during rapid auto-saves
   const resumeDataRef = React.useRef(resumeData)
   useEffect(() => {
     resumeDataRef.current = resumeData
   }, [resumeData])
+
+  // Debounce & single-flight auto-save engine refs
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+  const isSavingRef = React.useRef<boolean>(false)
+  const hasPendingSaveRef = React.useRef<boolean>(false)
+  const saveVersionRef = React.useRef<number>(0)
+  const idleTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup timers on unmount & flush on beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (debounceTimerRef.current || hasPendingSaveRef.current) {
+        saveResumeContentAction(resume.id, resumeDataRef.current)
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+  }, [resume.id])
 
   // Navigation State: 'profile' | 'work_0' | 'proj_0' | 'objective' | 'settings'
   const [activeTab, setActiveTab] = useState<string>('profile')
@@ -165,10 +187,13 @@ export default function BuilderClient({ resume, profileData }: BuilderClientProp
   useEffect(() => {
     setSelectedOptionTab(null)
     if (activeTab === 'objective') {
-      const text = resumeData.career_objective.final_edited_text || ''
+      const rawText = resumeData.career_objective.final_edited_text || ''
+      const text = rawText.includes('\n') && (rawText.includes('- ') || rawText.includes('• '))
+        ? rawText.split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean).join(' ')
+        : rawText
       setEditorText(text)
       setTechText('')
-      const optIdx = resumeData.career_objective.ai_options.indexOf(text)
+      const optIdx = resumeData.career_objective.ai_options.indexOf(rawText)
       if (optIdx !== -1) setSelectedOptionTab(optIdx)
     } else if (activeTab.startsWith('work_')) {
       const idx = parseInt(activeTab.split('_')[1], 10)
@@ -237,110 +262,186 @@ export default function BuilderClient({ resume, profileData }: BuilderClientProp
     }
   }
 
-  // Save current active tab text (Sets is_saved = true)
-  const handleSaveActiveContent = async () => {
-    setIsSaving(true)
-    const updated = { ...resumeData }
-
-    if (activeTab === 'objective') {
-      updated.career_objective = {
-        ...updated.career_objective,
-        final_edited_text: editorText,
-        is_saved: true
-      }
-    } else if (activeTab.startsWith('work_')) {
-      const idx = parseInt(activeTab.split('_')[1], 10)
-      if (updated.work_histories[idx]) {
-        updated.work_histories[idx] = {
-          ...updated.work_histories[idx],
-          final_edited_text: editorText,
-          tech: techText,
-          is_saved: true
-        }
-      }
-    } else if (activeTab.startsWith('proj_')) {
-      const idx = parseInt(activeTab.split('_')[1], 10)
-      if (updated.projects[idx]) {
-        updated.projects[idx] = {
-          ...updated.projects[idx],
-          final_edited_text: editorText,
-          tech: techText,
-          is_saved: true
-        }
-      }
+  // Centralized single-flight persistence engine
+  const executeSave = async (dataToSave: ResumeDataState, showSuccessToast: boolean = false) => {
+    // If a save network call is already actively in-flight, mark pending so the queue re-runs with newest data
+    if (isSavingRef.current) {
+      hasPendingSaveRef.current = true
+      return
     }
 
-    setResumeData(updated)
-    resumeDataRef.current = updated
-    setSaveStatus('saving')
-    const res = await saveResumeContentAction(resume.id, updated)
-    setIsSaving(false)
+    isSavingRef.current = true
+    hasPendingSaveRef.current = false
+    const thisVersion = ++saveVersionRef.current
 
-    if (res.success) {
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 2500)
-      toast.success('Changes saved to resume!')
-    } else {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    setSaveStatus('saving')
+
+    // Timeout safety fallback: ensure saveStatus is never stuck on 'saving' longer than 7 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (isSavingRef.current) {
+        isSavingRef.current = false
+        setSaveStatus('idle')
+      }
+    }, 7000)
+
+    try {
+      const res = await saveResumeContentAction(resume.id, dataToSave)
+      clearTimeout(safetyTimeout)
+
+      // Only apply 'saved' state if this is still the newest save version
+      if (thisVersion === saveVersionRef.current) {
+        if (res.success) {
+          setSaveStatus('saved')
+          if (showSuccessToast) {
+            toast.success('Changes saved to resume!')
+          }
+          idleTimerRef.current = setTimeout(() => {
+            setSaveStatus('idle')
+          }, 2000)
+        } else {
+          setSaveStatus('idle')
+          toast.error(res.error || 'Failed to save changes')
+        }
+      }
+    } catch (err: any) {
+      clearTimeout(safetyTimeout)
+      console.error('Auto-save error:', err)
       setSaveStatus('idle')
-      toast.error(res.error || 'Failed to save changes')
+      toast.error('Connection issue while saving changes')
+    } finally {
+      isSavingRef.current = false
+
+      // If another change occurred while save was in flight, immediately run save with the freshest data
+      if (hasPendingSaveRef.current) {
+        hasPendingSaveRef.current = false
+        executeSave(resumeDataRef.current, false)
+      }
     }
   }
 
-  // Update Settings with instant auto-save and visual indicator
-  const handleSettingsChange = async (newSettings: Partial<ResumeSettings>) => {
+  // Schedules a debounced save (700ms). If user keeps tweaking settings, cancels previous timer
+  const scheduleDebouncedSave = (updated: ResumeDataState) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    setSaveStatus('unsaved')
+
+    debounceTimerRef.current = setTimeout(() => {
+      executeSave(resumeDataRef.current, false)
+    }, 700)
+  }
+
+  // Immediately flushes any pending debounced save (e.g. before download or explicit save)
+  const flushPendingSave = async () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+    await executeSave(resumeDataRef.current, false)
+  }
+
+  // Save current active tab text (Sets is_saved = true)
+  const handleSaveActiveContent = async () => {
+    setIsSaving(true)
+    try {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+
+      const updated = { ...resumeDataRef.current }
+
+      if (activeTab === 'objective') {
+        updated.career_objective = {
+          ...updated.career_objective,
+          final_edited_text: editorText,
+          is_saved: true
+        }
+      } else if (activeTab.startsWith('work_')) {
+        const idx = parseInt(activeTab.split('_')[1], 10)
+        if (updated.work_histories[idx]) {
+          const nextWork = [...updated.work_histories]
+          nextWork[idx] = {
+            ...nextWork[idx],
+            final_edited_text: editorText,
+            tech: techText,
+            is_saved: true
+          }
+          updated.work_histories = nextWork
+        }
+      } else if (activeTab.startsWith('proj_')) {
+        const idx = parseInt(activeTab.split('_')[1], 10)
+        if (updated.projects[idx]) {
+          const nextProj = [...updated.projects]
+          nextProj[idx] = {
+            ...nextProj[idx],
+            final_edited_text: editorText,
+            tech: techText,
+            is_saved: true
+          }
+          updated.projects = nextProj
+        }
+      }
+
+      setResumeData(updated)
+      resumeDataRef.current = updated
+
+      await executeSave(updated, true)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Update Settings with instant UI preview + debounced auto-save of the LAST change
+  const handleSettingsChange = (newSettings: Partial<ResumeSettings>) => {
     const current = resumeDataRef.current
     const updated: ResumeDataState = {
       ...current,
       settings: { ...current.settings, ...newSettings }
     }
     resumeDataRef.current = updated
-    setResumeData(updated)
+    setResumeData(updated) // 0ms instant UI preview
 
-    setSaveStatus('saving')
-    const res = await saveResumeContentAction(resume.id, updated)
-    if (res.success) {
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 2500)
-    } else {
-      setSaveStatus('idle')
-      toast.error(res.error || 'Failed to save styling changes')
-    }
+    // Debounce database save: persists the LAST change smoothly without flooding the server
+    scheduleDebouncedSave(updated)
   }
 
-  // Handle 1-Click ATS Auto-Fix Action with instant auto-save
+  // Handle 1-Click ATS Auto-Fix Action with instant save
   const handleApplyFix = async (fixActionType: ATSIssue['fixActionType']) => {
     if (!fixActionType) return
     setIsSaving(true)
-    setSaveStatus('saving')
-
-    const current = resumeDataRef.current
-    const { updatedResume } = executeOneClickFix(current, profileData, fixActionType)
-    resumeDataRef.current = updatedResume
-    setResumeData(updatedResume)
-
-    // Sync editorText if currently viewing an affected work or project tab
-    if (activeTab.startsWith('work_')) {
-      const idx = parseInt(activeTab.split('_')[1], 10)
-      if (updatedResume.work_histories[idx]) {
-        setEditorText(updatedResume.work_histories[idx].final_edited_text)
+    try {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
       }
-    } else if (activeTab.startsWith('proj_')) {
-      const idx = parseInt(activeTab.split('_')[1], 10)
-      if (updatedResume.projects[idx]) {
-        setEditorText(updatedResume.projects[idx].final_edited_text)
+
+      const current = resumeDataRef.current
+      const { updatedResume } = executeOneClickFix(current, profileData, fixActionType)
+      resumeDataRef.current = updatedResume
+      setResumeData(updatedResume)
+
+      // Sync editorText if currently viewing an affected work or project tab
+      if (activeTab.startsWith('work_')) {
+        const idx = parseInt(activeTab.split('_')[1], 10)
+        if (updatedResume.work_histories[idx]) {
+          setEditorText(updatedResume.work_histories[idx].final_edited_text)
+          setTechText(updatedResume.work_histories[idx].tech || '')
+        }
+      } else if (activeTab.startsWith('proj_')) {
+        const idx = parseInt(activeTab.split('_')[1], 10)
+        if (updatedResume.projects[idx]) {
+          setEditorText(updatedResume.projects[idx].final_edited_text)
+          setTechText(updatedResume.projects[idx].tech || '')
+        }
       }
-    }
 
-    const res = await saveResumeContentAction(resume.id, updatedResume)
-    setIsSaving(false)
-
-    if (res.success) {
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 2500)
+      await executeSave(updatedResume, true)
       toast.success('Applied ATS fix and saved to resume!')
-    } else {
-      setSaveStatus('idle')
-      toast.error(res.error || 'Failed to apply ATS fix')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -444,17 +545,24 @@ export default function BuilderClient({ resume, profileData }: BuilderClientProp
   const handleDownloadPDF = async () => {
     setIsExporting(true)
     try {
-      // 1. Auto-save current state first so the PDF contains latest edits
-      await saveResumeContentAction(resume.id, resumeDataRef.current)
+      // Flush any pending debounced change so DB and PDF have the exact matching state
+      await flushPendingSave()
 
-      // 2. Fetch the generated vector PDF from server
-      const res = await fetch(`/api/resume/${resume.id}/download`)
+      const current = resumeDataRef.current
+
+      // 1. Send live state directly to the PDF generator API
+      const res = await fetch(`/api/resume/${resume.id}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeData: current })
+      })
+
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}))
         throw new Error(errJson.error || 'Failed to generate PDF')
       }
 
-      // 3. Trigger immediate binary file download in browser
+      // 2. Trigger immediate binary file download in browser
       const blob = await res.blob()
       const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -506,6 +614,11 @@ export default function BuilderClient({ resume, profileData }: BuilderClientProp
               <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 <span>Saving...</span>
+              </span>
+            ) : saveStatus === 'unsaved' ? (
+              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 flex items-center gap-1 animate-in fade-in">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span>Unsaved changes</span>
               </span>
             ) : saveStatus === 'saved' ? (
               <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 animate-in fade-in">
@@ -1295,7 +1408,12 @@ export default function BuilderClient({ resume, profileData }: BuilderClientProp
                           key={oIdx}
                           onClick={() => {
                             setSelectedOptionTab(oIdx)
-                            handleEditorTextChange(opt)
+                            const cleanOpt = opt
+                              .split('\n')
+                              .map(l => l.replace(/^[-•*]\s*/, '').trim())
+                              .filter(Boolean)
+                              .join(' ')
+                            handleEditorTextChange(cleanOpt)
                           }}
                           className={`py-2 px-3 text-xs font-semibold rounded-lg border text-center transition-all flex items-center justify-center gap-1.5 ${
                             isSelected

@@ -9,6 +9,16 @@ interface TemplateProps {
   settings: ResumeDataState['settings']
 }
 
+export function formatParagraph(text: string) {
+  if (!text) return null
+  const clean = text
+    .split('\n')
+    .map(line => line.replace(/^[-•*]\s*/, '').trim())
+    .filter(Boolean)
+    .join(' ')
+  return <p className="text-zinc-700 dark:text-zinc-300 mt-1 leading-relaxed text-justify">{clean}</p>
+}
+
 export function formatBulletPoints(text: string) {
   if (!text) return null
   const lines = text
@@ -54,6 +64,7 @@ export default function ClassicTemplate({ profile, resumeData, settings }: Templ
   const careerObjective = resumeData.career_objective?.final_edited_text
   const activities = profile.activities || []
   const recognitions = profile.recognitions || []
+  const isOnePage = settings.pageFit === '1-page'
 
   return (
     <div 
@@ -65,7 +76,7 @@ export default function ClassicTemplate({ profile, resumeData, settings }: Templ
       }}
     >
       {/* Header */}
-      <header className="text-center pb-3 border-b-2" style={{ borderColor: settings.accentColor }}>
+      <header className={`text-center ${isOnePage ? 'pb-2' : 'pb-3'} border-b-2`} style={{ borderColor: settings.accentColor }}>
         <h1 
           className="text-2xl font-bold uppercase tracking-wider mb-1"
           style={{ color: settings.accentColor }}
@@ -85,7 +96,7 @@ export default function ClassicTemplate({ profile, resumeData, settings }: Templ
       </header>
 
       {/* Main Body */}
-      <div className="space-y-4 pt-3">
+      <div className={isOnePage ? "space-y-2.5 pt-1.5" : "space-y-4 pt-3"}>
         {/* Career Objective */}
         {careerObjective && (
           <section>
@@ -96,7 +107,7 @@ export default function ClassicTemplate({ profile, resumeData, settings }: Templ
               Career Objective
             </h2>
             <div className="text-[0.92em]">
-              {formatBulletPoints(careerObjective)}
+              {formatParagraph(careerObjective)}
             </div>
           </section>
         )}
@@ -131,7 +142,7 @@ export default function ClassicTemplate({ profile, resumeData, settings }: Templ
             >
               Work Experience
             </h2>
-            <div className="space-y-3">
+            <div className={isOnePage ? "space-y-2" : "space-y-3"}>
               {workHistories.map((work, idx) => (
                 <div key={idx} className="text-[0.92em]">
                   <div className="flex items-baseline justify-between">
@@ -168,7 +179,7 @@ export default function ClassicTemplate({ profile, resumeData, settings }: Templ
             >
               Projects
             </h2>
-            <div className="space-y-3">
+            <div className={isOnePage ? "space-y-2" : "space-y-3"}>
               {projects.map((proj, idx) => (
                 <div key={idx} className="text-[0.92em]">
                   <div className="flex items-baseline justify-between">

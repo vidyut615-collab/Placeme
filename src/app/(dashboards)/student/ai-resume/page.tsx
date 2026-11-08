@@ -85,10 +85,22 @@ export default async function AIResumePage() {
                 <CardTitle className="text-lg line-clamp-1">{resume.title || 'Untitled Resume'}</CardTitle>
                 <CardDescription className="line-clamp-1">{resume.target_role || 'General Role'} at {resume.target_employer || 'Any Company'}</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1">
-                <div className="text-xs text-zinc-500 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(resume.created_at).toLocaleDateString()}
+              <CardContent className="flex-1 space-y-2">
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(resume.created_at).toLocaleDateString()}
+                  </span>
+                  {(() => {
+                    const content = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
+                    const score = content.ats_score?.match_score
+                    if (!score) return null
+                    return (
+                      <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                        ATS {score}%
+                      </span>
+                    )
+                  })()}
                 </div>
               </CardContent>
               <CardFooter className="pt-0 flex gap-2">

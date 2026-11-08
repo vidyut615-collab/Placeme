@@ -23,22 +23,34 @@ export default function ResumeRenderer({ profile, resumeData, settings, scale = 
     }
   }
 
+  // Calculate dynamic fit adjustments if '1-page' is selected or by default for standard graduate profiles
+  const totalEntries = (resumeData.work_histories?.length || 0) + (resumeData.projects?.length || 0)
+  const isOnePage = settings.pageFit === '1-page' || (settings.pageFit === 'auto' && totalEntries <= 4)
+
+  const effectiveFontSize = isOnePage ? Math.max(8.8, Math.round(settings.fontSize * 0.91 * 10) / 10) : settings.fontSize
+  const effectiveMargin = isOnePage ? Math.max(8, settings.margin - 4) : settings.margin
+  const effectiveLineHeight = isOnePage ? 1.25 : settings.lineHeight
+
+  const effectiveSettings: ResumeSettings = {
+    ...settings,
+    fontSize: effectiveFontSize,
+    margin: effectiveMargin,
+    lineHeight: effectiveLineHeight,
+    pageFit: isOnePage ? '1-page' : settings.pageFit
+  }
+
   // Render template based on settings.template
   const renderTemplate = () => {
     switch (settings.template) {
       case 'modern':
-        return <ModernTemplate profile={effectiveProfile} resumeData={resumeData} settings={settings} />
+        return <ModernTemplate profile={effectiveProfile} resumeData={resumeData} settings={effectiveSettings} />
       case 'executive':
-        return <ExecutiveTemplate profile={effectiveProfile} resumeData={resumeData} settings={settings} />
+        return <ExecutiveTemplate profile={effectiveProfile} resumeData={resumeData} settings={effectiveSettings} />
       case 'classic':
       default:
-        return <ClassicTemplate profile={effectiveProfile} resumeData={resumeData} settings={settings} />
+        return <ClassicTemplate profile={effectiveProfile} resumeData={resumeData} settings={effectiveSettings} />
     }
   }
-
-  // Calculate dynamic fit adjustments if '1-page' is selected
-  const effectiveFontSize = settings.pageFit === '1-page' ? Math.max(8.5, settings.fontSize - 0.5) : settings.fontSize
-  const effectiveMargin = settings.pageFit === '1-page' ? Math.max(8, settings.margin - 3) : settings.margin
 
   return (
     <div className="resume-print-wrapper flex flex-col items-center">

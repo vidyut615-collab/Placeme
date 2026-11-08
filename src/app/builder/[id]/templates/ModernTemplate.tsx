@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { ProfileData, ResumeDataState } from './types'
-import { formatBulletPoints } from './ClassicTemplate'
+import { formatBulletPoints, formatParagraph } from './ClassicTemplate'
 
 interface TemplateProps {
   profile: ProfileData
@@ -32,6 +32,7 @@ export default function ModernTemplate({ profile, resumeData, settings }: Templa
   const careerObjective = resumeData.career_objective?.final_edited_text
   const activities = profile.activities || []
   const recognitions = profile.recognitions || []
+  const isOnePage = settings.pageFit === '1-page'
 
   return (
     <div 
@@ -44,7 +45,7 @@ export default function ModernTemplate({ profile, resumeData, settings }: Templa
     >
       {/* LEFT COLUMN / SIDEBAR (33%) */}
       <aside 
-        className="w-[33%] p-4 bg-zinc-50 border-r border-zinc-200 flex flex-col space-y-4"
+        className={`w-[33%] ${isOnePage ? 'p-3 space-y-2.5' : 'p-4 space-y-4'} bg-zinc-50 border-r border-zinc-200 flex flex-col`}
         style={{ borderColor: '#e4e4e7' }}
       >
         {/* Contact Info */}
@@ -179,7 +180,7 @@ export default function ModernTemplate({ profile, resumeData, settings }: Templa
       </aside>
 
       {/* RIGHT COLUMN / MAIN BODY (67%) */}
-      <main className="w-[67%] p-5 space-y-4">
+      <main className={`w-[67%] ${isOnePage ? 'p-3 space-y-2.5' : 'p-5 space-y-4'}`}>
         {/* Name Header */}
         <header className="border-b pb-3" style={{ borderColor: settings.accentColor }}>
           <h1 
@@ -205,7 +206,7 @@ export default function ModernTemplate({ profile, resumeData, settings }: Templa
               Professional Summary
             </h2>
             <div className="text-[0.92em]">
-              {formatBulletPoints(careerObjective)}
+              {formatParagraph(careerObjective)}
             </div>
           </section>
         )}
@@ -219,7 +220,7 @@ export default function ModernTemplate({ profile, resumeData, settings }: Templa
             >
               Experience
             </h2>
-            <div className="space-y-3">
+            <div className={isOnePage ? "space-y-2" : "space-y-3"}>
               {workHistories.map((work, idx) => (
                 <div key={idx} className="text-[0.92em]">
                   <div className="flex items-baseline justify-between">
@@ -256,7 +257,7 @@ export default function ModernTemplate({ profile, resumeData, settings }: Templa
             >
               Featured Projects
             </h2>
-            <div className="space-y-3">
+            <div className={isOnePage ? "space-y-2" : "space-y-3"}>
               {projects.map((proj, idx) => (
                 <div key={idx} className="text-[0.92em]">
                   <div className="flex items-baseline justify-between">

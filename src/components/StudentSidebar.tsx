@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Briefcase, FileText, UserCircle, FileCheck, CreditCard, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Briefcase, FileText, UserCircle, FileCheck, CreditCard, Sparkles, Compass } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { LogoutButton } from './LogoutButton'
@@ -11,6 +11,7 @@ import { SidebarThemeToggle } from './ThemeToggle'
 export const studentNavigation = [
   { name: 'Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/student/jobs', icon: Briefcase },
+  { name: 'AI Job Search', href: '/student/ai-job-search', icon: Compass },
   { name: 'Applications', href: '/student/applications', icon: FileText },
   { name: 'My Profile', href: '/student/profile', icon: UserCircle },
   { name: 'AI Resume', href: '/student/ai-resume', icon: Sparkles },

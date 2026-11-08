@@ -1,4 +1,4 @@
-﻿export const PROMPT_SHORTEN_JD = `Rewrite the Job Description concisely in under 250 words. Focus strictly on responsibilities, hard/soft skills, tools, and required knowledge. Ensure it emphasizes teamwork, problem-solving, strategic thinking, and independence if mentioned in the original.
+export const PROMPT_SHORTEN_JD = `Rewrite the Job Description concisely in under 250 words. Focus strictly on responsibilities, hard/soft skills, tools, and required knowledge. Ensure it emphasizes teamwork, problem-solving, strategic thinking, and independence if mentioned in the original.
 Provide ONLY the rewritten text, with no introductory or supporting text.
 
 [Job Description]
@@ -46,7 +46,7 @@ export const PROMPT_CAREER_OBJECTIVE = `Generate 3 distinct, ATS-friendly Career
 Format: Output valid JSON exactly like this: {"options": ["option 1...", "option 2...", "option 3..."]}
 
 Guidelines:
-- FORMAT AS BULLET POINTS: Each option string MUST be a bulleted list (use the - character and \n newlines). Do not write a continuous paragraph.
+- FORMAT AS A COHESIVE PARAGRAPH: Each option string MUST be a single, flowing, well-structured paragraph (3-4 concise sentences, 50-70 words). Do NOT use bullet points, dashes, asterisks, or numbered lists.
 - Word count: 50-70 words per option.
 - Opening: Start with a strong action adjective and state the candidate's title with total years of experience (calculated from their work histories).
 - Experience & Skills: Highlight key skills aligned with the job description using powerful vocabulary (max 18 words).
@@ -67,3 +67,22 @@ Company: {{COMPANY_NAME}}
 
 [Target Job Description]
 {{SHORTENED_JD}}`;
+
+export const PROMPT_ATS_KEYWORD_MATCH = `You are an expert Applicant Tracking System (ATS) evaluator.
+Analyze the provided Target Job Description and Candidate Resume Text.
+Extract the 15-20 most critical hard skills, technologies, frameworks, and qualifications mentioned in the Job Description.
+Check which of these keywords are present vs missing in the Candidate's Resume.
+
+Format your output STRICTLY as valid JSON matching this schema:
+{
+  "match_score": 75,
+  "matching_keywords": ["React", "JavaScript", "REST APIs"],
+  "missing_keywords": ["Docker", "CI/CD", "AWS"],
+  "summary": "Strong frontend match, but missing DevOps and deployment keywords requested in the JD."
+}
+
+[Target Job Description]
+{{JOB_DESCRIPTION}}
+
+[Candidate Resume Text]
+{{RESUME_TEXT}}`;

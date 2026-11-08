@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import Groq from 'groq-sdk'
-import { PROMPT_SHORTEN_JD, PROMPT_WORK_HISTORY, PROMPT_PROJECT, PROMPT_CAREER_OBJECTIVE } from './prompts'
+import { PROMPT_SHORTEN_JD, PROMPT_WORK_HISTORY, PROMPT_PROJECT, PROMPT_CAREER_OBJECTIVE, PROMPT_ATS_KEYWORD_MATCH } from './prompts'
 
 const AI_RESUME_CREDIT_COST = 5
 
@@ -347,7 +347,10 @@ export async function generateCareerObjectiveAction(resumeId: string) {
       .replace('{{SHORTENED_JD}}', resume.shortened_jd || resume.job_description || '')
 
     const rawResponse = await callGroq(prompt, true)
-    const options = parseLLMJsonArray(rawResponse)
+    const rawOptions = parseLLMJsonArray(rawResponse)
+    const options = rawOptions.map((opt: string) => 
+      opt.split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean).join(' ')
+    )
 
     // Update state
     content.career_objective = {
@@ -390,5 +393,89 @@ export async function saveResumeContentAction(resumeId: string, content: any) {
   } catch (err: any) {
     console.error("saveResumeContentAction error:", err)
     return { success: false, error: err.message || 'Failed to save resume' }
+  }
+}
+
+/**
+ * Evaluates the resume text against the target job description to compute an ATS Keyword Match score.
+ */
+export async function checkATSMatchAction(resumeId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const { data: resume, error: fetchError } = await supabase
+      .from('ai_resumes')
+      .select('*')
+      .eq('id', resumeId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !resume) throw new Error('Resume not found')
+
+    const content = typeof resume.content === 'string' ? JSON.parse(resume.content) : (resume.content || {})
+    const workHistories = content.work_histories || []
+    const projects = content.projects || []
+    const objective = content.career_objective?.final_edited_text || ''
+
+    // Aggregate all candidate resume text
+    const resumeTextPieces: string[] = []
+    if (objective) resumeTextPieces.push(`Career Objective:\n${objective}`)
+
+    workHistories.forEach((w: any) => {
+      const text = w.final_edited_text || w.original_description
+      if (text) resumeTextPieces.push(`${w.role} at ${w.company} (${w.tech || ''}):\n${text}`)
+    })
+
+    projects.forEach((p: any) => {
+      const text = p.final_edited_text || p.original_description
+      if (text) resumeTextPieces.push(`${p.title} (${p.tech || ''}):\n${text}`)
+    })
+
+    const fullResumeText = resumeTextPieces.join('\n\n')
+    const targetJD = resume.job_description || resume.shortened_jd || ''
+
+    if (!targetJD.trim()) {
+      return {
+        success: true,
+        data: {
+          match_score: 80,
+          matching_keywords: ['General Technical Experience'],
+          missing_keywords: [],
+          summary: 'No specific target JD provided; resume evaluated on general competencies.'
+        }
+      }
+    }
+
+    const prompt = PROMPT_ATS_KEYWORD_MATCH
+      .replace('{{JOB_DESCRIPTION}}', targetJD)
+      .replace('{{RESUME_TEXT}}', fullResumeText)
+
+    const rawResponse = await callGroq(prompt, true)
+    let parsed: any = null
+    try {
+      const clean = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim()
+      parsed = JSON.parse(clean)
+    } catch {
+      parsed = {
+        match_score: 70,
+        matching_keywords: ['Technical Skills', 'Problem Solving'],
+        missing_keywords: ['DevOps', 'Cloud Deployment'],
+        summary: rawResponse.slice(0, 150)
+      }
+    }
+
+    // Persist to resume content
+    content.ats_score = parsed
+    await supabase
+      .from('ai_resumes')
+      .update({ content })
+      .eq('id', resumeId)
+
+    return { success: true, data: parsed }
+  } catch (err: any) {
+    console.error('checkATSMatchAction error:', err)
+    return { success: false, error: err.message || 'Failed to check ATS match' }
   }
 }

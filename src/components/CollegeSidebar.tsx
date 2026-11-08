@@ -13,6 +13,7 @@ import {
   Calendar,
   Building2,
   User,
+  Target,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ import { SidebarThemeToggle } from './ThemeToggle'
 export const baseCollegeNavigation = [
   { name: 'Overview', href: '/college/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/college/jobs', icon: Briefcase },
+  { name: 'Placement Readiness', href: '/college/placement-readiness', icon: Target },
   { name: 'Students', href: '/college/students', icon: Users },
   { name: 'Placed Students', href: '/college/placed-students', icon: Award },
   { name: 'Approvals', href: '/college/approvals', icon: CheckSquare },

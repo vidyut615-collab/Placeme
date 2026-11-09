@@ -95,6 +95,9 @@ export function ReportDetailClient({ report }: ReportDetailClientProps) {
   const [heatmapSortField, setHeatmapSortField] = useState<'coveragePct' | 'haveCount' | 'missingCount'>('coveragePct')
   const [heatmapSortOrder, setHeatmapSortOrder] = useState<'asc' | 'desc'>('asc')
 
+  // 3. Interview Question Accordion State (first open by default, only 1 open at a time)
+  const [expandedQuestionIndex, setExpandedQuestionIndex] = useState<number | null>(0)
+
   // Extract core report data
   const jobs = report.analyzed_jobs || []
   const primaryJob = jobs[0] || {}
@@ -763,7 +766,7 @@ export function ReportDetailClient({ report }: ReportDetailClientProps) {
         </CardContent>
       </Card>
 
-      {/* 5. Top 10 Recruiter Mock Interview Questions */}
+      {/* 5. Top 10 Recruiter Mock Interview Questions (Single-Open Accordion) */}
       <Card className="border shadow-xs">
         <CardHeader className="pb-3 border-b">
           <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2">
@@ -773,7 +776,7 @@ export function ReportDetailClient({ report }: ReportDetailClientProps) {
                 Top 10 Recruiter Mock Interview Questions
               </CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Technical depth and behavioral questions tailored to visiting recruiter requirements, structured around the STAR response model.
+                Technical depth and behavioral questions tailored to visiting recruiter requirements. Click any question to review answer framework and evaluator focus.
               </CardDescription>
             </div>
             <Badge variant="secondary" className="text-xs font-bold">
@@ -782,43 +785,75 @@ export function ReportDetailClient({ report }: ReportDetailClientProps) {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3 pt-4">
+        <CardContent className="space-y-2 pt-4">
           {interviewQuestions.length > 0 ? (
-            interviewQuestions.map((q, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl border bg-white dark:bg-zinc-900 space-y-2.5 text-xs shadow-2xs hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors"
-              >
-                <div className="flex justify-between items-start gap-3">
-                  <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100 leading-snug">
-                    #{idx + 1}. {q.question}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {q.job_title && (
-                      <Badge variant="secondary" className="text-[10px] font-medium hidden sm:inline-flex">
-                        {q.job_title}
+            interviewQuestions.map((q, idx) => {
+              const isOpen = expandedQuestionIndex === idx
+
+              return (
+                <div
+                  key={idx}
+                  className={`rounded-xl border transition-all ${
+                    isOpen
+                      ? 'bg-zinc-100 dark:bg-zinc-800/90 border-zinc-300 dark:border-zinc-600 shadow-xs ring-1 ring-zinc-300/60 dark:ring-zinc-700'
+                      : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40'
+                  }`}
+                >
+                  {/* Accordion Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedQuestionIndex(isOpen ? null : idx)}
+                    className="w-full text-left p-3.5 sm:p-4 flex items-center justify-between gap-3 select-none transition-colors"
+                    aria-expanded={isOpen}
+                  >
+                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                      <span className="font-bold text-xs text-blue-600 dark:text-blue-400 mt-0.5 shrink-0">
+                        Q{idx + 1}.
+                      </span>
+                      <span className="font-semibold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 leading-snug">
+                        {q.question}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {q.job_title && (
+                        <Badge variant="secondary" className="text-[10px] font-medium hidden sm:inline-flex">
+                          {q.job_title}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-[10px] font-semibold">
+                        {q.category}
                       </Badge>
-                    )}
-                    <Badge variant="outline" className="text-[10px] font-bold">
-                      {q.category}
-                    </Badge>
-                  </div>
-                </div>
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400">
+                        {isOpen ? (
+                          <ChevronUp className="w-4 h-4 text-zinc-700 dark:text-zinc-200" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-zinc-400" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
 
-                <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border space-y-1 text-xs">
-                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">
-                    Answer Guidance (STAR Framework):
-                  </div>
-                  <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    {q.ideal_answer_framework}
-                  </p>
-                </div>
+                  {/* Accordion Content Panel (Single open at a time) */}
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-1 space-y-3 text-xs border-t border-zinc-200 dark:border-zinc-700">
+                      <div className="p-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 space-y-1 text-xs shadow-2xs">
+                        <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                          Answer Guidance (STAR Framework):
+                        </div>
+                        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          {q.ideal_answer_framework}
+                        </p>
+                      </div>
 
-                <div className="text-[11px] text-zinc-500">
-                  <strong className="text-zinc-700 dark:text-zinc-300">Evaluator Focus:</strong> {q.evaluator_focus}
+                      <div className="text-[11px] text-zinc-500 pl-1">
+                        <strong className="text-zinc-700 dark:text-zinc-300">Evaluator Focus:</strong> {q.evaluator_focus}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           ) : (
             <p className="text-xs text-zinc-500 p-4">No mock questions available for this report.</p>
           )}

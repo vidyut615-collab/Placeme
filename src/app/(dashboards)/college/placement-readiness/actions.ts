@@ -1,18 +1,28 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { getAdminClient } from '@/utils/supabase/admin'
 import Groq from 'groq-sdk'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
 async function callGroq(prompt: string): Promise<string> {
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    model: 'openai/gpt-oss-120b',
-    temperature: 0.3,
-    max_tokens: 3000,
-  })
-  return completion.choices[0]?.message?.content || ''
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) {
+    console.warn('GROQ_API_KEY is not configured in the server environment.')
+    return ''
+  }
+  try {
+    const groq = new Groq({ apiKey })
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'openai/gpt-oss-120b',
+      temperature: 0.3,
+      max_tokens: 3000,
+    })
+    return completion.choices[0]?.message?.content || ''
+  } catch (err: any) {
+    console.error('Groq API call error:', err)
+    return ''
+  }
 }
 
 export interface JobInput {
@@ -80,12 +90,19 @@ export async function runBatchReadinessAnalysisAction(formData: {
 }) {
   try {
     const supabase = await createClient()
+    const adminDb = getAdminClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
-    const collegeId = user.app_metadata?.college_id || (
-      await supabase.from('users').select('college_id').eq('id', user.id).single()
-    ).data?.college_id
+    let collegeId = user.app_metadata?.college_id
+    if (!collegeId) {
+      const { data: userRow } = await adminDb
+        .from('users')
+        .select('college_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      collegeId = userRow?.college_id
+    }
 
     if (!collegeId) throw new Error('College affiliation not found')
 
@@ -156,7 +173,7 @@ ${jobsSummary}`
     }
 
     // 2. Fetch students belonging to this college
-    const { data: students, error: studentErr } = await supabase
+    const { data: students, error: studentErr } = await adminDb
       .from('students')
       .select('id, profile_data')
       .eq('college_id', collegeId)
@@ -410,7 +427,7 @@ Format strictly as JSON:
     }
 
     // 8. Save Comprehensive Report to Supabase
-    const { data: savedReport, error: saveErr } = await supabase
+    const { data: savedReport, error: saveErr } = await adminDb
       .from('tpo_readiness_reports')
       .insert({
         college_id: collegeId,
@@ -428,7 +445,7 @@ Format strictly as JSON:
         learning_roadmap: learningRoadmap,
       })
       .select('*')
-      .single()
+      .maybeSingle()
 
     if (saveErr) {
       console.warn('Save report warning:', saveErr)

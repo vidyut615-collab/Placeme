@@ -89,20 +89,26 @@ export function PlacementReadinessClient({
     }
 
     setIsAnalyzing(true)
-    const res = await runBatchReadinessAnalysisAction({
-      mode,
-      jobs,
-      batchYear,
-      department: selectedDept,
-    })
-    setIsAnalyzing(false)
+    try {
+      const res = await runBatchReadinessAnalysisAction({
+        mode,
+        jobs,
+        batchYear,
+        department: selectedDept,
+      })
 
-    if (res.success && res.report) {
-      setCurrentReport(res.report)
-      setReportsList((prev) => [res.report, ...prev])
-      setExpandedTier(null)
-    } else {
-      setErrorMsg(res.error || 'Failed to analyze placement readiness.')
+      if (res.success && res.report) {
+        setCurrentReport(res.report)
+        setReportsList((prev) => [res.report, ...prev])
+        setExpandedTier(null)
+      } else {
+        setErrorMsg(res.error || 'Failed to analyze placement readiness.')
+      }
+    } catch (err: any) {
+      console.error('Batch readiness analysis error:', err)
+      setErrorMsg(err.message || 'An unexpected error occurred during cohort analysis. Please check server logs.')
+    } finally {
+      setIsAnalyzing(false)
     }
   }
 

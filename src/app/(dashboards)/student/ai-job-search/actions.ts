@@ -10,16 +10,25 @@ import { executeMultiPortalCrawl, isRoleRelevant } from '@/lib/scrapers'
 const SEARCH_5_JOBS_CREDITS = 10
 const SEARCH_10_JOBS_CREDITS = 20
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
 async function callGroq(prompt: string): Promise<string> {
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    model: 'openai/gpt-oss-120b',
-    temperature: 0.4,
-    max_tokens: 2048,
-  })
-  return completion.choices[0]?.message?.content || ''
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) {
+    console.warn('GROQ_API_KEY is not configured in the server environment.')
+    return ''
+  }
+  try {
+    const groq = new Groq({ apiKey })
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'openai/gpt-oss-120b',
+      temperature: 0.4,
+      max_tokens: 2048,
+    })
+    return completion.choices[0]?.message?.content || ''
+  } catch (err: any) {
+    console.error('Groq call error in ai-job-search:', err)
+    return ''
+  }
 }
 
 function extractLocationTokens(locationStr: string): string[] {

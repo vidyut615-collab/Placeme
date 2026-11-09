@@ -15,15 +15,22 @@ export default async function MarketIntelligencePage() {
     redirect('/login')
   }
 
-  // Fetch jobs from Discovered Jobs Lake
-  const { data: jobs, count: totalCount } = await supabase
-    .from('discovered_jobs_lake')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .limit(50)
+  // Fetch counts globally so metric cards are accurate across the entire lake
+  const [totalRes, cleanRes, scamRes, jobsRes] = await Promise.all([
+    supabase.from('discovered_jobs_lake').select('*', { count: 'exact', head: true }),
+    supabase.from('discovered_jobs_lake').select('*', { count: 'exact', head: true }).eq('scam_status', 'clean'),
+    supabase.from('discovered_jobs_lake').select('*', { count: 'exact', head: true }).in('scam_status', ['scam', 'suspicious']),
+    supabase
+      .from('discovered_jobs_lake')
+      .select('id, title, company_name, location, workplace_mode, employment_type, primary_role, skills_required, sources, scam_status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000),
+  ])
 
-  const cleanCount = jobs?.filter((j) => j.scam_status === 'clean').length || 0
-  const scamCount = jobs?.filter((j) => j.scam_status === 'scam' || j.scam_status === 'suspicious').length || 0
+  const totalCount = totalRes.count || 0
+  const cleanCount = cleanRes.count || 0
+  const scamCount = scamRes.count || 0
+  const jobs = jobsRes.data || []
 
   return (
     <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-6xl mx-auto">

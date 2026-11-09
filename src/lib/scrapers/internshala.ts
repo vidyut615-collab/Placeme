@@ -28,24 +28,50 @@ function stripTags(html: string): string {
   return decodeHtml(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
 }
 
-function getCityAliases(rawLocation: string): string[] {
-  const norm = rawLocation.toLowerCase()
-  if (norm.includes('bengaluru') || norm.includes('bangalore')) {
-    return ['bengaluru', 'bangalore']
+function getCityAliases(rawLocation: string, internshalaSlug?: string): string[] {
+  if (internshalaSlug) {
+    return [internshalaSlug]
   }
-  if (norm.includes('mumbai') || norm.includes('thane') || norm.includes('navi mumbai') || norm.includes('bkc')) {
+  const norm = rawLocation.toLowerCase()
+  if (norm.includes('bengaluru') || norm.includes('bangalore') || norm.includes('blr')) {
+    return ['bengaluru']
+  }
+  if (
+    norm.includes('mumbai') ||
+    norm.includes('bombay') ||
+    norm.includes('thane') ||
+    norm.includes('navi mumbai') ||
+    norm.includes('bkc')
+  ) {
     return ['mumbai', 'navi-mumbai']
   }
-  if (norm.includes('pune')) {
+  if (norm.includes('pune') || norm.includes('hinjewadi')) {
     return ['pune']
   }
-  if (norm.includes('delhi') || norm.includes('noida') || norm.includes('gurgaon') || norm.includes('gurugram')) {
+  if (
+    norm.includes('delhi') ||
+    norm.includes('noida') ||
+    norm.includes('gurgaon') ||
+    norm.includes('gurugram') ||
+    norm.includes('ncr')
+  ) {
     return ['delhi', 'noida', 'gurgaon']
   }
-  if (norm.includes('hyderabad')) {
+  if (
+    norm.includes('hyderabad') ||
+    norm.includes('hydrabad') ||
+    norm.includes('secunderabad') ||
+    norm.includes('cyberabad')
+  ) {
     return ['hyderabad']
   }
-  if (norm.includes('remote')) {
+  if (norm.includes('chennai') || norm.includes('madras')) {
+    return ['chennai']
+  }
+  if (norm.includes('kolkata') || norm.includes('calcutta')) {
+    return ['kolkata']
+  }
+  if (norm.includes('remote') || norm.includes('wfh') || norm.includes('work from home')) {
     return ['work-from-home']
   }
   const clean = rawLocation.split(',')[0].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
@@ -55,13 +81,14 @@ function getCityAliases(rawLocation: string): string[] {
 export async function searchInternshalaPublic(options: {
   query: string
   location?: string
+  internshalaSlug?: string
   limit?: number
   jobType?: string
   workplaceMode?: string
 }): Promise<InternshalaJobCard[]> {
   try {
     const rawLoc = options.workplaceMode === 'remote' ? 'remote' : (options.location || 'Mumbai')
-    const cityAliases = getCityAliases(rawLoc)
+    const cityAliases = getCityAliases(rawLoc, options.internshalaSlug)
     const cleanQuery = (options.query || 'software-developer').toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
     const urls: string[] = []
@@ -110,6 +137,17 @@ export async function searchInternshalaPublic(options: {
           const linkMatch = chunk.match(/href="([^"]+)"/i)
           const relativeUrl = linkMatch ? linkMatch[1] : ''
           const fullUrl = relativeUrl.startsWith('http') ? relativeUrl : `https://internshala.com${relativeUrl}`
+
+          // Cross-city leak prevention: If search is city-specific, reject URLs that explicitly indicate other cities
+          if (options.internshalaSlug && options.internshalaSlug !== 'work-from-home') {
+            const lowerUrl = fullUrl.toLowerCase()
+            if (lowerUrl.includes('-job-in-') || lowerUrl.includes('-internship-in-')) {
+              if (!lowerUrl.includes(`-in-${options.internshalaSlug}`)) {
+                // If it belongs to a completely different city, skip it
+                continue
+              }
+            }
+          }
 
           const companyMatch =
             chunk.match(/class="[^"]*company_name[^"]*"[^>]*>([\s\S]*?)<\/a>/i) ||

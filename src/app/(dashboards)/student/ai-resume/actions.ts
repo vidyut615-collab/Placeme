@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import Groq from 'groq-sdk'
 import { PROMPT_SHORTEN_JD, PROMPT_WORK_HISTORY, PROMPT_PROJECT, PROMPT_CAREER_OBJECTIVE, PROMPT_ATS_KEYWORD_MATCH } from './prompts'
 
-const AI_RESUME_CREDIT_COST = 5
+const AI_RESUME_CREDIT_COST = 30
 
 // Initialize Groq
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })

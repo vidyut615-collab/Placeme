@@ -1,9 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
+import { getAdminClient } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import { PlacementReadinessClient } from './PlacementReadinessClient'
 
 export default async function PlacementReadinessPage() {
   const supabase = await createClient()
+  const adminDb = getAdminClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -15,50 +17,93 @@ export default async function PlacementReadinessPage() {
     redirect('/login')
   }
 
-  const collegeId = user.app_metadata?.college_id || (
-    await supabase.from('users').select('college_id').eq('id', user.id).single()
-  ).data?.college_id
+  let collegeId = user.app_metadata?.college_id
+  if (!collegeId) {
+    const { data: userRow } = await adminDb
+      .from('users')
+      .select('college_id')
+      .eq('id', user.id)
+      .maybeSingle()
+    collegeId = userRow?.college_id
+  }
 
-  let departments: string[] = [
-    'Computer Engineering',
-    'Information Technology',
-    'Electronics & Telecommunication',
-    'Artificial Intelligence & Data Science',
-    'Mechanical Engineering',
+  let collegeCredits = 500
+  let availableYears: string[] = ['2026', '2025', '2027', '2028']
+  let availableDegrees: string[] = ['B.Tech', 'MCA', 'M.Tech', 'BBA', 'B.Com']
+  let availableDepartments: string[] = [
+    'CMPN',
+    'IT',
+    'CIVIL',
+    'MECH',
   ]
 
   if (collegeId) {
-    const { data: college } = await supabase
+    const { data: college } = await adminDb
       .from('colleges')
-      .select('onboarding_fields')
+      .select('credit_balance, onboarding_fields')
       .eq('id', collegeId)
       .maybeSingle()
 
-    if (college?.onboarding_fields?.departments && college.onboarding_fields.departments.length > 0) {
-      departments = college.onboarding_fields.departments
+    if (college) {
+      if (typeof college.credit_balance === 'number') {
+        collegeCredits = college.credit_balance
+      }
+      if (college.onboarding_fields?.years && college.onboarding_fields.years.length > 0) {
+        availableYears = college.onboarding_fields.years
+      }
+      if (college.onboarding_fields?.types && college.onboarding_fields.types.length > 0) {
+        availableDegrees = college.onboarding_fields.types
+      }
+      if (college.onboarding_fields?.departments && college.onboarding_fields.departments.length > 0) {
+        availableDepartments = college.onboarding_fields.departments
+      }
     }
   }
 
-  // Fetch past reports
-  const { data: pastReports } = await supabase
-    .from('tpo_readiness_reports')
-    .select('*')
-    .eq('college_id', collegeId)
-    .order('created_at', { ascending: false })
-    .limit(10)
+  // Fetch lightweight student metadata for instant client-side student counting and credit calculation
+  let studentsMeta: { id: string; year: string; degree: string; department: string }[] = []
+  if (collegeId) {
+    const { data: students } = await adminDb
+      .from('students')
+      .select('id, profile_data')
+      .eq('college_id', collegeId)
+
+    if (students) {
+      studentsMeta = students.map((s: any) => {
+        const prof = s.profile_data || {}
+        return {
+          id: s.id,
+          year: String(prof.year || prof.academic_year || prof.graduation_year || prof.academics?.graduation_year || ''),
+          degree: String(prof.type || prof.degree || prof.academics?.degree || ''),
+          department: String(prof.department || prof.branch || prof.academics?.department || ''),
+        }
+      })
+    }
+  }
+
+  // Fetch past reports using admin client to guarantee complete history visibility
+  let pastReports: any[] = []
+  if (collegeId) {
+    const { data } = await adminDb
+      .from('tpo_readiness_reports')
+      .select('*')
+      .eq('college_id', collegeId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (data) {
+      pastReports = data
+    }
+  }
 
   return (
-    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Placement Readiness</h1>
-        <p className="text-zinc-500 mt-1">
-          Batch-level skill intelligence, deficit heatmaps, and data-driven workshop recommendations.
-        </p>
-      </div>
-
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-8 w-full max-w-[1600px] mx-auto">
       <PlacementReadinessClient
-        departments={departments}
-        pastReports={pastReports || []}
+        collegeCredits={collegeCredits}
+        availableYears={availableYears}
+        availableDegrees={availableDegrees}
+        availableDepartments={availableDepartments}
+        studentsMeta={studentsMeta}
+        pastReports={pastReports}
       />
     </div>
   )

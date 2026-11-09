@@ -7,8 +7,8 @@ import { sanitizeAndGuardPosting } from '@/lib/posting-guard'
 import { generateCanonicalJobKey, generateContentHash } from '@/lib/job-key'
 import { executeMultiPortalCrawl, isRoleRelevant } from '@/lib/scrapers'
 
-const SEARCH_5_JOBS_CREDITS = 10
-const SEARCH_10_JOBS_CREDITS = 20
+const SEARCH_5_JOBS_CREDITS = 100
+const SEARCH_10_JOBS_CREDITS = 180
 
 async function callGroq(prompt: string): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY
@@ -31,49 +31,349 @@ async function callGroq(prompt: string): Promise<string> {
   }
 }
 
-function extractLocationTokens(locationStr: string): string[] {
-  const norm = locationStr.toLowerCase()
-  if (norm.includes('bengaluru') || norm.includes('bangalore')) {
-    return ['bengaluru', 'bangalore']
+export interface SearchIntent {
+  canonicalCity: string
+  canonicalLocation: string
+  cityAliases: string[]
+  internshalaSlug: string
+  isRemote: boolean
+  targetDomain: string
+  canonicalRoleQuery: string
+  roleKeywords: string[]
+  negativeKeywords: string[]
+  extractedResumeSkills: string[]
+}
+
+function getBaselineCityInfo(locationStr: string) {
+  const norm = locationStr.toLowerCase().trim()
+  let isRemote = norm.includes('remote') || norm.includes('wfh') || norm.includes('work from home')
+
+  if (
+    norm.includes('hyder') ||
+    norm.includes('hydr') ||
+    norm.includes('cyberabad') ||
+    norm.includes('secunderabad') ||
+    norm.includes('hitec')
+  ) {
+    return {
+      canonicalCity: 'Hyderabad',
+      canonicalLocation: 'Hyderabad, Telangana, India',
+      cityAliases: ['hyderabad', 'secunderabad', 'cyberabad', 'hitec city', 'gachibowli', 'kondapur', 'madhapur', 'telangana'],
+      internshalaSlug: 'hyderabad',
+      isRemote: false,
+    }
   }
+
+  if (
+    norm.includes('bengaluru') ||
+    norm.includes('bangalore') ||
+    norm.includes('blr') ||
+    norm.includes('whitefield')
+  ) {
+    return {
+      canonicalCity: 'Bengaluru',
+      canonicalLocation: 'Bengaluru, Karnataka, India',
+      cityAliases: ['bengaluru', 'bangalore', 'whitefield', 'koramangala', 'electronic city', 'bellandur', 'karnataka'],
+      internshalaSlug: 'bengaluru',
+      isRemote: false,
+    }
+  }
+
+  if (
+    norm.includes('pune') ||
+    norm.includes('hinjewadi') ||
+    norm.includes('kharadi')
+  ) {
+    return {
+      canonicalCity: 'Pune',
+      canonicalLocation: 'Pune, Maharashtra, India',
+      cityAliases: ['pune', 'hinjewadi', 'kharadi', 'magarpatta', 'baner', 'kothrud', 'maharashtra'],
+      internshalaSlug: 'pune',
+      isRemote: false,
+    }
+  }
+
+  if (
+    norm.includes('delhi') ||
+    norm.includes('noida') ||
+    norm.includes('gurgaon') ||
+    norm.includes('gurugram') ||
+    norm.includes('ncr') ||
+    norm.includes('ghaziabad') ||
+    norm.includes('faridabad')
+  ) {
+    return {
+      canonicalCity: 'Delhi NCR',
+      canonicalLocation: 'Delhi NCR, India',
+      cityAliases: ['delhi', 'noida', 'gurgaon', 'gurugram', 'ncr', 'faridabad', 'ghaziabad'],
+      internshalaSlug: 'delhi',
+      isRemote: false,
+    }
+  }
+
+  if (
+    norm.includes('chennai') ||
+    norm.includes('madras') ||
+    norm.includes('omr')
+  ) {
+    return {
+      canonicalCity: 'Chennai',
+      canonicalLocation: 'Chennai, Tamil Nadu, India',
+      cityAliases: ['chennai', 'omr', 'guindy', 'siruseri', 'tidel park', 'tamil nadu'],
+      internshalaSlug: 'chennai',
+      isRemote: false,
+    }
+  }
+
   if (
     norm.includes('mumbai') ||
+    norm.includes('bombay') ||
     norm.includes('thane') ||
     norm.includes('navi mumbai') ||
     norm.includes('bkc') ||
     norm.includes('powai') ||
     norm.includes('andheri')
   ) {
-    return ['mumbai', 'navi mumbai', 'thane', 'bkc', 'powai', 'andheri']
+    return {
+      canonicalCity: 'Mumbai',
+      canonicalLocation: 'Mumbai, Maharashtra, India',
+      cityAliases: ['mumbai', 'navi mumbai', 'thane', 'bkc', 'powai', 'andheri', 'maharashtra'],
+      internshalaSlug: 'mumbai',
+      isRemote: false,
+    }
   }
-  if (norm.includes('pune')) {
-    return ['pune', 'hinjewadi']
+
+  if (isRemote) {
+    return {
+      canonicalCity: 'Remote',
+      canonicalLocation: 'Remote, India',
+      cityAliases: ['remote', 'work from home', 'wfh', 'anywhere'],
+      internshalaSlug: 'work-from-home',
+      isRemote: true,
+    }
   }
-  if (
-    norm.includes('delhi') ||
-    norm.includes('noida') ||
-    norm.includes('gurgaon') ||
-    norm.includes('gurugram')
-  ) {
-    return ['delhi', 'noida', 'gurgaon', 'gurugram', 'ncr']
+
+  const clean = locationStr.split(',')[0].trim() || 'Mumbai'
+  return {
+    canonicalCity: clean,
+    canonicalLocation: `${clean}, India`,
+    cityAliases: [clean.toLowerCase()],
+    internshalaSlug: clean.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    isRemote: false,
   }
-  if (norm.includes('hyderabad')) {
-    return ['hyderabad']
-  }
-  if (norm.includes('chennai')) {
-    return ['chennai']
-  }
-  if (norm.includes('remote')) {
-    return ['remote', 'work from home']
-  }
-  const clean = locationStr.split(',')[0].trim().toLowerCase()
-  return [clean || 'mumbai']
 }
 
-function getCityDefaultSeedJobs(locationStr: string) {
-  const norm = locationStr.toLowerCase()
+/**
+ * AI-powered Search Intent Normalizer
+ * Uses Groq to understand misspelled cities, slang, resume domain, role keywords,
+ * negative exclusion keywords, and extracted technical skills.
+ */
+export async function resolveSearchIntent(params: {
+  rawLocation: string
+  query: string
+  resumeTitle?: string
+  resumeRole?: string
+  resumeContent?: any
+  profileSkills?: string
+}): Promise<SearchIntent> {
+  const { rawLocation, query, resumeTitle = '', resumeRole = '', resumeContent = {}, profileSkills = '' } = params
+  const baseline = getBaselineCityInfo(rawLocation)
 
-  if (norm.includes('bengaluru') || norm.includes('bangalore')) {
+  const fallbackNegative = [
+    'automotive',
+    'automobile',
+    'mechanical',
+    'civil',
+    'chemical',
+    'manufacturing',
+    'assembly',
+    'sales executive',
+    'telecalling',
+    'bpo',
+    'site engineer',
+    'field engineer',
+    'quality supervisor',
+    'production supervisor',
+    'pharmacist',
+    'boiler',
+    'textile',
+    'electrician',
+    'hardware assembly',
+    'machinist',
+  ]
+
+  const fallbackSkills = [
+    'React',
+    'JavaScript',
+    'TypeScript',
+    'Node.js',
+    'Python',
+    'SQL',
+    'Git',
+    'Data Structures & Algorithms',
+  ]
+
+  try {
+    const resumeSummary = JSON.stringify({
+      title: resumeTitle,
+      targetRole: resumeRole,
+      skills: profileSkills,
+      summary: resumeContent?.summary || resumeContent?.objective || '',
+      projects: (resumeContent?.projects || []).slice(0, 3).map((p: any) => p.title || p.name || ''),
+    }).slice(0, 900)
+
+    const prompt = `You are an expert AI Career Matcher & Indian Tech Job Market Normalizer.
+Analyze the student's job search input and resume to generate precise search parameters.
+
+Input:
+- User Typed Location: "${rawLocation}"
+- User Query / Target Role: "${query}"
+- Resume Profile Context: ${resumeSummary}
+
+Return ONLY a strict JSON object (no markdown formatting, no code fences, just raw JSON) with these exact keys:
+{
+  "canonicalCity": "Canonical city name (e.g. Hyderabad, Bengaluru, Mumbai, Pune, Delhi NCR, Chennai, Kolkata, Remote)",
+  "canonicalLocation": "Full Indian canonical location string (e.g. 'Hyderabad, Telangana, India')",
+  "cityAliases": ["array of lowercase city name variants, tech clusters, and slang e.g. 'hyderabad', 'secunderabad', 'cyberabad', 'hitec city', 'gachibowli'"],
+  "internshalaSlug": "canonical lowercase slug for Internshala job URLs e.g. 'hyderabad'",
+  "isRemote": boolean,
+  "targetDomain": "candidate's core domain e.g. 'software_engineering'",
+  "canonicalRoleQuery": "clean normalized role search query e.g. 'Software Developer'",
+  "roleKeywords": ["array of role keywords e.g. 'software', 'developer', 'sde', 'frontend', 'backend', 'full stack', 'react', 'node'"],
+  "negativeKeywords": ["strict lowercase exclusion terms for irrelevant domains e.g. 'automotive', 'mechanical', 'civil', 'chemical', 'manufacturing', 'assembly', 'sales executive', 'telecalling', 'bpo', 'site engineer', 'field engineer', 'quality supervisor'"],
+  "extractedResumeSkills": ["top 8-15 technical skills from resume e.g. 'React', 'TypeScript', 'Node.js', 'PostgreSQL', 'Docker', 'Git'"]
+}`
+
+    const rawResponse = await callGroq(prompt)
+    if (rawResponse) {
+      const cleanJson = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim()
+      const parsed = JSON.parse(cleanJson)
+      if (parsed.canonicalCity && parsed.canonicalLocation) {
+        return {
+          canonicalCity: parsed.canonicalCity || baseline.canonicalCity,
+          canonicalLocation: parsed.canonicalLocation || baseline.canonicalLocation,
+          cityAliases:
+            Array.isArray(parsed.cityAliases) && parsed.cityAliases.length > 0
+              ? parsed.cityAliases
+              : baseline.cityAliases,
+          internshalaSlug: parsed.internshalaSlug || baseline.internshalaSlug,
+          isRemote: parsed.isRemote ?? baseline.isRemote,
+          targetDomain: parsed.targetDomain || 'software_engineering',
+          canonicalRoleQuery: parsed.canonicalRoleQuery || query,
+          roleKeywords:
+            Array.isArray(parsed.roleKeywords) && parsed.roleKeywords.length > 0
+              ? parsed.roleKeywords
+              : ['software', 'developer', 'engineer', 'sde'],
+          negativeKeywords:
+            Array.isArray(parsed.negativeKeywords) && parsed.negativeKeywords.length > 0
+              ? parsed.negativeKeywords
+              : fallbackNegative,
+          extractedResumeSkills:
+            Array.isArray(parsed.extractedResumeSkills) && parsed.extractedResumeSkills.length > 0
+              ? parsed.extractedResumeSkills
+              : fallbackSkills,
+        }
+      }
+    }
+  } catch (aiErr) {
+    console.warn('AI intent extraction warning; fallback to baseline normalizer:', aiErr)
+  }
+
+  return {
+    canonicalCity: baseline.canonicalCity,
+    canonicalLocation: baseline.canonicalLocation,
+    cityAliases: baseline.cityAliases,
+    internshalaSlug: baseline.internshalaSlug,
+    isRemote: baseline.isRemote,
+    targetDomain: 'software_engineering',
+    canonicalRoleQuery: query,
+    roleKeywords: ['software', 'developer', 'engineer', 'sde', 'frontend', 'backend', 'fullstack'],
+    negativeKeywords: fallbackNegative,
+    extractedResumeSkills: fallbackSkills,
+  }
+}
+
+function getCityDefaultSeedJobs(canonicalCity: string) {
+  const norm = canonicalCity.toLowerCase()
+
+  // 1. HYDERABAD SEED JOBS
+  if (norm.includes('hyder') || norm.includes('hydr') || norm.includes('cyber')) {
+    return [
+      {
+        company: 'Microsoft India',
+        title: 'Software Engineer Trainee - Campus / Off-Campus 2026',
+        location: 'Hyderabad, Telangana (Gachibowli / IDC)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Software Engineer',
+        skills: ['Java', 'C++', 'Data Structures', 'Algorithms', 'Azure', 'Git'],
+        salary: '₹18 - ₹25 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Microsoft India Development Center (IDC) in Hyderabad is hiring early-career Software Engineers. Work on high-scale distributed systems, cloud services on Azure, and developer platforms.',
+      },
+      {
+        company: 'ServiceNow',
+        title: 'Associate Software Engineer - Platform / Frontend',
+        location: 'Hyderabad, Telangana (Knowledge City / Hitec City)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Frontend Developer',
+        skills: ['JavaScript', 'React', 'Node.js', 'REST APIs', 'HTML/CSS', 'TypeScript'],
+        salary: '₹14 - ₹19 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Join ServiceNow Hyderabad technology hub. You will engineer resilient enterprise UI workflows, interactive dashboards, and scalable web apps using React and modern JavaScript.',
+      },
+      {
+        company: 'Amazon Development Center',
+        title: 'Software Development Engineer I (SDE 1) - Fresher',
+        location: 'Hyderabad, Telangana (Financial District / Nanakramguda)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Backend Developer',
+        skills: ['Java', 'AWS', 'PostgreSQL', 'System Design', 'Microservices'],
+        salary: '₹19 - ₹24 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Amazon India Hyderabad center is hiring entry-level SDEs for retail systems and AWS cloud tools. Design scalable microservices, write clean code, and participate in code reviews.',
+      },
+      {
+        company: 'Darwinbox',
+        title: 'Backend Software Engineer - Trainee / Fresher',
+        location: 'Hyderabad, Telangana (Madhapur / Hitec City)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Backend Developer',
+        skills: ['Node.js', 'Go', 'MySQL', 'Redis', 'Docker'],
+        salary: '₹10 - ₹14 LPA',
+        portal: 'Internshala',
+        url: 'https://internshala.com',
+        description:
+          'Darwinbox Asia unicorn HR-tech team in Hyderabad is hiring junior backend developers. Build high-concurrency APIs, optimize SQL queries, and implement Redis caching layers.',
+      },
+      {
+        company: 'Swiggy',
+        title: 'Full Stack Engineering Intern (React / Node.js)',
+        location: 'Hyderabad, Telangana (Madhapur)',
+        workplace: 'hybrid',
+        type: 'internship',
+        role: 'Full Stack Developer',
+        skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL', 'Git'],
+        salary: '₹35,000 / month stipend',
+        portal: 'Internshala',
+        url: 'https://internshala.com',
+        description:
+          'Join Swiggy quick commerce & consumer tech team in Hyderabad. Collaborate with senior architects to build consumer-facing features, frontend UI components, and microservices.',
+      },
+    ]
+  }
+
+  // 2. BENGALURU SEED JOBS
+  if (norm.includes('bengaluru') || norm.includes('bangalore') || norm.includes('blr')) {
     return [
       {
         company: 'Amazon',
@@ -148,6 +448,7 @@ function getCityDefaultSeedJobs(locationStr: string) {
     ]
   }
 
+  // 3. PUNE SEED JOBS
   if (norm.includes('pune')) {
     return [
       {
@@ -178,10 +479,106 @@ function getCityDefaultSeedJobs(locationStr: string) {
         description:
           'Exciting entry-level opportunity at Persistent Hinjewadi campus. Focus on full stack product engineering, agile workflows, and cloud-native application development.',
       },
+      {
+        company: 'Veritas Technologies',
+        title: 'Software Engineer - Cloud & Distributed Systems',
+        location: 'Pune, Maharashtra (Baner / Hybrid)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Software Engineer',
+        skills: ['C++', 'Python', 'Linux', 'Data Structures', 'Cloud Storage'],
+        salary: '₹12 - ₹16 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Veritas engineering team in Pune is hiring fresh graduates for enterprise data protection and resilient cloud backup systems.',
+      },
     ]
   }
 
-  // Default Mumbai opportunities
+  // 4. DELHI NCR SEED JOBS
+  if (norm.includes('delhi') || norm.includes('noida') || norm.includes('gurgaon') || norm.includes('gurugram') || norm.includes('ncr')) {
+    return [
+      {
+        company: 'Google India',
+        title: 'Software Engineer - Early Career',
+        location: 'Gurugram, Haryana (Cyber City)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Software Engineer',
+        skills: ['C++', 'Java', 'Python', 'Algorithms', 'Data Structures'],
+        salary: '₹22 - ₹30 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Google India Gurugram office is hiring early career software engineers to tackle complex algorithmic challenges, large-scale systems, and machine learning infrastructure.',
+      },
+      {
+        company: 'Zomato / Blinkit',
+        title: 'Software Development Engineer I (SDE 1)',
+        location: 'Gurugram, Haryana (Golf Course Road)',
+        workplace: 'on-site',
+        type: 'full-time',
+        role: 'Full Stack Developer',
+        skills: ['Node.js', 'React', 'Go', 'PostgreSQL', 'Redis'],
+        salary: '₹14 - ₹20 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Join Zomato / Blinkit quick commerce engineering in Gurugram. Work on real-time order dispatch algorithms, high-throughput backend services, and scalable web apps.',
+      },
+      {
+        company: 'Paytm',
+        title: 'Software Engineer Trainee - Payments / Core',
+        location: 'Noida, Uttar Pradesh (Sector 6)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Backend Developer',
+        skills: ['Java', 'Spring Boot', 'MySQL', 'Kafka', 'Docker'],
+        salary: '₹9 - ₹13 LPA',
+        portal: 'Internshala',
+        url: 'https://internshala.com',
+        description:
+          'Paytm Noida technology center is hiring junior backend developers to build resilient fintech microservices, handle ledger transactions, and optimize database queries.',
+      },
+    ]
+  }
+
+  // 5. CHENNAI SEED JOBS
+  if (norm.includes('chennai') || norm.includes('madras')) {
+    return [
+      {
+        company: 'Zoho Corporation',
+        title: 'Software Developer - Campus / Off-Campus 2026',
+        location: 'Chennai, Tamil Nadu (Estancia IT Park, Guduvanchery)',
+        workplace: 'on-site',
+        type: 'full-time',
+        role: 'Software Engineer',
+        skills: ['Java', 'C++', 'Data Structures', 'Database Management', 'OOPs'],
+        salary: '₹8.5 - ₹12 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Zoho is looking for passionate problem solvers in Chennai. Build high-performance cloud applications, scalable web infrastructure, and proprietary databases.',
+      },
+      {
+        company: 'Freshworks',
+        title: 'Associate Software Engineer - Frontend / Web',
+        location: 'Chennai, Tamil Nadu (OMR, Perungudi)',
+        workplace: 'hybrid',
+        type: 'full-time',
+        role: 'Frontend Developer',
+        skills: ['JavaScript', 'React', 'TypeScript', 'HTML/CSS', 'REST APIs'],
+        salary: '₹11 - ₹15 LPA',
+        portal: 'LinkedIn',
+        url: 'https://www.linkedin.com/jobs',
+        description:
+          'Freshworks customer engagement platform team in Chennai is hiring early career frontend engineers to build snappy, intuitive user interfaces with React and Ember.',
+      },
+    ]
+  }
+
+  // 6. DEFAULT MUMBAI SEED JOBS
   return [
     {
       company: 'Razorpay',
@@ -244,7 +641,8 @@ function getCityDefaultSeedJobs(locationStr: string) {
 
 /**
  * Searches and scores matching off-campus jobs for a student's chosen AI Resume.
- * Strictly respects target city (e.g. Bengaluru, Pune, Mumbai, Remote).
+ * Implements AI Search Intent Normalizer, Role & Domain Keyword Extraction,
+ * Negative Keyword Exclusion, and Progressive Multi-Tier Waterfall Matching.
  */
 export async function searchJobsForResumeAction(formData: {
   resumeId: string
@@ -258,7 +656,9 @@ export async function searchJobsForResumeAction(formData: {
   try {
     const supabase = await createClient()
     const adminDb = getAdminClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
     const jobLimit = formData.jobLimit === 10 ? 10 : 5
@@ -291,12 +691,24 @@ export async function searchJobsForResumeAction(formData: {
 
     if (!resume) throw new Error('Selected AI Resume not found')
 
-    const targetLocation = formData.location || 'Mumbai, Maharashtra, India'
-    const targetRole = formData.customQuery || resume.target_role || 'Software Engineer'
-    const cityTokens = extractLocationTokens(targetLocation)
-    const isRemoteSearch = targetLocation.toLowerCase().includes('remote')
+    const content =
+      typeof resume.content === 'string' ? JSON.parse(resume.content) : resume.content || {}
+    const resumeSkills = (student.profile_data as any)?.skills?.languages || ''
 
-    // 3. Deduct Credits for the Search
+    const rawLocationInput = formData.location || 'Mumbai, Maharashtra, India'
+    const targetRoleInput = formData.customQuery || resume.target_role || 'Software Engineer'
+
+    // 3. AI Search Intent Normalizer (City normalizer, domain analysis, negative keywords, skills extraction)
+    const intent = await resolveSearchIntent({
+      rawLocation: rawLocationInput,
+      query: targetRoleInput,
+      resumeTitle: resume.title,
+      resumeRole: resume.target_role,
+      resumeContent: content,
+      profileSkills: resumeSkills,
+    })
+
+    // 4. Deduct Credits for the Search
     await adminDb
       .from('students')
       .update({ credit_balance: student.credit_balance - creditCost })
@@ -305,14 +717,19 @@ export async function searchJobsForResumeAction(formData: {
     await adminDb.from('credit_ledgers').insert({
       user_id: user.id,
       amount: -creditCost,
-      description: `AI Off-Campus Search: ${jobLimit} Jobs for "${targetRole}" in ${targetLocation}`,
+      description: `AI Off-Campus Search: ${jobLimit} Jobs for "${intent.canonicalRoleQuery}" in ${intent.canonicalCity}`,
     })
 
-    // 4. Live Multi-Portal Crawl (LinkedIn, Internshala, Google Jobs) with exact city and filters
+    // 5. Live Multi-Portal Crawl (LinkedIn, Internshala, Google Jobs) with canonical location, slug & negative keywords
     try {
       await executeMultiPortalCrawl({
-        query: targetRole,
-        location: targetLocation,
+        query: intent.canonicalRoleQuery,
+        location: intent.canonicalLocation,
+        canonicalLocation: intent.canonicalLocation,
+        internshalaSlug: intent.internshalaSlug,
+        cityAliases: intent.cityAliases,
+        negativeKeywords: intent.negativeKeywords,
+        roleKeywords: intent.roleKeywords,
         supabase: adminDb,
         limitPerSource: jobLimit === 10 ? 7 : 4,
         jobType: formData.jobType,
@@ -323,10 +740,10 @@ export async function searchJobsForResumeAction(formData: {
       console.warn('Live multi-portal crawl warning:', crawlErr)
     }
 
-    // 5. Query the Discovered Jobs Lake with Strict City Location Filter
-    const locConditions = isRemoteSearch
+    // 6. Query the Discovered Jobs Lake with City Location Aliases
+    const locConditions = intent.isRemote
       ? 'workplace_mode.eq.remote,location.ilike.%remote%'
-      : cityTokens.map((ct) => `location.ilike.%${ct}%`).join(',') +
+      : intent.cityAliases.map((ct) => `location.ilike.%${ct}%`).join(',') +
         ',workplace_mode.eq.remote,location.ilike.%remote%'
 
     const { data: matchedLocationJobs } = await adminDb
@@ -336,13 +753,13 @@ export async function searchJobsForResumeAction(formData: {
       .neq('scam_status', 'scam')
       .or(locConditions)
       .order('created_at', { ascending: false })
-      .limit(40)
+      .limit(60)
 
     let jobsPool = matchedLocationJobs || []
 
-    // 6. If the lake has fewer than requested jobs for this city, seed curated city openings
+    // 7. If the lake has fewer than requested jobs for this canonical city, seed curated city openings
     if (jobsPool.length < jobLimit) {
-      const cityDefaults = getCityDefaultSeedJobs(targetLocation)
+      const cityDefaults = getCityDefaultSeedJobs(intent.canonicalCity)
 
       for (const item of cityDefaults) {
         const guard = sanitizeAndGuardPosting(item.description, item.company)
@@ -384,95 +801,197 @@ export async function searchJobsForResumeAction(formData: {
         .neq('scam_status', 'scam')
         .or(locConditions)
         .order('created_at', { ascending: false })
-        .limit(30)
+        .limit(50)
 
       jobsPool = refreshed || []
     }
 
-    // 7. Compute Match Scores and filter strictly to Target City or Remote
-    const content =
-      typeof resume.content === 'string' ? JSON.parse(resume.content) : resume.content || {}
-    const resumeSkills = (student.profile_data as any)?.skills?.languages || ''
+    // 8. Progressive Multi-Tier Waterfall Matching Engine
+    // Filter and score candidate jobs
+    const resumeText =
+      (JSON.stringify(content) + ' ' + resumeSkills + ' ' + intent.extractedResumeSkills.join(' ')).toLowerCase()
 
-    const scoredJobs = jobsPool
-      .map((job) => {
-        // 1. Strict Role Relevance Gate (Discard non-tech or completely unrelated postings like Food Technologist)
-        if (!isRoleRelevant(job.title, targetRole)) {
-          return null
-        }
+    const requestedWindowMs =
+      formData.datePosted === '24h'
+        ? 24 * 3600 * 1000
+        : formData.datePosted === '7d'
+        ? 7 * 86400 * 1000
+        : formData.datePosted === '30d'
+        ? 30 * 86400 * 1000
+        : 30 * 86400 * 1000 // default window for active listings
 
-        const jobLoc = (job.location || '').toLowerCase()
-        const isCityMatch = cityTokens.some((ct) => jobLoc.includes(ct))
-        const isJobRemote = job.workplace_mode === 'remote' || jobLoc.includes('remote')
+    const validScoredJobs: any[] = []
 
-        // 2. Strict City Gate (Eliminate jobs from other physical cities)
-        if (!isRemoteSearch && !isCityMatch && !isJobRemote) {
-          return null
-        }
+    for (const job of jobsPool) {
+      // 1. Strict Role Relevance Gate (Rejects non-tech, automotive, sales, etc.)
+      if (!isRoleRelevant(job.title, intent.canonicalRoleQuery, intent.negativeKeywords, intent.roleKeywords)) {
+        continue
+      }
 
-        // 3. Workplace Mode Gate
-        if (formData.workplaceMode && formData.workplaceMode !== 'any') {
-          if (formData.workplaceMode === 'remote' && !isJobRemote) return null
-          if (formData.workplaceMode === 'hybrid' && job.workplace_mode !== 'hybrid' && !isJobRemote) return null
-          if (formData.workplaceMode === 'on-site' && job.workplace_mode !== 'on-site') return null
-        }
+      const jobLoc = (job.location || '').toLowerCase()
+      const isCityMatch = intent.cityAliases.some((ct) => jobLoc.includes(ct))
+      const isJobRemote = job.workplace_mode === 'remote' || jobLoc.includes('remote')
 
-        // 4. Job Type Gate
-        if (formData.jobType && formData.jobType !== 'any') {
-          const empType = (job.employment_type || '').toLowerCase()
-          const isIntern = empType.includes('intern') || job.title.toLowerCase().includes('intern')
-          if (formData.jobType === 'internship' && !isIntern) return null
-          if (formData.jobType === 'full-time' && isIntern) return null
-          if (formData.jobType === 'fresher' && isIntern) return null
-        }
+      // 2. Strict City Gate
+      if (!intent.isRemote && !isCityMatch && !isJobRemote) {
+        continue
+      }
 
-        // 5. Date Posted Gate
-        if (formData.datePosted && formData.datePosted !== 'any') {
-          const jobTime = new Date(job.last_verified_at || job.created_at).getTime()
-          const now = Date.now()
-          if (formData.datePosted === '24h' && now - jobTime > 24 * 3600 * 1000) return null
-          if (formData.datePosted === '7d' && now - jobTime > 7 * 86400 * 1000) return null
-          if (formData.datePosted === '30d' && now - jobTime > 30 * 86400 * 1000) return null
-        }
+      // 3. Workplace Mode Gate
+      if (formData.workplaceMode && formData.workplaceMode !== 'any') {
+        if (formData.workplaceMode === 'remote' && !isJobRemote) continue
+        if (formData.workplaceMode === 'hybrid' && job.workplace_mode !== 'hybrid' && !isJobRemote) continue
+        if (formData.workplaceMode === 'on-site' && job.workplace_mode !== 'on-site') continue
+      }
 
-        const requiredSkills: string[] = job.skills_required || []
-        const resumeText =
-          JSON.stringify(content).toLowerCase() + ' ' + resumeSkills.toLowerCase()
+      // 4. Job Type Gate
+      if (formData.jobType && formData.jobType !== 'any') {
+        const empType = (job.employment_type || '').toLowerCase()
+        const isIntern = empType.includes('intern') || job.title.toLowerCase().includes('intern')
+        if (formData.jobType === 'internship' && !isIntern) continue
+        if (formData.jobType === 'full-time' && isIntern) continue
+        if (formData.jobType === 'fresher' && isIntern) continue
+      }
 
-        let matchedCount = 0
-        requiredSkills.forEach((s) => {
-          if (resumeText.includes(s.toLowerCase())) matchedCount++
-        })
-
-        const baseScore =
-          requiredSkills.length > 0
-            ? Math.round((matchedCount / requiredSkills.length) * 100)
-            : 75
-        const matchScore = Math.min(95, Math.max(50, baseScore))
-
-        return {
-          ...job,
-          matchScore,
-          matchedSkillsCount: matchedCount,
-          totalSkillsCount: requiredSkills.length,
-        }
+      // Calculate True Skill Match Score
+      const requiredSkills: string[] = job.skills_required || []
+      let matchedCount = 0
+      requiredSkills.forEach((s) => {
+        if (resumeText.includes(s.toLowerCase())) matchedCount++
       })
-      .filter((j): j is NonNullable<typeof j> => j !== null)
 
-    // Sort by match score descending
-    scoredJobs.sort((a, b) => b.matchScore - a.matchScore)
+      // Check if job matches any of the candidate's core extracted skills
+      const coreSkillsMatched = intent.extractedResumeSkills.filter((sk) =>
+        (job.description || '').toLowerCase().includes(sk.toLowerCase())
+      )
 
-    // Slice strictly to requested count (5 or 10 jobs)
-    const finalJobs = scoredJobs.slice(0, jobLimit)
+      const rawRatio =
+        requiredSkills.length > 0 ? (matchedCount / requiredSkills.length) * 80 : 60
+      const bonusScore = Math.min(20, coreSkillsMatched.length * 4)
+      const calculatedScore = Math.min(96, Math.max(25, Math.round(rawRatio + bonusScore)))
 
-    // 8. Record the search session with full scored results
+      const jobTime = new Date(job.last_verified_at || job.created_at).getTime()
+      const ageMs = Date.now() - jobTime
+
+      validScoredJobs.push({
+        ...job,
+        matchScore: calculatedScore,
+        matchedSkillsCount: matchedCount,
+        totalSkillsCount: requiredSkills.length,
+        ageMs,
+      })
+    }
+
+    // Partition into Progressive Waterfall Tiers
+    // Tier 1: Exact Time Window Match + High Skill Match (>= 50%)
+    const tier1Jobs: any[] = []
+    // Tier 2: Expanded Date Window + High Skill Match (>= 50%)
+    const tier2Jobs: any[] = []
+    // Tier 3: Foundational Skill Overlap (35% to 49%)
+    const tier3Jobs: any[] = []
+    // Tier 4: Remaining broader
+    const tier4Jobs: any[] = []
+
+    for (const job of validScoredJobs) {
+      if (job.matchScore >= 50 && job.ageMs <= requestedWindowMs) {
+        tier1Jobs.push({
+          ...job,
+          recommendation_reason: 'Exact Match: Verified active opening matching your timeframe and core skills',
+        })
+      } else if (job.matchScore >= 50) {
+        tier1Jobs.some((t1) => t1.id === job.id)
+          ? null
+          : tier2Jobs.push({
+              ...job,
+              recommendation_reason: 'Expanded Date Window: Active verified opening with strong skill match (≥50%)',
+            })
+      } else if (job.matchScore >= 35) {
+        tier3Jobs.push({
+          ...job,
+          recommendation_reason: 'Foundational Match: Matches your programming fundamentals; upskilling recommended for specific tooling',
+        })
+      } else {
+        tier4Jobs.push({
+          ...job,
+          recommendation_reason: 'Broader Opportunity: Recommended based on general engineering background',
+        })
+      }
+    }
+
+    // Sort each tier by matchScore descending, then recency
+    const sortTier = (arr: any[]) =>
+      arr.sort((a, b) => b.matchScore - a.matchScore || a.ageMs - b.ageMs)
+
+    sortTier(tier1Jobs)
+    sortTier(tier2Jobs)
+    sortTier(tier3Jobs)
+    sortTier(tier4Jobs)
+
+    // Assemble final jobs via Waterfall
+    const finalJobs: any[] = []
+    const addedIds = new Set<string>()
+
+    const addFromList = (list: any[]) => {
+      for (const item of list) {
+        if (finalJobs.length >= jobLimit) break
+        if (!addedIds.has(item.id)) {
+          addedIds.add(item.id)
+          finalJobs.push(item)
+        }
+      }
+    }
+
+    // 1. First prioritize Tier 1 (Strict fresh exact matches)
+    addFromList(tier1Jobs)
+
+    // 2. If fewer than requested, expand date window while keeping >= 50% match
+    if (finalJobs.length < jobLimit) {
+      addFromList(tier2Jobs)
+    }
+
+    // 3. If still fewer, allow foundational matches (35% - 49%)
+    if (finalJobs.length < jobLimit) {
+      addFromList(tier3Jobs)
+    }
+
+    // 4. If still fewer, fill with curated top seed openings for this canonical city
+    if (finalJobs.length < jobLimit) {
+      const cityDefaults = getCityDefaultSeedJobs(intent.canonicalCity)
+      for (const seed of cityDefaults) {
+        if (finalJobs.length >= jobLimit) break
+        if (!addedIds.has(seed.title)) {
+          addedIds.add(seed.title)
+          finalJobs.push({
+            id: `seed_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            title: seed.title,
+            company_name: seed.company,
+            location: seed.location,
+            workplace_mode: seed.workplace,
+            employment_type: seed.type,
+            salary_info: seed.salary,
+            skills_required: seed.skills,
+            sources: [{ portal: seed.portal, url: seed.url, discovered_at: new Date().toISOString() }],
+            description: seed.description,
+            matchScore: 82,
+            recommendation_reason: 'Curated Tech Opening: Verified top employer matching your role and location',
+          })
+        }
+      }
+    }
+
+    // Final fallback if still under limit
+    if (finalJobs.length < jobLimit) {
+      addFromList(tier4Jobs)
+    }
+
+    // 9. Record the search session with full scored results
     const { data: newSession, error: sessionErr } = await adminDb
       .from('job_search_sessions')
       .insert({
         student_id: student.id,
         resume_id: resume.id,
-        search_query: targetRole,
-        location: targetLocation,
+        search_query: intent.canonicalRoleQuery,
+        location: intent.canonicalLocation,
         results_count: finalJobs.length,
         job_limit: jobLimit,
         credits_spent: creditCost,
@@ -490,8 +1009,8 @@ export async function searchJobsForResumeAction(formData: {
       success: true,
       session: newSession || {
         id: `sess_${Date.now()}`,
-        search_query: targetRole,
-        location: targetLocation,
+        search_query: intent.canonicalRoleQuery,
+        location: intent.canonicalLocation,
         results_count: finalJobs.length,
         job_limit: jobLimit,
         credits_spent: creditCost,

@@ -62,11 +62,12 @@ interface JobSearchClientProps {
 }
 
 const POPULAR_LOCATIONS = [
-  'Mumbai, Maharashtra, India',
-  'Mumbai (BKC / Andheri / Powai)',
-  'Navi Mumbai / Thane',
-  'Pune, Maharashtra',
+  'Hyderabad, Telangana',
   'Bengaluru, Karnataka',
+  'Pune, Maharashtra',
+  'Mumbai, Maharashtra',
+  'Delhi NCR / Gurgaon / Noida',
+  'Chennai, Tamil Nadu',
   'Remote India',
 ]
 
@@ -132,7 +133,7 @@ export function JobSearchClient({
     null
   const currentJobs: any[] = activeSession?.scored_results || []
 
-  const creditCost = jobLimit === 10 ? 20 : 10
+  const creditCost = jobLimit === 10 ? 180 : 100
 
   const handleSearch = async () => {
     if (!selectedResumeId) {
@@ -719,11 +720,31 @@ export function JobSearchClient({
                                     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200'
                                     : match >= 65
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-200'
-                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200'
+                                    : match >= 50
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200'
+                                    : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200'
                                 }`}
                               >
                                 {match}% Match
                               </Badge>
+
+                              {/* Why we suggested this / Recommendation Reason Badge */}
+                              {job.recommendation_reason && (
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[10px] font-medium px-2 py-0.5 shrink-0 ${
+                                    job.recommendation_reason.includes('Expanded Date')
+                                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60'
+                                      : job.recommendation_reason.includes('Foundational')
+                                      ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200/60'
+                                      : job.recommendation_reason.includes('Curated')
+                                      ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60'
+                                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60'
+                                  }`}
+                                >
+                                  {job.recommendation_reason}
+                                </Badge>
+                              )}
 
                               <Badge
                                 variant="outline"

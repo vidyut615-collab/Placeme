@@ -10,10 +10,24 @@ export interface CrawlResult {
   jobs: any[]
 }
 
+export interface MultiPortalCrawlOptions {
+  query: string
+  location?: string
+  canonicalLocation?: string
+  internshalaSlug?: string
+  cityAliases?: string[]
+  negativeKeywords?: string[]
+  roleKeywords?: string[]
+  supabase: any
+  limitPerSource?: number
+  jobType?: string
+  workplaceMode?: string
+  datePosted?: string
+}
+
 const TECH_SYNONYMS = new Set([
   'software',
   'developer',
-  'engineer',
   'frontend',
   'backend',
   'fullstack',
@@ -22,21 +36,13 @@ const TECH_SYNONYMS = new Set([
   'programmer',
   'coding',
   'coder',
-  'tech',
-  'technical',
-  'technology',
-  'system',
-  'analyst',
+  'devops',
+  'cloud',
   'qa',
   'tester',
   'testing',
-  'devops',
-  'cloud',
-  'data',
-  'ai',
-  'ml',
-  'intern',
-  'trainee',
+  'sdet',
+  'sde',
   'react',
   'node',
   'java',
@@ -44,23 +50,129 @@ const TECH_SYNONYMS = new Set([
   'javascript',
   'typescript',
   'c++',
+  'golang',
   '.net',
   'ui',
   'ux',
+  'data',
+  'ai',
+  'ml',
+  'machine learning',
+  'deep learning',
+  'database',
+  'api',
+  'microservices',
+  'flutter',
+  'android',
+  'ios',
 ])
 
-export function isRoleRelevant(jobTitle: string, query: string): boolean {
+const DEFAULT_NEGATIVE_KEYWORDS = [
+  'automotive',
+  'automobile',
+  'mechanical',
+  'civil',
+  'chemical',
+  'manufacturing',
+  'machinist',
+  'machinery',
+  'assembly',
+  'boiler',
+  'welder',
+  'fitter',
+  'draughtsman',
+  'site engineer',
+  'field engineer',
+  'sales executive',
+  'sales associate',
+  'telecaller',
+  'telecalling',
+  'tele-caller',
+  'bpo',
+  'call center',
+  'quality supervisor',
+  'production supervisor',
+  'plant engineer',
+  'pharmacist',
+  'pharma',
+  'lab technician',
+  'textile',
+  'electrician',
+  'electrical technician',
+  'construction',
+  'driver',
+  'security guard',
+  'cook',
+  'chef',
+  'waiter',
+  'delivery',
+  'real estate',
+  'nurse',
+  'doctor',
+  'accountant',
+  'cashier',
+  'hotel',
+  'hospitality',
+]
+
+// Words that are too generic to indicate a software/tech role on their own
+const GENERIC_ROLE_NOUNS = new Set([
+  'engineer',
+  'developer',
+  'intern',
+  'trainee',
+  'associate',
+  'specialist',
+  'consultant',
+  'analyst',
+  'lead',
+  'manager',
+  'officer',
+  'executive',
+])
+
+export function isRoleRelevant(
+  jobTitle: string,
+  query: string,
+  negativeKeywords?: string[],
+  roleKeywords?: string[]
+): boolean {
   const titleNorm = jobTitle.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
   const titleWords = titleNorm.split(/\s+/).filter((w) => w.length > 2)
+  const fullTitle = ` ${titleNorm} `
+
+  // 1. Negative keywords gate (highest priority rejection)
+  const allNegatives = [...(negativeKeywords || []), ...DEFAULT_NEGATIVE_KEYWORDS]
+  for (const neg of allNegatives) {
+    const cleanNeg = neg.toLowerCase().trim()
+    if (!cleanNeg) continue
+    if (fullTitle.includes(` ${cleanNeg} `) || fullTitle.includes(cleanNeg)) {
+      return false
+    }
+  }
+
+  // 2. AI-extracted role keywords check
+  if (roleKeywords && roleKeywords.length > 0) {
+    const hasRoleKeyword = roleKeywords.some((rk) => {
+      const cleanRk = rk.toLowerCase().trim()
+      return cleanRk && (fullTitle.includes(` ${cleanRk} `) || titleWords.includes(cleanRk))
+    })
+    if (hasRoleKeyword) return true
+  }
+
+  // 3. User query word overlap (excluding generic nouns like 'engineer', 'associate')
   const queryNorm = query.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
-  const queryWords = queryNorm.split(/\s+/).filter((w) => w.length > 2)
+  const queryWords = queryNorm
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !GENERIC_ROLE_NOUNS.has(w))
 
-  // Direct word overlap with user query
-  const hasDirectMatch = queryWords.some((qw) => titleWords.includes(qw))
-  if (hasDirectMatch) return true
+  const hasSpecificQueryMatch = queryWords.some((qw) => titleWords.includes(qw))
+  if (hasSpecificQueryMatch) return true
 
-  // Tech domain synonym overlap
-  const isQueryTech = queryWords.some((qw) => TECH_SYNONYMS.has(qw))
+  // 4. Tech domain synonym overlap
+  const isQueryTech = queryNorm
+    .split(/\s+/)
+    .some((qw) => TECH_SYNONYMS.has(qw))
   const isTitleTech = titleWords.some((tw) => TECH_SYNONYMS.has(tw))
 
   return isQueryTech && isTitleTech
@@ -130,18 +242,15 @@ function extractSkillsForRole(title: string, roleQuery: string): string[] {
  * Orchestrates multi-portal search across LinkedIn, Internshala, and Google Jobs (Naukri/Indeed).
  * Applies Posting Guard (anti-scam), Role Relevance Filtering, and Canonical Deduplication.
  */
-export async function executeMultiPortalCrawl(options: {
-  query: string
-  location?: string
-  supabase: any
-  limitPerSource?: number
-  jobType?: string
-  workplaceMode?: string
-  datePosted?: string
-}): Promise<CrawlResult> {
+export async function executeMultiPortalCrawl(options: MultiPortalCrawlOptions): Promise<CrawlResult> {
   const {
     query,
     location = 'Mumbai, Maharashtra, India',
+    canonicalLocation,
+    internshalaSlug,
+    cityAliases,
+    negativeKeywords,
+    roleKeywords,
     supabase,
     limitPerSource = 5,
     jobType,
@@ -149,11 +258,13 @@ export async function executeMultiPortalCrawl(options: {
     datePosted,
   } = options
 
+  const targetLocation = canonicalLocation || location
+
   // 1. Run multi-source crawlers in parallel with graceful error isolation
   const [linkedInJobs, googleJobs, internshalaJobs] = await Promise.all([
     searchLinkedInGuest({
       query,
-      location,
+      location: targetLocation,
       limit: limitPerSource,
       jobType,
       workplaceMode,
@@ -162,13 +273,14 @@ export async function executeMultiPortalCrawl(options: {
       console.warn('LinkedIn crawler error:', e)
       return []
     }),
-    searchGoogleJobs({ query, location, limit: limitPerSource }).catch((e) => {
+    searchGoogleJobs({ query, location: targetLocation, limit: limitPerSource }).catch((e) => {
       console.warn('Google Jobs crawler error:', e)
       return []
     }),
     searchInternshalaPublic({
       query,
-      location,
+      location: targetLocation,
+      internshalaSlug,
       limit: limitPerSource,
       jobType,
       workplaceMode,
@@ -185,11 +297,11 @@ export async function executeMultiPortalCrawl(options: {
     rawCandidates.push({
       title: j.title,
       company: j.company || 'Tech Employer',
-      location: j.location || location,
+      location: j.location || targetLocation,
       portal: 'LinkedIn',
       url: j.url,
       portalId: j.id,
-      description: `${j.title} opening at ${j.company || 'Tech Employer'} in ${j.location || location}. Key technical competencies: ${query}.`,
+      description: `${j.title} opening at ${j.company || 'Tech Employer'} in ${j.location || targetLocation}. Key technical competencies: ${query}.`,
       salary: 'Competitive / As per industry standards',
     })
   })
@@ -225,11 +337,23 @@ export async function executeMultiPortalCrawl(options: {
   let upsertedCount = 0
   const processedJobs: any[] = []
 
-  // 2. Sanitize with Posting Guard and write to Discovered Jobs Lake
+  // 2. Sanitize with Posting Guard, Role Gate, and write to Discovered Jobs Lake
   for (const item of rawCandidates) {
-    // A. Strict Role Relevance Gate (Rejects promoted unrelated postings like Food Technologist, Delivery, Chef, Sales)
-    if (!isRoleRelevant(item.title, query)) {
+    // A. Strict Role Relevance Gate (Rejects promoted unrelated postings like Automotive, Delivery, Chef, Sales)
+    if (!isRoleRelevant(item.title, query, negativeKeywords, roleKeywords)) {
       continue
+    }
+
+    // B. Strict City Gate (Verify scraped job belongs to the target city or is Remote)
+    if (cityAliases && cityAliases.length > 0 && workplaceMode !== 'remote') {
+      const itemLoc = (item.location || '').toLowerCase()
+      const isRemoteItem = itemLoc.includes('remote') || itemLoc.includes('work from home')
+      const matchesTargetCity = cityAliases.some((alias) => itemLoc.includes(alias))
+
+      if (!isRemoteItem && !matchesTargetCity) {
+        // Discard candidate from a different physical city
+        continue
+      }
     }
 
     const guard = sanitizeAndGuardPosting(item.description, item.company)

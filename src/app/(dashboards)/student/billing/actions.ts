@@ -50,7 +50,7 @@ export async function createSubscriptionOrder() {
       status: 'pending',
       payload: {
         extension_months: 12, // Grant 1 year of access
-        credits_included: 50 // Give 50 AI credits as a welcome bonus
+        credits_included: 150 // Give 150 AI credits as a welcome bonus (1 Resume + 1 5-Job search)
       }
     })
 

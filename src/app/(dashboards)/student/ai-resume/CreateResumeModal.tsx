@@ -26,7 +26,7 @@ interface Props {
 }
 
 // Will be dynamic in Phase 5
-const AI_RESUME_CREDIT_COST = 5 
+const AI_RESUME_CREDIT_COST = 30 
 
 export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: Props) {
   const router = useRouter()

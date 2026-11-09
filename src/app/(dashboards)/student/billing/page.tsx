@@ -52,11 +52,11 @@ export default async function BillingPage() {
     ? new Date(student.access_end_date).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Not Active'
 
-  // Mocking credit plans for now (Phase 5 will make these DB-driven globally)
+  // Top-up credit plans
   const creditPlans = [
-    { id: 'plan_small', name: 'Starter Pack', credits: 20, price: 99 },
-    { id: 'plan_medium', name: 'Pro Pack', credits: 50, price: 199 },
-    { id: 'plan_large', name: 'Power Pack', credits: 150, price: 499 },
+    { id: 'plan_small', name: 'Starter Pack', credits: 500, price: 100, badge: null },
+    { id: 'plan_medium', name: 'Pro Pack', credits: 1000, price: 190, badge: '5% OFF' },
+    { id: 'plan_large', name: 'Power Pack', credits: 2000, price: 360, badge: '10% OFF' },
   ]
 
   return (
@@ -144,7 +144,12 @@ export default async function BillingPage() {
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
               {creditPlans.map(plan => (
-                <div key={plan.id} className="border bg-white dark:bg-zinc-950 p-3 rounded-lg flex flex-col items-center justify-between text-center gap-3">
+                <div key={plan.id} className="border bg-white dark:bg-zinc-950 p-3 rounded-lg flex flex-col items-center justify-between text-center gap-3 relative overflow-hidden">
+                  {plan.badge && (
+                    <span className="absolute top-1.5 right-1.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      {plan.badge}
+                    </span>
+                  )}
                   <div>
                     <div className="font-bold text-sm">{plan.credits} Credits</div>
                     <div className="text-xs text-zinc-500">{plan.name}</div>

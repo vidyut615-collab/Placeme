@@ -112,6 +112,29 @@ export async function POST(req: Request) {
         }
       }
 
+      // Handle College Institutional Top-up
+      if (request.type === 'college_credit_topup' && request.college_id) {
+        const { data: college } = await supabase
+          .from('colleges')
+          .select('credit_balance')
+          .eq('id', request.college_id)
+          .single()
+
+        if (college && actionPayload.credits_included) {
+          const newBal = (college.credit_balance || 0) + actionPayload.credits_included
+          await supabase
+            .from('colleges')
+            .update({ credit_balance: newBal })
+            .eq('id', request.college_id)
+
+          await supabase.from('credit_ledgers').insert({
+            user_id: request.user_id,
+            amount: actionPayload.credits_included,
+            description: `Institutional Credit Top-up: ${actionPayload.credits_included} Credits`,
+          })
+        }
+      }
+
       return NextResponse.json({ status: 'ok' })
 
     } else if (eventName === 'payment.failed') {

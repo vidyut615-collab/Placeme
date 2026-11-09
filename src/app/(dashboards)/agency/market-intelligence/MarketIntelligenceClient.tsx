@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PaginationControls } from '@/components/PaginationControls'
 import {
   Globe,
   ShieldCheck,
@@ -31,18 +32,34 @@ export function MarketIntelligenceClient({
 }: MarketIntelligenceProps) {
   const [filter, setFilter] = useState<'all' | 'clean' | 'suspicious' | 'scam'>('all')
   const [search, setSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 100
 
-  const filteredJobs = initialJobs.filter((j) => {
-    if (filter !== 'all' && j.scam_status !== filter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      const titleMatch = (j.title || '').toLowerCase().includes(q)
-      const companyMatch = (j.company_name || '').toLowerCase().includes(q)
-      const locMatch = (j.location || '').toLowerCase().includes(q)
-      if (!titleMatch && !companyMatch && !locMatch) return false
-    }
-    return true
-  })
+  // Reset to page 1 whenever search query or status filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filter, search])
+
+  const filteredJobs = useMemo(() => {
+    return initialJobs.filter((j) => {
+      if (filter !== 'all' && j.scam_status !== filter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        const titleMatch = (j.title || '').toLowerCase().includes(q)
+        const companyMatch = (j.company_name || '').toLowerCase().includes(q)
+        const locMatch = (j.location || '').toLowerCase().includes(q)
+        if (!titleMatch && !companyMatch && !locMatch) return false
+      }
+      return true
+    })
+  }, [initialJobs, filter, search])
+
+  const totalPages = Math.ceil(filteredJobs.length / pageSize) || 1
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedJobs = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize
+    return filteredJobs.slice(start, start + pageSize)
+  }, [filteredJobs, safeCurrentPage, pageSize])
 
   return (
     <div className="space-y-6">
@@ -140,15 +157,20 @@ export function MarketIntelligenceClient({
       {/* Discovered Jobs Table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-bold flex items-center gap-2">
-            <Globe className="w-5 h-5 text-blue-600" /> Discovered Jobs Lake Explorer
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Globe className="w-5 h-5 text-blue-600" /> Discovered Jobs Lake Explorer
+            </CardTitle>
+            <Badge variant="secondary" className="w-fit text-[11px] font-normal text-zinc-600 dark:text-zinc-400">
+              100 jobs per view
+            </Badge>
+          </div>
           <CardDescription>
             Live view of off-campus jobs aggregated from LinkedIn, Internshala, and Google Jobs with Posting Guard verdicts.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto px-6">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b text-zinc-500 text-left">
@@ -160,14 +182,14 @@ export function MarketIntelligenceClient({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredJobs.length === 0 ? (
+                {paginatedJobs.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-zinc-500">
                       No jobs matching current filter.
                     </td>
                   </tr>
                 ) : (
-                  filteredJobs.map((job) => {
+                  paginatedJobs.map((job) => {
                     const sourcePortal = job.sources?.[0]?.portal || 'LinkedIn'
                     const applyUrl = job.sources?.[0]?.url || '#'
 
@@ -219,6 +241,17 @@ export function MarketIntelligenceClient({
               </tbody>
             </table>
           </div>
+
+          {filteredJobs.length > 0 && (
+            <PaginationControls
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              totalItems={filteredJobs.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              itemLabel="discovered jobs"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

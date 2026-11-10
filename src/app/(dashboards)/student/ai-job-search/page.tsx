@@ -149,7 +149,7 @@ export default async function AIJobSearchPage() {
   const isActive = Boolean(student.access_end_date && new Date(student.access_end_date) >= new Date())
 
   return (
-    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-6xl mx-auto">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
       <JobSearchClient
         resumes={resumes || []}
         creditBalance={student.credit_balance || 0}

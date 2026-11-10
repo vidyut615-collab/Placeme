@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, CreditCard } from 'lucide-react'
+import { Loader2, CreditCard, Sparkles, Zap } from 'lucide-react'
 import { createSubscriptionOrder, createCreditTopupOrder } from './actions'
-
 import { toast } from 'sonner'
 
 interface CheckoutButtonProps {
@@ -16,6 +15,9 @@ interface CheckoutButtonProps {
   variant?: 'default' | 'outline' | 'secondary'
   className?: string
   disabled?: boolean
+  userName?: string
+  userEmail?: string
+  icon?: 'card' | 'zap' | 'sparkles'
 }
 
 export function CheckoutButton({ 
@@ -26,7 +28,10 @@ export function CheckoutButton({
   label = "Pay Now", 
   variant = "default",
   className,
-  disabled
+  disabled,
+  userName,
+  userEmail,
+  icon = 'card'
 }: CheckoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -70,27 +75,27 @@ export function CheckoutButton({
 
       // 2. Open Razorpay Checkout Modal
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Use test key
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: orderResponse.amount, 
         currency: "INR",
         name: "Placeme",
-        description: type === 'subscription' ? "12 Months Placement Access" : "AI Credit Top-up",
+        description: type === 'subscription' ? "12 Months Placement Access Pass" : `AI Intelligence Top-up (${credits} Credits)`,
         order_id: orderResponse.orderId,
         handler: function (response: any) {
-          toast.success('Payment successful!', {
-            description: 'Your account is being updated. Refreshing in a moment...'
+          toast.success('Payment captured successfully!', {
+            description: 'Your balance and access pass are updated. Reloading ledger...'
           })
           setTimeout(() => {
             window.location.reload()
-          }, 2500)
+          }, 2000)
         },
         prefill: {
-          name: "Student", // We could prefill actual names if passed down
-          email: "",
+          name: userName || "Student Candidate",
+          email: userEmail || "",
           contact: ""
         },
         theme: {
-          color: "#2563eb" // blue-600
+          color: "#09090b"
         },
         modal: {
           ondismiss: function() {
@@ -102,8 +107,8 @@ export function CheckoutButton({
       const rzp = new (window as any).Razorpay(options)
       
       rzp.on('payment.failed', function (response: any) {
-        toast.error('Payment failed', {
-          description: response.error.description
+        toast.error('Payment failed or cancelled', {
+          description: response.error?.description || 'Transaction could not be completed.'
         })
         setIsLoading(false)
       })
@@ -125,11 +130,15 @@ export function CheckoutButton({
       className={className}
     >
       {isLoading ? (
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+      ) : icon === 'zap' ? (
+        <Zap className="mr-2 h-3.5 w-3.5 stroke-[1.5]" />
+      ) : icon === 'sparkles' ? (
+        <Sparkles className="mr-2 h-3.5 w-3.5 stroke-[1.5]" />
       ) : (
-        <CreditCard className="mr-2 h-4 w-4" />
+        <CreditCard className="mr-2 h-3.5 w-3.5 stroke-[1.5]" />
       )}
-      {isLoading ? 'Processing...' : label}
+      {isLoading ? 'Connecting...' : label}
     </Button>
   )
 }

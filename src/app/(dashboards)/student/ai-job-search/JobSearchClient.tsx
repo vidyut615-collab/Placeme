@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import Link from 'next/link'
 import {
   Compass,
   Sparkles,
@@ -27,6 +24,12 @@ import {
   Archive,
   ArchiveRestore,
   SlidersHorizontal,
+  Coins,
+  ChevronDown,
+  BookOpen,
+  Send,
+  AlertCircle,
+  Tag
 } from 'lucide-react'
 import {
   searchJobsForResumeAction,
@@ -34,6 +37,8 @@ import {
   generateCoverLetterAction,
   toggleArchiveSearchSessionAction,
 } from './actions'
+import { LinearDrawer } from '@/components/ui/linear/LinearDrawer'
+import { TactileButton } from '@/components/ui/tactile/TactileButton'
 
 interface SearchSession {
   id: string
@@ -62,12 +67,11 @@ interface JobSearchClientProps {
 }
 
 const POPULAR_LOCATIONS = [
-  'Hyderabad, Telangana',
+  'Mumbai, Maharashtra',
   'Bengaluru, Karnataka',
   'Pune, Maharashtra',
-  'Mumbai, Maharashtra',
-  'Delhi NCR / Gurgaon / Noida',
-  'Chennai, Tamil Nadu',
+  'Delhi NCR / Gurgaon',
+  'Hyderabad, Telangana',
   'Remote India',
 ]
 
@@ -84,6 +88,7 @@ export function JobSearchClient({
   const [creditBalance, setCreditBalance] = useState(initialCredits)
 
   // Advanced Filters State
+  const [showFilters, setShowFilters] = useState<boolean>(false)
   const [jobType, setJobType] = useState<string>('any')
   const [workplaceMode, setWorkplaceMode] = useState<string>('any')
   const [datePosted, setDatePosted] = useState<string>('any')
@@ -116,9 +121,9 @@ export function JobSearchClient({
     }
   })
 
-  // Detailed Gap / Cold Email Modal State
+  // Slide-over Inspector Drawer State
   const [activeJob, setActiveJob] = useState<any | null>(null)
-  const [activeModalTab, setActiveModalTab] = useState<'analysis' | 'email'>('analysis')
+  const [activeDrawerTab, setActiveDrawerTab] = useState<'overview' | 'analysis' | 'email'>('overview')
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const [analysisMap, setAnalysisMap] = useState<Record<string, any>>(initialAnalysisMap)
   const [coverLetterMap, setCoverLetterMap] = useState<Record<string, string>>(initialCoverMap)
@@ -193,10 +198,8 @@ export function JobSearchClient({
       prev.map((s) => (s.id === sess.id ? { ...s, is_archived: nextArchived } : s))
     )
 
-    // Call server action to persist in database
     await toggleArchiveSearchSessionAction(sess.id, nextArchived)
 
-    // If archiving the currently active session in active view, switch to next available
     if (!showArchived && nextArchived && sess.id === activeSessionId) {
       const nextActive = activeSessions.find((s) => s.id !== sess.id)
       if (nextActive) {
@@ -205,12 +208,12 @@ export function JobSearchClient({
     }
   }
 
-  const handleOpenJobModal = async (job: any, tab: 'analysis' | 'email' = 'analysis') => {
+  const handleOpenDrawer = async (job: any, tab: 'overview' | 'analysis' | 'email' = 'overview') => {
     setActiveJob(job)
-    setActiveModalTab(tab)
+    setActiveDrawerTab(tab)
 
-    // Trigger analysis if not already cached (Free - 0 Credits)
-    if (!analysisMap[job.id]) {
+    // Trigger analysis if opening analysis tab and not already cached
+    if (tab === 'analysis' && !analysisMap[job.id]) {
       setAnalyzingId(job.id)
       const res = await analyzeJobMatchAction(
         selectedResumeId || activeSession?.resume_id || '',
@@ -222,7 +225,7 @@ export function JobSearchClient({
       }
     }
 
-    // Trigger email generation if email tab opened and not already generated (Free - 0 Credits)
+    // Trigger email generation if email tab opened and not already generated
     if (tab === 'email' && !coverLetterMap[job.id]) {
       setIsGeneratingCover(true)
       const res = await generateCoverLetterAction(
@@ -232,6 +235,35 @@ export function JobSearchClient({
       setIsGeneratingCover(false)
       if (res.success && res.coverLetter) {
         setCoverLetterMap((prev) => ({ ...prev, [job.id]: res.coverLetter }))
+      }
+    }
+  }
+
+  const handleSwitchDrawerTab = async (tab: 'overview' | 'analysis' | 'email') => {
+    setActiveDrawerTab(tab)
+    if (!activeJob) return
+
+    if (tab === 'analysis' && !analysisMap[activeJob.id]) {
+      setAnalyzingId(activeJob.id)
+      const res = await analyzeJobMatchAction(
+        selectedResumeId || activeSession?.resume_id || '',
+        activeJob.id
+      )
+      setAnalyzingId(null)
+      if (res.success && res.data) {
+        setAnalysisMap((prev) => ({ ...prev, [activeJob.id]: res.data }))
+      }
+    }
+
+    if (tab === 'email' && !coverLetterMap[activeJob.id]) {
+      setIsGeneratingCover(true)
+      const res = await generateCoverLetterAction(
+        selectedResumeId || activeSession?.resume_id || '',
+        activeJob.id
+      )
+      setIsGeneratingCover(false)
+      if (res.success && res.coverLetter) {
+        setCoverLetterMap((prev) => ({ ...prev, [activeJob.id]: res.coverLetter }))
       }
     }
   }
@@ -256,100 +288,80 @@ export function JobSearchClient({
   }
 
   return (
-    <div className="space-y-8">
-      {/* 1. Page Header with Credit Counter in Top-Right */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
+    <div className="space-y-6">
+      {/* ── 1. Linear Header Toolbar ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2.5">
-            <Compass className="w-8 h-8 text-purple-600" /> AI Job Search
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Discover active, verified off-campus jobs tailored directly to your AI Resume.
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+              AI Job Discovery & Radar
+            </h1>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 font-semibold">
+              Off-Campus Intelligence
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            Discover verified jobs across LinkedIn, Internshala, and Indian portals aligned with your AI Resume.
           </p>
         </div>
 
-        {/* Top-Right Credit Counter Badge */}
-        <div className="flex items-center gap-2.5 bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 px-4 py-2 rounded-full shadow-xs">
-          <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-          <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-            {creditBalance} Available Credits
-          </span>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/student/billing"
+            className="flex items-center gap-2 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 rounded-lg text-xs font-mono shadow-2xs transition-colors"
+          >
+            <Coins className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
+            <span className="text-zinc-500">Balance:</span>
+            <span className="text-purple-600 dark:text-purple-400 font-semibold font-mono">
+              {creditBalance} Credits
+            </span>
+          </Link>
         </div>
       </div>
 
-      {/* 2. Search Configuration Console Card */}
-      <Card className="border-purple-100 dark:border-purple-950/60 shadow-sm bg-white dark:bg-zinc-900/90 overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-purple-50/40 via-white to-blue-50/30 dark:from-purple-950/20 dark:via-zinc-900 dark:to-blue-950/10 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
-          <CardTitle className="text-lg font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-            <Briefcase className="w-5 h-5 text-purple-600" /> Configure Job Search
-          </CardTitle>
-          <CardDescription className="text-xs text-zinc-500">
-            Scans LinkedIn, Internshala, and Indian portals for live opportunities matching your specific skills.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-5 pt-5">
-          {/* Primary Row: Resume, City, Number of Jobs */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-            {/* Field 1: Match Against Which Resume */}
-            <div className="md:col-span-4 space-y-1.5">
-              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                1. Select AI Resume
-              </label>
-              {resumes.length > 0 ? (
-                <select
-                  value={selectedResumeId}
-                  onChange={(e) => setSelectedResumeId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
-                >
-                  {resumes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title || 'Untitled'} ({r.target_role || 'General'})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="text-xs text-amber-600 p-2.5 border border-amber-200 rounded-md bg-amber-50 dark:bg-amber-950/20">
-                  No AI Resumes created yet. Please create one in the AI Resume tab.
-                </div>
-              )}
-              {selectedResume && (
-                <div className="text-xs text-zinc-500 pt-0.5">
-                  Target Role:{' '}
-                  <strong className="text-purple-600 dark:text-purple-400">
-                    {selectedResume.target_role || 'Software Engineer'}
-                  </strong>
-                </div>
-              )}
-            </div>
-
-            {/* Field 2: Target City / Region */}
-            <div className="md:col-span-5 space-y-1.5">
-              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                2. Target City / Region
-              </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <Input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Mumbai, Maharashtra, India"
-                  className="pl-9 h-10 text-sm"
-                />
+      {/* ── 2. Unified AI Command Console (Compact Linear Form) ── */}
+      <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end">
+          {/* Resume Selector */}
+          <div className="lg:col-span-4 space-y-1.5">
+            <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 font-mono block">
+              1. Target AI Resume
+            </label>
+            {resumes.length > 0 ? (
+              <select
+                value={selectedResumeId}
+                onChange={(e) => setSelectedResumeId(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-400 transition"
+              >
+                {resumes.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.title || 'Untitled'} ({r.target_role || 'General'})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-[11px] text-amber-700 dark:text-amber-300 p-2 border border-amber-200 dark:border-amber-900/50 rounded-lg bg-amber-50 dark:bg-amber-950/20 font-mono">
+                No resumes compiled yet. Build one in AI Resume.
               </div>
+            )}
+          </div>
 
-              {/* Quick Select Location Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[11px] text-zinc-400">Quick:</span>
-                {POPULAR_LOCATIONS.map((loc) => (
+          {/* Location Input with Quick Pills */}
+          <div className="lg:col-span-5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
+                2. Target Hub / Region
+              </label>
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                {POPULAR_LOCATIONS.slice(0, 3).map((loc) => (
                   <button
                     key={loc}
                     type="button"
                     onClick={() => setLocation(loc)}
-                    className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
-                      location === loc
-                        ? 'bg-purple-600 text-white border-purple-600 font-medium'
-                        : 'bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:border-purple-300'
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded border transition cursor-pointer ${
+                      location.includes(loc.split(',')[0])
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white font-semibold'
+                        : 'bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400'
                     }`}
                   >
                     {loc.split(',')[0]}
@@ -357,747 +369,812 @@ export function JobSearchClient({
                 ))}
               </div>
             </div>
-
-            {/* Field 3: Number of Jobs to Find (5 or 10) */}
-            <div className="md:col-span-3 space-y-1.5">
-              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                3. Number of Jobs
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setJobLimit(5)}
-                  className={`h-10 px-3 rounded-md border text-xs font-semibold flex flex-col items-center justify-center transition-all ${
-                    jobLimit === 5
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                      : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-purple-300'
-                  }`}
-                >
-                  <span>5 Jobs</span>
-                  <span
-                    className={`text-[10px] ${
-                      jobLimit === 5 ? 'text-purple-100' : 'text-zinc-400'
-                    }`}
-                  >
-                    10 Credits
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setJobLimit(10)}
-                  className={`h-10 px-3 rounded-md border text-xs font-semibold flex flex-col items-center justify-center transition-all ${
-                    jobLimit === 10
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                      : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-purple-300'
-                  }`}
-                >
-                  <span>10 Jobs</span>
-                  <span
-                    className={`text-[10px] ${
-                      jobLimit === 10 ? 'text-purple-100' : 'text-zinc-400'
-                    }`}
-                  >
-                    20 Credits
-                  </span>
-                </button>
-              </div>
-              <div className="text-[11px] text-zinc-400 text-center">
-                Detailed gap analysis &amp; cover letters are free.
-              </div>
+            <div className="relative">
+              <MapPin className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 stroke-[1.5]" />
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. Mumbai, Maharashtra, India"
+                className="w-full h-9 pl-8 pr-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-400 transition"
+              />
             </div>
           </div>
 
-          {/* Secondary Filter Row: Job Type, Workplace Mode, Date Posted */}
-          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Filter 1: Job Type */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600" /> Job Type
-              </label>
+          {/* Job Volume Toggle (5 / 10 Jobs) */}
+          <div className="lg:col-span-3 space-y-1.5">
+            <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 font-mono block">
+              3. Scan Volume
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setJobLimit(5)}
+                className={`h-9 px-2 rounded-lg border text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  jobLimit === 5
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-2xs font-bold'
+                    : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400'
+                }`}
+              >
+                <span>5 Jobs</span>
+                <span className={`text-[10px] ${jobLimit === 5 ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400'}`}>
+                  (100 cr)
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setJobLimit(10)}
+                className={`h-9 px-2 rounded-lg border text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  jobLimit === 10
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-2xs font-bold'
+                    : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400'
+                }`}
+              >
+                <span>10 Jobs</span>
+                <span className={`text-[10px] ${jobLimit === 10 ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400'}`}>
+                  (180 cr)
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Collapsible Filter Bar */}
+        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-mono text-[11px] cursor-pointer"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 stroke-[1.5]" />
+            <span>Faceted Filters</span>
+            {(jobType !== 'any' || workplaceMode !== 'any' || datePosted !== 'any') && (
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-600 dark:bg-purple-400" />
+            )}
+            <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+
+          <div className="flex items-center gap-2">
+            {searchError && (
+              <span className="text-rose-600 dark:text-rose-400 text-xs font-mono flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 stroke-[1.5]" />
+                {searchError}
+              </span>
+            )}
+
+            <TactileButton
+              variant="primary"
+              size="sm"
+              onClick={handleSearch}
+              disabled={isSearching || !isActive || resumes.length === 0}
+              className="text-xs bg-purple-600 hover:bg-purple-700 text-white font-medium"
+              icon={isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Compass className="w-3.5 h-3.5 stroke-[1.5]" />}
+            >
+              {isSearching ? 'Scanning Portals...' : `Launch Discovery (${creditCost} cr)`}
+            </TactileButton>
+          </div>
+        </div>
+
+        {/* Expanded Filters Drawer */}
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+            <div className="space-y-1">
+              <label className="text-[11px] font-mono text-zinc-500">Employment Type</label>
               <select
                 value={jobType}
                 onChange={(e) => setJobType(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
               >
-                <option value="any">Any Job Type</option>
+                <option value="any">Any Employment Type</option>
                 <option value="internship">Internship / PPO</option>
-                <option value="fresher">Fresher (0–1 Years)</option>
+                <option value="fresher">Fresher (0-1 Years)</option>
                 <option value="full-time">Full-Time Permanent</option>
               </select>
             </div>
 
-            {/* Filter 2: Workplace Mode */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-purple-600" /> Workplace Mode
-              </label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-mono text-zinc-500">Workplace Mode</label>
               <select
                 value={workplaceMode}
                 onChange={(e) => setWorkplaceMode(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
               >
-                <option value="any">Any Work Mode</option>
+                <option value="any">Any Mode</option>
                 <option value="remote">Remote (Work From Home)</option>
                 <option value="hybrid">Hybrid</option>
                 <option value="on-site">On-Site</option>
               </select>
             </div>
 
-            {/* Filter 3: Date Posted */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-purple-600" /> Date Posted
-              </label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-mono text-zinc-500">Posting Recency</label>
               <select
                 value={datePosted}
                 onChange={(e) => setDatePosted(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
               >
-                <option value="any">Anytime</option>
-                <option value="24h">Past 24 Hours</option>
-                <option value="7d">Past 7 Days</option>
-                <option value="30d">Past 30 Days</option>
+                <option value="any">Any Time</option>
+                <option value="past_24h">Past 24 Hours</option>
+                <option value="past_week">Past 7 Days</option>
+                <option value="past_month">Past 30 Days</option>
               </select>
             </div>
-          </div>
-
-          {searchError && (
-            <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 p-3 rounded-md border border-red-200">
-              {searchError}
-            </div>
-          )}
-        </CardContent>
-
-        <CardFooter className="bg-zinc-50/70 dark:bg-zinc-900/60 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-col sm:flex-row justify-between items-center gap-3 py-3 px-6">
-          <div className="text-xs text-zinc-500">
-            Scanning for: <strong>{selectedResume?.target_role || 'Software Engineer'}</strong> in{' '}
-            <strong>{location.split(',')[0]}</strong>
-            {workplaceMode !== 'any' && (
-              <span className="capitalize"> • {workplaceMode}</span>
-            )}
-            {jobType !== 'any' && <span className="capitalize"> • {jobType}</span>}
-          </div>
-
-          <Button
-            onClick={handleSearch}
-            disabled={isSearching || !isActive || resumes.length === 0}
-            className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white gap-2 font-semibold px-6 shadow-xs"
-          >
-            {isSearching ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Finding Jobs with AI...
-              </>
-            ) : (
-              <>
-                <Compass className="w-4 h-4" /> Find {jobLimit} Relevant Jobs ({creditCost}{' '}
-                Credits)
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
-
-      {/* 3. Structured Searches & Results Section */}
-      <div className="space-y-5">
-        {/* Searches Bar Header with Archive Toggle Button on the Right */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <History className="w-5 h-5 text-purple-600" />
-              {showArchived ? 'Archived Searches' : 'Your AI Job Searches'} (
-              {displayedSessions.length})
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              {showArchived
-                ? 'These are your archived searches. Click the restore icon to move any back to active.'
-                : 'Click any past search session below to view its verified job recommendations.'}
-            </p>
-          </div>
-
-          {/* Show Archive Button where user marked in red */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant={showArchived ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowArchived(!showArchived)}
-              className={`h-8 text-xs gap-1.5 font-medium ${
-                showArchived
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                  : 'text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-purple-300'
-              }`}
-            >
-              <Archive className="w-3.5 h-3.5" />
-              {showArchived
-                ? 'View Active Searches'
-                : `Show Archived (${archivedSessions.length})`}
-            </Button>
-          </div>
-        </div>
-
-        {displayedSessions.length === 0 ? (
-          <div className="p-12 border-2 border-dashed rounded-xl text-center space-y-3 bg-zinc-50/50 dark:bg-zinc-900/30">
-            {showArchived ? (
-              <>
-                <Archive className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                <h3 className="font-semibold text-base text-zinc-800 dark:text-zinc-200">
-                  No Archived Searches
-                </h3>
-                <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                  When you archive previous searches using the archive icon on each card, they will appear here.
-                </p>
-              </>
-            ) : (
-              <>
-                <Compass className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                <h3 className="font-semibold text-base text-zinc-800 dark:text-zinc-200">
-                  No Active AI Job Searches
-                </h3>
-                <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                  Select your AI Resume and target city above, then click Find Relevant Jobs to launch your first off-campus search.
-                </p>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Search Session Selector Pills / Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {displayedSessions.map((sess) => {
-                const isSelected = sess.id === activeSessionId
-                const dateStr = new Date(sess.created_at).toLocaleDateString('en-IN', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-
-                return (
-                  <button
-                    key={sess.id}
-                    type="button"
-                    onClick={() => setActiveSessionId(sess.id)}
-                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 relative ${
-                      isSelected
-                        ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-500 dark:border-purple-500 shadow-xs ring-2 ring-purple-500/30'
-                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-purple-200 hover:bg-zinc-50/50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 w-full">
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate">
-                          {sess.search_query}
-                        </div>
-                        <div className="text-xs text-zinc-500 flex items-center gap-1 mt-0.5 truncate">
-                          <MapPin className="w-3 h-3 shrink-0 text-zinc-400" />
-                          <span className="truncate">{sess.location.split(',')[0]}</span>
-                        </div>
-                      </div>
-
-                      {/* Jobs Count Badge + Archive Toggle Icon */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Badge
-                          variant="secondary"
-                          className={`text-[10px] shrink-0 font-bold ${
-                            isSelected
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-                          }`}
-                        >
-                          {sess.results_count || sess.job_limit || 5} Jobs
-                        </Badge>
-
-                        {/* Archive / Unarchive Button */}
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          title={sess.is_archived ? 'Restore search' : 'Archive search'}
-                          onClick={(e) => handleToggleArchive(e, sess)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              handleToggleArchive(e as any, sess)
-                            }
-                          }}
-                          className="p-1 rounded-md text-zinc-400 hover:text-purple-600 hover:bg-purple-100/50 dark:hover:bg-zinc-800 transition-colors"
-                        >
-                          {sess.is_archived ? (
-                            <ArchiveRestore className="w-3.5 h-3.5" />
-                          ) : (
-                            <Archive className="w-3.5 h-3.5" />
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400 w-full pt-1 border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="truncate">
-                        Resume: {sess.ai_resumes?.title || 'Selected Resume'}
-                      </span>
-                      {isSelected ? (
-                        <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1 shrink-0">
-                          Viewing Openings ↓
-                        </span>
-                      ) : (
-                        <span className="shrink-0">{dateStr}</span>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Active Search Results Details: Unified Seamless Workspace Panel */}
-            {activeSession && (
-              <div className="mt-3 bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800/80 rounded-2xl shadow-xs overflow-hidden">
-                {/* Seamless Header */}
-                <div className="bg-gradient-to-r from-purple-50/90 via-purple-50/40 to-white dark:from-purple-950/40 dark:via-zinc-900 dark:to-zinc-900 border-b border-purple-100 dark:border-purple-900/50 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <Layers className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-50">
-                          Verified Openings for &ldquo;{activeSession.search_query}&rdquo;
-                        </h3>
-                        <Badge
-                          variant="secondary"
-                          className="text-[11px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 border-0"
-                        >
-                          {activeSession.location.split(',')[0]}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        Matched against resume:{' '}
-                        <strong className="text-zinc-700 dark:text-zinc-200">
-                          {activeSession.ai_resumes?.title || 'Active Resume'}
-                        </strong>
-                        <span className="mx-1.5">•</span>
-                        <span>{activeSession.credits_spent} Credits unlocked</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                    <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1">
-                      {currentJobs.length} Verified Openings
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Job Rows List */}
-                {currentJobs.length === 0 ? (
-                  <div className="p-10 text-center text-zinc-500 text-sm">
-                    No individual job records stored for this session. Run a new search above to fetch fresh opportunities!
-                  </div>
-                ) : (
-                  <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                    {currentJobs.map((job) => {
-                      const portal = job.sources?.[0]?.portal || 'LinkedIn'
-                      const applyUrl = job.sources?.[0]?.url || 'https://www.linkedin.com/jobs'
-                      const match = job.matchScore || 75
-
-                      return (
-                        <div
-                          key={job.id}
-                          className="p-4 sm:p-5 hover:bg-purple-50/20 dark:hover:bg-purple-950/10 transition-colors flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
-                        >
-                          {/* Left: Job Core Info */}
-                          <div className="flex-1 min-w-0 space-y-1.5 w-full">
-                            {/* Line 1: Title, Match Badge, Source Portal */}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4
-                                onClick={() => handleOpenJobModal(job, 'analysis')}
-                                className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 hover:text-purple-600 cursor-pointer transition-colors"
-                              >
-                                {job.title}
-                              </h4>
-
-                              {/* Match Score Badge */}
-                              <Badge
-                                className={`text-[11px] font-bold px-2 py-0.5 shrink-0 ${
-                                  match >= 80
-                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200'
-                                    : match >= 65
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-200'
-                                    : match >= 50
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200'
-                                    : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200'
-                                }`}
-                              >
-                                {match}% Match
-                              </Badge>
-
-                              {/* Why we suggested this / Recommendation Reason Badge */}
-                              {job.recommendation_reason && (
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-[10px] font-medium px-2 py-0.5 shrink-0 ${
-                                    job.recommendation_reason.includes('Expanded Date')
-                                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60'
-                                      : job.recommendation_reason.includes('Foundational')
-                                      ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200/60'
-                                      : job.recommendation_reason.includes('Curated')
-                                      ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60'
-                                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60'
-                                  }`}
-                                >
-                                  {job.recommendation_reason}
-                                </Badge>
-                              )}
-
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] text-zinc-500 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
-                              >
-                                via {portal}
-                              </Badge>
-                            </div>
-
-                            {/* Line 2: Company, Location, Workplace Mode, Job Type, Salary */}
-                            <div className="flex flex-wrap items-center gap-y-1 gap-x-2 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-                              <span className="flex items-center gap-1 text-zinc-800 dark:text-zinc-200 font-semibold">
-                                <Building2 className="w-3.5 h-3.5 text-zinc-400" />
-                                {job.company_name}
-                              </span>
-                              <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3 text-zinc-400" />
-                                {job.location || 'Mumbai'}
-                              </span>
-                              <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                              <span className="capitalize">{job.workplace_mode || 'hybrid'}</span>
-                              <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                              <span className="capitalize">{job.employment_type || 'full-time'}</span>
-                              <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                              <span className="text-zinc-900 dark:text-zinc-100 font-semibold">
-                                {job.salary_info || 'Competitive'}
-                              </span>
-                            </div>
-
-                            {/* Line 3: Skills Chips + Short Snippet */}
-                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                              {job.skills_required && job.skills_required.length > 0 && (
-                                <>
-                                  {job.skills_required.slice(0, 4).map((s: string, idx: number) => (
-                                    <span
-                                      key={idx}
-                                      className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded text-[11px] font-medium"
-                                    >
-                                      {s}
-                                    </span>
-                                  ))}
-                                </>
-                              )}
-                              {job.description && (
-                                <span className="text-xs text-zinc-400 line-clamp-1 max-w-xl hidden xl:inline-block ml-1">
-                                  — {job.description.replace(/\s+/g, ' ').slice(0, 110)}...
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Right: Actions row */}
-                          <div className="flex items-center gap-2 shrink-0 w-full lg:w-auto justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-zinc-100 dark:border-zinc-800">
-                            {/* Free Gap & Tailoring Modal Trigger */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenJobModal(job, 'analysis')}
-                              className="h-8 text-xs gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300 font-medium whitespace-nowrap"
-                            >
-                              <TrendingUp className="w-3.5 h-3.5" /> Gaps &amp; Tailor
-                            </Button>
-
-                            {/* Free Cold Email Modal Trigger */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenJobModal(job, 'email')}
-                              className="h-8 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 font-medium whitespace-nowrap"
-                            >
-                              <Mail className="w-3.5 h-3.5" /> Cold Email
-                            </Button>
-
-                            {/* Direct Apply Button */}
-                            <a
-                              href={applyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-1.5 h-8 px-3.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap"
-                            >
-                              Apply <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* 4. Modal: Detailed Gap Analysis & Cold Email Generator (Free - 0 Credits) */}
-      {activeJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-start bg-gradient-to-r from-purple-50/50 via-white to-zinc-50 dark:from-purple-950/20 dark:via-zinc-900 dark:to-zinc-900">
-              <div>
-                <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-                  {activeJob.title}
+      {/* ── 3. Horizontal Stream Rail (Past Search Sessions) ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 font-mono">
+              Discovery Streams ({displayedSessions.length})
+            </span>
+            <span className="text-zinc-400 dark:text-zinc-600 text-xs">•</span>
+            <span className="text-[11px] text-zinc-500">
+              {showArchived ? 'Viewing archived search batches' : 'Click any batch to inspect its live radar'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowArchived(!showArchived)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px] font-mono text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition cursor-pointer"
+          >
+            {showArchived ? (
+              <>
+                <ArchiveRestore className="w-3.5 h-3.5 stroke-[1.5]" />
+                <span>Active Streams</span>
+              </>
+            ) : (
+              <>
+                <Archive className="w-3.5 h-3.5 stroke-[1.5]" />
+                <span>Archived ({archivedSessions.length})</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Horizontal Chips Rail */}
+        {displayedSessions.length === 0 ? (
+          <div className="p-8 text-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 text-xs text-zinc-500">
+            {showArchived ? 'No archived discovery streams stored.' : 'No discovery searches conducted yet. Launch your first scan above.'}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {displayedSessions.map((sess) => {
+              const isSelected = sess.id === activeSessionId
+              const roleTitle = sess.search_query.split('in')[0].trim()
+              const city = (sess.location || '').split(',')[0]
+
+              return (
+                <div
+                  key={sess.id}
+                  onClick={() => setActiveSessionId(sess.id)}
+                  className={`group shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-mono transition-all cursor-pointer select-none ${
+                    isSelected
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-2xs font-semibold'
+                      : 'bg-white dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="truncate max-w-[140px] font-medium">{roleTitle}</span>
+                    <span className="opacity-50">·</span>
+                    <span className="opacity-75 text-[11px] truncate max-w-[80px]">{city}</span>
+                  </div>
+
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isSelected
+                        ? 'bg-zinc-800 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    {sess.results_count || sess.job_limit || 5}
+                  </span>
+
+                  <button
+                    type="button"
+                    title={sess.is_archived ? 'Restore search' : 'Archive search'}
+                    onClick={(e) => handleToggleArchive(e, sess)}
+                    className="opacity-40 hover:opacity-100 transition p-0.5"
+                  >
+                    {sess.is_archived ? (
+                      <ArchiveRestore className="w-3.5 h-3.5 stroke-[1.5]" />
+                    ) : (
+                      <Archive className="w-3.5 h-3.5 stroke-[1.5]" />
+                    )}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── 4. Verified Openings Stream (Linear-Grade Feed) ── */}
+      {activeSession && (
+        <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/30 overflow-hidden shadow-xs divide-y divide-zinc-100 dark:divide-zinc-800/60">
+          {/* Feed Header */}
+          <div className="p-4 bg-zinc-50/70 dark:bg-zinc-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200/80 dark:border-zinc-800/80">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                  Radar Feed for &ldquo;{activeSession.search_query}&rdquo;
                 </h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  {activeJob.company_name} • {activeJob.location} •{' '}
-                  <span className="text-emerald-600 font-semibold">Included Free</span>
-                </p>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                  {activeSession.location.split(',')[0]}
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
+                Matched against: <strong className="text-zinc-800 dark:text-zinc-200">{activeSession.ai_resumes?.title || 'Selected AI Resume'}</strong>
+              </p>
+            </div>
+
+            <span className="text-[11px] font-mono text-zinc-500 font-medium">
+              {currentJobs.length} Opportunities Logged
+            </span>
+          </div>
+
+          {/* Jobs List */}
+          {currentJobs.length === 0 ? (
+            <div className="p-12 text-center text-xs text-zinc-500 font-mono space-y-1">
+              <p>No job listings saved in this session.</p>
+              <p className="text-zinc-400">Launch a new search above to fetch fresh opportunities.</p>
+            </div>
+          ) : (
+            currentJobs.map((job) => {
+              const portal = job.sources?.[0]?.portal || 'LinkedIn'
+              const applyUrl = job.sources?.[0]?.url || 'https://www.linkedin.com/jobs'
+              const match = job.matchScore || 78
+
+              return (
+                <div
+                  key={job.id}
+                  className="p-4 sm:p-5 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40 transition-colors flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 select-none"
+                >
+                  {/* Left: Job Core Info */}
+                  <div className="flex-1 min-w-0 space-y-2 w-full">
+                    {/* Line 1: Title, Match Badge, Recommendation Reason */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4
+                        onClick={() => handleOpenDrawer(job, 'overview')}
+                        className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 hover:text-purple-600 dark:hover:text-purple-300 cursor-pointer transition truncate"
+                      >
+                        {job.title}
+                      </h4>
+
+                      {/* Match Score Badge */}
+                      <span
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                          match >= 80
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60'
+                            : match >= 65
+                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/60'
+                            : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60'
+                        }`}
+                      >
+                        {match}% Match
+                      </span>
+
+                      {/* Portal tag */}
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700">
+                        via {portal}
+                      </span>
+                    </div>
+
+                    {/* Line 2: Company, Location, Workplace Mode, Job Type, Salary */}
+                    <div className="flex flex-wrap items-center gap-y-1 gap-x-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                      <span className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100">
+                        <Building2 className="w-3.5 h-3.5 text-zinc-400 stroke-[1.5]" />
+                        {job.company_name}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-zinc-400 stroke-[1.5]" />
+                        {job.location || 'Mumbai'}
+                      </span>
+                      <span>•</span>
+                      <span className="capitalize">{job.workplace_mode || 'Hybrid'}</span>
+                      <span>•</span>
+                      <span className="capitalize">{job.employment_type || 'Full-time'}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        {job.salary_info || 'Competitive'}
+                      </span>
+                    </div>
+
+                    {/* Line 3: Skills Chips */}
+                    {job.skills_required && job.skills_required.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {job.skills_required.slice(0, 5).map((s: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded text-[10px] font-mono font-medium border border-zinc-200/60 dark:border-zinc-700/60"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-2 shrink-0 w-full lg:w-auto justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-zinc-100 dark:border-zinc-800">
+                    <TactileButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenDrawer(job, 'overview')}
+                      className="text-xs font-mono"
+                      icon={<FileText className="w-3.5 h-3.5 stroke-[1.5]" />}
+                    >
+                      Job Details
+                    </TactileButton>
+
+                    <TactileButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenDrawer(job, 'analysis')}
+                      className="text-xs font-mono"
+                      icon={<TrendingUp className="w-3.5 h-3.5 stroke-[1.5]" />}
+                    >
+                      Gaps & Tailor
+                    </TactileButton>
+
+                    <TactileButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenDrawer(job, 'email')}
+                      className="text-xs font-mono"
+                      icon={<Mail className="w-3.5 h-3.5 stroke-[1.5]" />}
+                    >
+                      Cold Email
+                    </TactileButton>
+
+                    <a
+                      href={applyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 text-xs font-semibold shadow-2xs transition-all"
+                    >
+                      <span>Apply</span>
+                      <ExternalLink className="w-3 h-3 stroke-[2]" />
+                    </a>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+
+      {/* ── 5. Slide-Over LinearDrawer Inspector (Zero-Context Loss) ── */}
+      <LinearDrawer
+        isOpen={!!activeJob}
+        onClose={() => setActiveJob(null)}
+        title={activeJob?.title || 'Job Overview'}
+        subtitle={`${activeJob?.company_name || 'Organization'} · ${activeJob?.location || 'Pan-India'}`}
+        width="lg"
+      >
+        {activeJob && (
+          <div className="space-y-6">
+            {/* Header Metadata Capsule */}
+            <div className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">
+                    {activeJob.company_name}
+                  </span>
+                  <span className="text-[11px] font-mono text-zinc-500">
+                    Discovered via {activeJob.sources?.[0]?.portal || 'Recruitment Portal'}
+                  </span>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 px-2.5 py-1 rounded-full">
+                  {activeJob.matchScore || 78}% Match
+                </span>
               </div>
 
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/80 text-xs font-mono">
+                <div>
+                  <span className="text-zinc-500 block text-[11px]">Salary / Stipend</span>
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                    {activeJob.salary_info || 'Competitive'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 block text-[11px]">Workplace</span>
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200 capitalize">
+                    {activeJob.workplace_mode || 'Hybrid'} ({activeJob.employment_type || 'Full-time'})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Segmented Inspector Tabs (3-Tab System) */}
+            <div className="flex items-center p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
               <button
                 type="button"
-                onClick={() => setActiveJob(null)}
-                className="text-zinc-400 hover:text-zinc-600 p-1 text-xl leading-none"
+                onClick={() => handleSwitchDrawerTab('overview')}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-medium transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeDrawerTab === 'overview'
+                    ? 'bg-white text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 shadow-2xs font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
               >
-                &times;
+                <FileText className="w-3.5 h-3.5 stroke-[1.5]" />
+                <span>Job Overview</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSwitchDrawerTab('analysis')}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-medium transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeDrawerTab === 'analysis'
+                    ? 'bg-white text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 shadow-2xs font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 stroke-[1.5]" />
+                <span>Gaps & Strategy</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSwitchDrawerTab('email')}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-medium transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeDrawerTab === 'email'
+                    ? 'bg-white text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 shadow-2xs font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5 stroke-[1.5]" />
+                <span>Cold Outreach</span>
               </button>
             </div>
 
-            {/* Modal Tabs */}
-            <div className="flex border-b border-zinc-200 dark:border-zinc-800 px-5 bg-zinc-50/50 dark:bg-zinc-900/50 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveModalTab('analysis')}
-                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
-                  activeModalTab === 'analysis'
-                    ? 'border-purple-600 text-purple-600 font-bold'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-                }`}
-              >
-                <TrendingUp className="w-3.5 h-3.5" /> Skill Gaps &amp; Resume Tailoring
-              </button>
+            {/* Tab 1: Complete Job Overview & Raw Description Preview */}
+            {activeDrawerTab === 'overview' && (
+              <div className="space-y-5">
+                {/* 4-Card Key Specifications Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 space-y-1">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">Compensation</span>
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-mono block truncate">
+                      {activeJob.salary_info || 'Competitive'}
+                    </span>
+                  </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveModalTab('email')
-                  if (!coverLetterMap[activeJob.id]) {
-                    handleGenerateCover(activeJob.id)
-                  }
-                }}
-                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
-                  activeModalTab === 'email'
-                    ? 'border-purple-600 text-purple-600 font-bold'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5" /> Recruiter Cold Email
-              </button>
-            </div>
+                  <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 space-y-1">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">Workplace</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 font-mono capitalize block truncate">
+                      {activeJob.workplace_mode || 'Hybrid'}
+                    </span>
+                  </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-5 text-sm flex-1">
-              {activeModalTab === 'analysis' ? (
-                <>
-                  {analyzingId === activeJob.id ? (
-                    <div className="py-12 text-center space-y-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto" />
-                      <p className="text-xs text-zinc-500">
-                        Analyzing your resume against {activeJob.company_name}&apos;s tech stack...
-                      </p>
+                  <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 space-y-1">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">Employment</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 font-mono capitalize block truncate">
+                      {activeJob.employment_type || 'Full-time'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 space-y-1">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">Location</span>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 font-mono block truncate" title={activeJob.location || 'Pan-India'}>
+                      {activeJob.location || 'Pan-India'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* AI Recommendation Reason Callout */}
+                {activeJob.recommendation_reason && (
+                  <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/50 dark:bg-purple-950/20 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 dark:text-purple-300">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
+                      <span>Recommendation Rationale</span>
                     </div>
-                  ) : analysisMap[activeJob.id] ? (
-                    <div className="space-y-5">
-                      {/* Match Score & Status */}
-                      <div className="flex items-center justify-between p-3.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800">
-                        <div>
-                          <div className="text-xs font-semibold text-purple-900 dark:text-purple-300">
-                            Resume Compatibility Score
-                          </div>
-                          <div className="text-2xl font-black text-purple-700 dark:text-purple-400 mt-0.5">
-                            {analysisMap[activeJob.id].match_score || 78}%
-                          </div>
-                        </div>
-                        <Badge className="bg-purple-600 text-white text-xs">AI Analyzed</Badge>
-                      </div>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      {activeJob.recommendation_reason}
+                    </p>
+                  </div>
+                )}
 
-                      {/* Matching vs Missing Skills */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20">
-                          <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4" /> Your Matching Strengths
-                          </h4>
-                          <div className="flex flex-wrap gap-1.5 mt-2.5">
-                            {(analysisMap[activeJob.id].matching_skills || []).map(
-                              (s: string, i: number) => (
-                                <span
-                                  key={i}
-                                  className="bg-white dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded text-xs border border-emerald-200"
-                                >
-                                  {s}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
-                          <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                            <TrendingUp className="w-4 h-4" /> Missing Skill Gaps
-                          </h4>
-                          <div className="flex flex-wrap gap-1.5 mt-2.5">
-                            {(analysisMap[activeJob.id].missing_skills || []).map(
-                              (s: string, i: number) => (
-                                <span
-                                  key={i}
-                                  className="bg-white dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded text-xs border border-amber-200"
-                                >
-                                  {s}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Tailoring Suggestions */}
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                          Recommended Resume Revisions
-                        </h4>
-                        <div className="space-y-2">
-                          {(analysisMap[activeJob.id].tailoring_suggestions || []).map(
-                            (item: any, i: number) => (
-                              <div
-                                key={i}
-                                className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40 text-xs space-y-1"
-                              >
-                                <div className="font-semibold text-purple-700 dark:text-purple-400">
-                                  {item.section}
-                                </div>
-                                <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                                  {item.advice}
-                                </p>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 2-Day Upskill Roadmap */}
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                          Fast-Track Upskill Roadmap
-                        </h4>
-                        <div className="space-y-2">
-                          {(analysisMap[activeJob.id].upskill_roadmap || []).map(
-                            (road: any, i: number) => (
-                              <div
-                                key={i}
-                                className="p-3 rounded-lg border border-purple-200 dark:border-purple-900 bg-purple-50/30 dark:bg-purple-950/20 text-xs flex justify-between items-start gap-4"
-                              >
-                                <div className="space-y-1">
-                                  <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                                    <span>{road.skill}</span>
-                                    <Badge variant="outline" className="text-[10px]">
-                                      {road.duration}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-zinc-600 dark:text-zinc-400">
-                                    <strong>Key topics:</strong> {road.key_topics}
-                                  </p>
-                                  <p className="text-zinc-500 text-[11px]">
-                                    <strong>Recommended guide:</strong> {road.resource}
-                                  </p>
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
+                {/* Required Skills & Tech Stack Matrix */}
+                {activeJob.skills_required && activeJob.skills_required.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                        Required Tech Stack & Skills
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {activeJob.skills_required.length} competencies
+                      </span>
                     </div>
-                  ) : (
-                    <div className="py-8 text-center text-xs text-zinc-500">
-                      Failed to load analysis. Please close and reopen.
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Tab 2: Cold Email Generator */
-                <div className="space-y-4">
-                  {isGeneratingCover ? (
-                    <div className="py-12 text-center space-y-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto" />
-                      <p className="text-xs text-zinc-500">
-                        Drafting personalized cold email based on your projects and{' '}
-                        {activeJob.company_name}&apos;s role...
-                      </p>
-                    </div>
-                  ) : coverLetterMap[activeJob.id] ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                          Recruiter-Ready Cold Email (Under 160 Words)
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeJob.skills_required.map((skill: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700/80 text-xs px-2.5 py-1 rounded-md font-mono font-medium"
+                        >
+                          {skill}
                         </span>
-                        <Button
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full Job Description & Scope */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                      Full Job Description & Role Overview
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                      Listing Feed
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-line font-sans max-h-[380px] overflow-y-auto scrollbar-thin">
+                    {activeJob.description || 'No detailed job description provided by the source listing.'}
+                  </div>
+                </div>
+
+                {/* Tactical Transition Bar */}
+                <div className="p-3.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">
+                      Evaluate Candidate Fit
+                    </span>
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      Check your missing skills or draft a personalized cold email
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <TactileButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSwitchDrawerTab('analysis')}
+                      className="text-xs font-mono"
+                      icon={<TrendingUp className="w-3.5 h-3.5 stroke-[1.5]" />}
+                    >
+                      Check Gaps
+                    </TactileButton>
+
+                    <TactileButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSwitchDrawerTab('email')}
+                      className="text-xs font-mono"
+                      icon={<Mail className="w-3.5 h-3.5 stroke-[1.5]" />}
+                    >
+                      Cold Email
+                    </TactileButton>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Skill Gaps & Resume Tailoring */}
+            {activeDrawerTab === 'analysis' && (
+              <div className="space-y-5">
+                {analyzingId === activeJob.id ? (
+                  <div className="py-12 text-center space-y-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto" />
+                    <p className="text-xs text-zinc-500 font-mono">
+                      Analyzing resume against {activeJob.company_name}&apos;s tech stack...
+                    </p>
+                  </div>
+                ) : analysisMap[activeJob.id] ? (
+                  <div className="space-y-5">
+                    {/* Strengths vs Missing Gaps Bento */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Matching Skills */}
+                      <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                          <CheckCircle2 className="w-4 h-4 stroke-[1.5]" />
+                          <span>Matching Strengths</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(analysisMap[activeJob.id].matching_skills || []).map((s: string, i: number) => (
+                            <span
+                              key={i}
+                              className="bg-white dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded text-[11px] font-mono border border-emerald-200 dark:border-emerald-800"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Missing Gaps */}
+                      <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                          <TrendingUp className="w-4 h-4 stroke-[1.5]" />
+                          <span>Identified Gaps</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(analysisMap[activeJob.id].missing_skills || []).map((s: string, i: number) => (
+                            <span
+                              key={i}
+                              className="bg-white dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded text-[11px] font-mono border border-amber-200 dark:border-amber-800"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Resume Tailoring Advice */}
+                    <div className="space-y-2.5">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold block">
+                        Recommended Resume Adjustments
+                      </span>
+                      <div className="space-y-2">
+                        {(analysisMap[activeJob.id].tailoring_suggestions || []).map((item: any, i: number) => (
+                          <div
+                            key={i}
+                            className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 text-xs space-y-1"
+                          >
+                            <span className="font-semibold text-purple-700 dark:text-purple-400 font-mono block">
+                              {item.section}
+                            </span>
+                            <p className="text-zinc-600 dark:text-zinc-300 text-[11px] leading-relaxed">
+                              {item.advice}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Fast-Track Learning Roadmap */}
+                    <div className="space-y-2.5">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold block">
+                        Interview Prep &amp; Fast-Track Roadmap
+                      </span>
+                      <div className="space-y-2">
+                        {(analysisMap[activeJob.id].upskill_roadmap || []).map((road: any, i: number) => (
+                          <div
+                            key={i}
+                            className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 text-xs space-y-1"
+                          >
+                            <div className="flex items-center justify-between font-medium">
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">{road.skill}</span>
+                              <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                                {road.duration}
+                              </span>
+                            </div>
+                            <p className="text-zinc-600 dark:text-zinc-400 text-[11px]">
+                              <strong>Core focus:</strong> {road.key_topics}
+                            </p>
+                            <p className="text-zinc-500 text-[10px] font-mono">
+                              Guide: {road.resource}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Direct Bridge to AI Resume Studio */}
+                    <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/40 dark:bg-purple-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-semibold text-purple-900 dark:text-purple-200 block">
+                          Tailor AI Resume for this Opening
+                        </span>
+                        <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                          Launch LaTeX compiler with this role requirements prefilled.
+                        </p>
+                      </div>
+                      <Link
+                        href="/student/ai-resume"
+                        className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium shrink-0 transition"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Open Resume Studio</span>
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-xs text-zinc-500 font-mono">
+                    Failed to load telemetry. Click Gaps &amp; Tailor to re-analyze.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Recruiter Cold Outreach */}
+            {activeDrawerTab === 'email' && (
+              <div className="space-y-4">
+                {isGeneratingCover ? (
+                  <div className="py-12 text-center space-y-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto" />
+                    <p className="text-xs text-zinc-500 font-mono">
+                      Drafting customized cold pitch based on your projects and {activeJob.company_name}&apos;s stack...
+                    </p>
+                  </div>
+                ) : coverLetterMap[activeJob.id] ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
+                        Personalized Pitch (Under 160 Words)
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <TactileButton
                           size="sm"
                           variant="outline"
                           onClick={() => handleCopyCover(coverLetterMap[activeJob.id])}
-                          className="h-7 text-xs gap-1.5"
+                          className="h-7 text-xs font-mono"
+                          icon={copiedCover ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 stroke-[2]" /> : <Copy className="w-3.5 h-3.5 stroke-[1.5]" />}
                         >
-                          {copiedCover ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Copied!
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" /> Copy Email
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                          {copiedCover ? 'Copied' : 'Copy Pitch'}
+                        </TactileButton>
 
-                      <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 font-mono text-xs whitespace-pre-wrap leading-relaxed text-zinc-800 dark:text-zinc-200 select-all">
-                        {coverLetterMap[activeJob.id]}
+                        <a
+                          href={`mailto:?subject=${encodeURIComponent(
+                            `Application: ${activeJob.title} - Candidate Pitch`
+                          )}&body=${encodeURIComponent(coverLetterMap[activeJob.id])}`}
+                          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                        >
+                          <Send className="w-3.5 h-3.5 stroke-[1.5]" />
+                          <span>Open Mail</span>
+                        </a>
                       </div>
                     </div>
-                  ) : (
-                    <div className="py-8 text-center space-y-3">
-                      <Mail className="w-8 h-8 text-zinc-400 mx-auto" />
-                      <p className="text-xs text-zinc-500">
-                        Generate a customized cold application email highlighting your real projects.
+
+                    <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 font-mono text-xs whitespace-pre-wrap leading-relaxed text-zinc-800 dark:text-zinc-200 select-all shadow-2xs">
+                      {coverLetterMap[activeJob.id]}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center space-y-3 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                    <Mail className="w-8 h-8 text-zinc-400 mx-auto stroke-[1.5]" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                        Generate High-Response Cold Pitch
                       </p>
-                      <Button
-                        size="sm"
-                        onClick={() => handleGenerateCover(activeJob.id)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1.5"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" /> Draft Email Now (Free)
-                      </Button>
+                      <p className="text-[11px] text-zinc-500">
+                        Synthesize a 160-word recruiter email highlighting your actual verified portfolio.
+                      </p>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    <TactileButton
+                      size="sm"
+                      variant="primary"
+                      onClick={() => handleGenerateCover(activeJob.id)}
+                      className="text-xs bg-purple-600 hover:bg-purple-700 text-white font-medium mx-auto"
+                      icon={<Sparkles className="w-3.5 h-3.5" />}
+                    >
+                      Draft Cold Pitch (Free)
+                    </TactileButton>
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/60 flex justify-between items-center text-xs">
-              <span className="text-zinc-500">Direct external link to employer portal:</span>
+            {/* Sticky Drawer Footer Actions */}
+            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
+              <TactileButton
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveJob(null)}
+                className="w-full text-xs font-mono"
+              >
+                Close Inspector
+              </TactileButton>
+
               <a
                 href={activeJob.sources?.[0]?.url || 'https://www.linkedin.com/jobs'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-bold text-purple-600 hover:text-purple-700 hover:underline"
+                className="inline-flex items-center justify-center gap-1.5 w-full h-8 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 text-xs font-semibold shadow-2xs transition"
               >
-                Apply on {activeJob.sources?.[0]?.portal || 'Portal'}{' '}
-                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Apply on {activeJob.sources?.[0]?.portal || 'Portal'}</span>
+                <ExternalLink className="w-3.5 h-3.5 stroke-[2]" />
               </a>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </LinearDrawer>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { StudentJobsDirectory } from '@/components/StudentJobsDirectory'
 import { JobDetailsData } from '@/components/JobDetailsModal'
+import { CheckCircle2, AlertTriangle, ShieldCheck, Sparkles } from 'lucide-react'
 
 export default async function StudentJobsPage(props: {
   searchParams?: Promise<{
@@ -33,7 +34,7 @@ export default async function StudentJobsPage(props: {
     .single()
 
   if (!student) {
-    return <div>Error loading student profile.</div>
+    return <div className="p-8 text-zinc-400 font-mono text-sm">Error loading candidate profile.</div>
   }
 
   let accessStatus: 'active' | 'expired' | 'unpaid' = 'active'
@@ -147,36 +148,58 @@ export default async function StudentJobsPage(props: {
   const totalPages = Math.ceil(totalItems / pageSize) || 1
 
   return (
-    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Placement Drives &amp; Opportunities</h1>
-        <p className="text-zinc-500 mt-1">Discover campus and global placement opportunities, explore job details, and track application windows.</p>
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
+      {/* Header Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Placement Drives & Opportunities</h1>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+              {totalItems} Available
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            Discover verified campus and partner drives, inspect recruitment criteria, and submit direct applications.
+          </p>
+        </div>
       </div>
 
       {student.is_blacklisted && (
-        <div className="bg-red-50 text-red-900 border border-red-200 p-4 rounded-md">
-          <h3 className="font-semibold">Account Suspended</h3>
-          <p className="text-sm mt-1">You are currently blacklisted from applying to jobs. Please contact your college administrator.</p>
+        <div className="bg-rose-50 dark:bg-rose-950/20 text-rose-900 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 p-4 rounded-xl flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 mt-0.5 flex-shrink-0 stroke-[1.5]" />
+          <div className="space-y-1 text-xs">
+            <h3 className="font-semibold text-rose-900 dark:text-rose-200">Account Under Placement Suspension</h3>
+            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Your profile is currently restricted from submitting new drive applications. Please contact your college placement administrator for review.
+            </p>
+          </div>
         </div>
       )}
 
       {isPlaced && !student.is_blacklisted && (
-        <div className="bg-emerald-50 text-emerald-950 border border-emerald-200 p-4 rounded-md">
-          <h3 className="font-semibold text-emerald-900">1-Offer Policy Active — Officially Placed</h3>
-          <p className="text-sm mt-1 text-emerald-800">
-            You hold an approved placement offer at <strong>{latestOffer?.company_name}</strong> (₹{maxCurrentCtc} LPA). 
-            Regular campus placement drives are locked.
-          </p>
-          <div className="flex flex-wrap gap-4 mt-2 text-xs text-emerald-800">
-            {superDreamConfig.enabled && (
-              <span>• Super Dream (&ge; ₹{superDreamConfig.min_ctc} LPA): {counters.super_dream_attempts || 0} / {superDreamConfig.max_attempts || 2} attempts used</span>
-            )}
-            {dreamConfig.enabled && (
-              <span>• Dream (&ge; ₹{dreamConfig.min_ctc} LPA): {counters.dream_attempts || 0} / {dreamConfig.max_dream_attempts || 3} attempts used</span>
-            )}
-            {upgradeConfig.enabled && (
-              <span>• Upgrades: {counters.upgrades_used || 0} / {upgradeConfig.max_allowed || 1} used (Min: {upgradeConfig.min_multiplier}x)</span>
-            )}
+        <div className="bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-4 rounded-xl flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0 stroke-[1.5]" />
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-300">
+              <span>1-Offer Policy Active — Officially Placed Candidate</span>
+              <span className="bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/50 text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                Upgrade Path Unlocked
+              </span>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              You hold an approved placement offer at <strong className="text-zinc-900 dark:text-zinc-200">{latestOffer?.company_name}</strong> (₹{maxCurrentCtc} LPA). Standard tier drives are locked. You may apply only for configured Dream or Super Dream tier upgrades.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-1 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              {superDreamConfig.enabled && (
+                <span>Super Dream (&ge; ₹{superDreamConfig.min_ctc} LPA): <strong className="text-zinc-900 dark:text-zinc-200">{counters.super_dream_attempts || 0} / {superDreamConfig.max_attempts || 2}</strong> used</span>
+              )}
+              {dreamConfig.enabled && (
+                <span>Dream (&ge; ₹{dreamConfig.min_ctc} LPA): <strong className="text-zinc-900 dark:text-zinc-200">{counters.dream_attempts || 0} / {dreamConfig.max_dream_attempts || 3}</strong> used</span>
+              )}
+              {upgradeConfig.enabled && (
+                <span>Multiplier: <strong className="text-zinc-900 dark:text-zinc-200">{upgradeConfig.min_multiplier}×</strong> minimum CTC required</span>
+              )}
+            </div>
           </div>
         </div>
       )}

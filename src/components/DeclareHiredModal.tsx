@@ -224,10 +224,15 @@ export function DeclareHiredModal({
           triggerButton
         ) : (
           <Button 
-            className={`gap-2 ${hasPendingOffer ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white ${triggerClassName || ''}`}
+            size="sm"
+            className={`gap-2 h-8.5 px-3.5 rounded-lg text-xs font-medium shadow-2xs transition-colors cursor-pointer ${
+              hasPendingOffer 
+                ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900'
+            } ${triggerClassName || ''}`}
           >
-            {hasPendingOffer ? <Clock className="h-4 w-4" /> : <Award className="h-4 w-4" />}
-            {hasPendingOffer ? 'Offer Verification Pending' : 'Declare Placement / Got Placed'}
+            {hasPendingOffer ? <Clock className="w-3.5 h-3.5 stroke-[1.5]" /> : <Award className="w-3.5 h-3.5 stroke-[1.5] text-emerald-400 dark:text-emerald-600" />}
+            <span>{hasPendingOffer ? 'Offer Verification Pending' : 'Declare Placement'}</span>
           </Button>
         )) as React.ReactElement)
       } />

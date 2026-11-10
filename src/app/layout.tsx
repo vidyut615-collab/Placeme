@@ -1,41 +1,39 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, DM_Sans, Fira_Code } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from 'sonner';
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-heading",
-  subsets: ["latin"],
-});
-
-const dmSans = DM_Sans({
+const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
-const firaCode = Fira_Code({
+const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Verdana Health Dashboard",
-  description: "Secure, reliable health management dashboard",
+  title: "Placeme | Next-Gen Campus Placement Operating System",
+  description: "Deterministic placement workflow engine for universities and elite students.",
 };
-
-import { Toaster } from 'sonner'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${plusJakartaSans.variable} ${dmSans.variable} ${firaCode.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col font-sans bg-[#fbfbfc] text-zinc-900 dark:bg-[#09090b] dark:text-zinc-100 selection:bg-indigo-500/20 selection:text-indigo-900 dark:selection:text-indigo-200">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >

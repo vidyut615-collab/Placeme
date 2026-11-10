@@ -1,22 +1,35 @@
 'use client'
 
-import { useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useTransition } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { Input } from '@/components/ui/input'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Search, X, LayoutGrid, List } from 'lucide-react'
-import { StudentJobCard } from '@/components/StudentJobCard'
-import { getJobDisplayStatus } from '@/lib/job-status-helper'
-import { WORKPLACE_MODES, EMPLOYMENT_TYPES } from '@/lib/cities-data'
+  Search,
+  X,
+  LayoutGrid,
+  List,
+  Building2,
+  MapPin,
+  Clock,
+  Briefcase,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+  Calendar,
+  Sparkles,
+} from 'lucide-react'
 import { JobDetailsData } from '@/components/JobDetailsModal'
 import { PaginationControls } from '@/components/PaginationControls'
-import { useState, useMemo } from 'react'
+import { WORKPLACE_MODES, EMPLOYMENT_TYPES } from '@/lib/cities-data'
+import { formatDate } from '@/lib/utils'
+import { applyForJob } from '@/app/(dashboards)/student/actions'
+import {
+  LinearStatusDot,
+  PriorityBadge,
+  LinearDrawer,
+  LinearRow,
+  CommandKBar,
+} from '@/components/ui/linear'
+import { TactileButton, TactileCard } from '@/components/ui/tactile'
 
 interface StudentJobsDirectoryProps {
   jobs: JobDetailsData[]
@@ -55,12 +68,16 @@ export function StudentJobsDirectory({
   pageSize,
   searchQuery,
   activeWorkplace,
-  activeEmployment
+  activeEmployment,
 }: StudentJobsDirectoryProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [selectedJob, setSelectedJob] = useState<JobDetailsData | null>(null)
+  const [isApplying, startApplyTransition] = useTransition()
+  const [localSearch, setLocalSearch] = useState(searchQuery)
 
   const appliedSet = useMemo(() => new Set(appliedJobIds), [appliedJobIds])
 
@@ -84,194 +101,430 @@ export function StudentJobsDirectory({
     [searchParams]
   )
 
-  const handleSearch = (value: string) => {
+  const handleSearchSubmit = (value: string) => {
     router.push(pathname + '?' + createQueryString({ q: value, page: '1' }))
   }
 
-  const handleWorkplaceChange = (val: string | null) => {
-    router.push(pathname + '?' + createQueryString({ workplace: val || '', page: '1' }))
+  const handleWorkplaceChange = (val: string) => {
+    router.push(pathname + '?' + createQueryString({ workplace: val, page: '1' }))
   }
 
-  const handleEmploymentChange = (val: string | null) => {
-    router.push(pathname + '?' + createQueryString({ employment: val || '', page: '1' }))
+  const handleEmploymentChange = (val: string) => {
+    router.push(pathname + '?' + createQueryString({ employment: val, page: '1' }))
   }
 
   const handlePageChange = (page: number) => {
     router.push(pathname + '?' + createQueryString({ page: page.toString() }))
   }
 
-  const clearFilters = () => {
-    router.push(pathname + '?' + createQueryString({ q: null, workplace: null, employment: null, page: '1' }))
+  // Calculate policy status for a job
+  const getJobPolicyEvaluation = (job: JobDetailsData) => {
+    const hasApplied = appliedSet.has(job.id)
+    if (hasApplied) {
+      return { canApply: false, reason: 'Already Applied', badge: 'Applied' }
+    }
+    if (isBlacklisted) {
+      return { canApply: false, reason: 'Student account currently under disciplinary hold.', badge: 'Blocked' }
+    }
+    if (accessStatus === 'unpaid' || accessStatus === 'expired') {
+      return { canApply: false, reason: 'Placement profile access is inactive or unpaid.', badge: 'Inactive' }
+    }
+
+    const ctc = Number(job.compensation_ctc || 0)
+
+    if (isPlaced && maxCurrentCtc > 0) {
+      if (upgradeConfig.enabled) {
+        const requiredCtc = maxCurrentCtc * (upgradeConfig.min_multiplier || 1.5)
+        if (ctc < requiredCtc) {
+          return {
+            canApply: false,
+            reason: `Blocked by ${upgradeConfig.min_multiplier || 1.5}× Upgrade Policy. Incoming CTC (₹${ctc} LPA) must be ≥ ₹${requiredCtc.toFixed(1)} LPA.`,
+            badge: 'Policy Barrier',
+          }
+        }
+      }
+    }
+
+    if (appLimitConfig.enabled && appLimitConfig.max_total && totalAppsCount >= appLimitConfig.max_total) {
+      return { canApply: false, reason: `Maximum application limit (${appLimitConfig.max_total}) reached.`, badge: 'Limit Reached' }
+    }
+
+    return { canApply: true, reason: null, badge: 'Eligible' }
   }
 
-  const hasActiveFilters = searchQuery || activeWorkplace !== 'all' || activeEmployment !== 'all'
+  const handleApply = (jobId: string) => {
+    startApplyTransition(async () => {
+      const res = await applyForJob(jobId)
+      if (res?.error) {
+        alert(res.error)
+      } else {
+        appliedSet.add(jobId)
+        if (selectedJob?.id === jobId) {
+          setSelectedJob(null)
+        }
+        router.refresh()
+      }
+    })
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Search & Filter Bar */}
-      <div className="p-4 rounded-xl border bg-white dark:bg-zinc-900/60 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          {/* Keyword Search */}
-          <div className="sm:col-span-6 relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-            <Input
-              placeholder="Search by job title, company, skills, or city..."
-              defaultValue={searchQuery}
-              onChange={(e) => {
-                const val = e.target.value
-                setTimeout(() => handleSearch(val), 300)
-              }}
-              className="pl-9 h-9 text-sm"
-            />
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
+      
+      {/* ── 1. Linear Header & Command Filter Capsule ── */}
+      <div className="flex flex-col gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="font-heading font-bold text-2xl text-[#242424] dark:text-white tracking-tight">
+              Verified Placement Drives
+            </h1>
+            <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              Active visiting campus recruitments and network-wide consortium opportunities.
+            </p>
           </div>
 
-          {/* Workplace Mode Filter */}
-          <div className="sm:col-span-3">
-            <Select value={activeWorkplace} onValueChange={handleWorkplaceChange}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="All Workplace Modes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Modes (On-Site, Remote, Hybrid)</SelectItem>
-                {WORKPLACE_MODES.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Employment Type Filter */}
-          <div className="sm:col-span-3">
-            <Select value={activeEmployment} onValueChange={handleEmploymentChange}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="All Employment Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types (Full-time, Internship, etc.)</SelectItem>
-                {EMPLOYMENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg border text-xs font-mono transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-2xs'
+                  : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+              title="List View"
+            >
+              <List className="w-4 h-4 stroke-[1.5]" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg border text-xs font-mono transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-2xs'
+                  : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid className="w-4 h-4 stroke-[1.5]" />
+            </button>
           </div>
         </div>
 
-        {/* Filter Summary & View Toggle */}
-        <div className="flex items-center justify-between text-xs text-zinc-500 pt-1">
-          <div className="flex items-center gap-4">
-            <span>
-              Showing <strong>{jobs.length}</strong> of {totalItems} open drives
-            </span>
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
-              >
-                <X className="h-3 w-3" /> Clear Filters
-              </button>
-            )}
+        {/* Filter Capsule Bar */}
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          {/* Search Input */}
+          <div className="flex-1 min-w-[240px]">
+            <CommandKBar
+              value={localSearch}
+              onChange={(val) => {
+                setLocalSearch(val)
+                handleSearchSubmit(val)
+              }}
+              placeholder="Filter by company, role, or skill keywords..."
+            />
           </div>
-          
-          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border dark:border-zinc-700">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-              title="Grid View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-              title="List View"
-            >
-              <List className="w-4 h-4" />
-            </button>
+
+          {/* Workplace Mode Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {['all', ...WORKPLACE_MODES].map((mode) => {
+              const isSelected = activeWorkplace === mode || (mode === 'all' && !activeWorkplace)
+              return (
+                <button
+                  key={mode}
+                  onClick={() => handleWorkplaceChange(mode)}
+                  className={`px-3 py-1.5 rounded-full font-mono text-xs transition-colors shrink-0 ${
+                    isSelected
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold shadow-2xs'
+                      : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  {mode === 'all' ? 'All Modes' : mode}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Employment Type Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {['all', ...EMPLOYMENT_TYPES].map((emp) => {
+              const isSelected = activeEmployment === emp || (emp === 'all' && !activeEmployment)
+              return (
+                <button
+                  key={emp}
+                  onClick={() => handleEmploymentChange(emp)}
+                  className={`px-3 py-1.5 rounded-full font-mono text-xs transition-colors shrink-0 ${
+                    isSelected
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold shadow-2xs'
+                      : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  {emp === 'all' ? 'All Types' : emp}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
 
-      {/* Jobs Container */}
+      {/* ── 2. Jobs Main Canvas (List or Grid) ── */}
       {jobs.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-12 text-center text-sm text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/30">
-          No job drives match your current search and filter criteria.
+        <div className="p-16 text-center bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xs">
+          <Briefcase className="w-10 h-10 stroke-[1.5] text-zinc-400 mx-auto mb-3" />
+          <h3 className="font-semibold text-base text-zinc-900 dark:text-zinc-100">
+            No matching drives found
+          </h3>
+          <p className="font-mono text-xs text-zinc-500 mt-1">
+            Try adjusting your workplace filters, employment types, or search keywords.
+          </p>
         </div>
-      ) : (
-        <div className={viewMode === 'grid' ? "grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex flex-col gap-4"}>
+      ) : viewMode === 'list' ? (
+        /* Linear High-Density List */
+        <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xs divide-y divide-zinc-100 dark:divide-zinc-800/60">
           {jobs.map((job) => {
             const hasApplied = appliedSet.has(job.id)
-            const displayStatus = getJobDisplayStatus({ ...job, status: job.status || 'active' })
-            let disabledReason = ''
-            const jobCtc = job.compensation_ctc || 0
-
-            if (displayStatus.key === 'paused') {
-              disabledReason = 'Applications Paused by College'
-            } else if (displayStatus.key === 'ongoing') {
-              disabledReason = 'Application Deadline Passed'
-            } else if (isBlacklisted) {
-              disabledReason = 'Debarred from campus drives'
-            } else if (isPlaced && !hasApplied) {
-              const isSuperDreamEligible = superDreamConfig.enabled && jobCtc >= superDreamConfig.min_ctc
-              const isDreamEligible = dreamConfig.enabled && jobCtc >= dreamConfig.min_ctc
-              const isUpgradeEligible = upgradeConfig.enabled && jobCtc >= (maxCurrentCtc * upgradeConfig.min_multiplier)
-
-              if (!isSuperDreamEligible && !isDreamEligible && !isUpgradeEligible) {
-                disabledReason = `1-Offer Policy Active: Placed at ₹${maxCurrentCtc} LPA`
-              } else if (isSuperDreamEligible) {
-                const used = counters.super_dream_attempts || 0
-                if (used >= (superDreamConfig.max_attempts || 2)) {
-                  disabledReason = `Super Dream attempt limit reached (${used}/${superDreamConfig.max_attempts || 2})`
-                }
-              } else if (isDreamEligible) {
-                const used = counters.dream_attempts || 0
-                if (used >= (dreamConfig.max_dream_attempts || 3)) {
-                  disabledReason = `Dream attempt limit reached (${used}/${dreamConfig.max_dream_attempts || 3})`
-                }
-              } else if (isUpgradeEligible) {
-                const used = counters.upgrades_used || 0
-                if (used >= (upgradeConfig.max_allowed || 1)) {
-                  disabledReason = `Upgrade attempts exhausted (${used}/${upgradeConfig.max_allowed || 1})`
-                }
-              }
-            } else if (!hasApplied && appLimitConfig.enabled) {
-              if (appLimitConfig.max_active && activeAppsCount >= appLimitConfig.max_active) {
-                disabledReason = `Active limit reached (${activeAppsCount}/${appLimitConfig.max_active})`
-              } else if (appLimitConfig.max_total && totalAppsCount >= appLimitConfig.max_total) {
-                disabledReason = `Total application quota exhausted (${totalAppsCount}/${appLimitConfig.max_total})`
-              }
-            }
-
-            const isUpgrade = isPlaced && !disabledReason
+            const evaluation = getJobPolicyEvaluation(job)
+            const ctc = Number(job.compensation_ctc || 0)
+            const isSuperDream = ctc >= 20
+            const isDream = ctc >= 10 && ctc < 20
 
             return (
-              <StudentJobCard
+              <LinearRow
                 key={job.id}
-                job={job}
-                hasApplied={hasApplied}
-                disabledReason={disabledReason}
-                isUpgrade={isUpgrade}
-                accessStatus={accessStatus}
-                viewMode={viewMode}
-                statusBadge={{
-                  label: displayStatus.label,
-                  badgeColor: displayStatus.badgeColor,
-                }}
+                onClick={() => setSelectedJob(job)}
+                isSelected={selectedJob?.id === job.id}
+                title={job.title}
+                subtitle={
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                      {job.company_name || 'Corporate Partner'}
+                    </span>
+                    <span>·</span>
+                    <span className="text-zinc-400">
+                      {job.job_location || 'Pan-India'} ({job.workplace_mode || 'On-Site'})
+                    </span>
+                  </span>
+                }
+                metadata={
+                  <div className="flex items-center gap-3">
+                    {job.compensation_ctc && (
+                      <span className="font-mono font-bold text-zinc-900 dark:text-white">
+                        ₹{job.compensation_ctc} LPA
+                      </span>
+                    )}
+                    {job.application_deadline && (
+                      <span className="text-[10px] text-zinc-400">
+                        Deadline: {formatDate(job.application_deadline)}
+                      </span>
+                    )}
+                  </div>
+                }
+                rightSlot={
+                  <div className="flex items-center gap-2">
+                    {hasApplied ? (
+                      <LinearStatusDot status="applied" size="sm" />
+                    ) : !evaluation.canApply ? (
+                      <PriorityBadge tier="locked" size="sm" labelOverride="Blocked" />
+                    ) : isSuperDream ? (
+                      <PriorityBadge tier="super_dream" size="sm" />
+                    ) : isDream ? (
+                      <PriorityBadge tier="dream" size="sm" />
+                    ) : (
+                      <PriorityBadge tier="eligible" size="sm" />
+                    )}
+                  </div>
+                }
               />
+            )
+          })}
+        </div>
+      ) : (
+        /* Linear Bento Card Grid */
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {jobs.map((job) => {
+            const hasApplied = appliedSet.has(job.id)
+            const evaluation = getJobPolicyEvaluation(job)
+            const ctc = Number(job.compensation_ctc || 0)
+            const isSuperDream = ctc >= 20
+            const isDream = ctc >= 10 && ctc < 20
+
+            return (
+              <TactileCard
+                key={job.id}
+                onClick={() => setSelectedJob(job)}
+                className="flex flex-col justify-between h-full space-y-4"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-xs font-mono font-semibold text-[#2B59D1] dark:text-indigo-400 truncate">
+                      {job.company_name || 'Corporate Partner'}
+                    </span>
+                    {hasApplied ? (
+                      <LinearStatusDot status="applied" size="sm" />
+                    ) : isSuperDream ? (
+                      <PriorityBadge tier="super_dream" size="sm" />
+                    ) : isDream ? (
+                      <PriorityBadge tier="dream" size="sm" />
+                    ) : (
+                      <PriorityBadge tier="core" size="sm" />
+                    )}
+                  </div>
+
+                  <h3 className="font-heading font-bold text-base text-[#242424] dark:text-white line-clamp-1">
+                    {job.title}
+                  </h3>
+
+                  <p className="font-mono text-xs text-zinc-500 mt-1 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-zinc-400 stroke-[1.5]" />
+                    <span>{job.job_location || 'Pan-India'} ({job.workplace_mode})</span>
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+                  <span className="font-mono font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                    {job.compensation_ctc ? `₹${job.compensation_ctc} LPA` : 'Competitive'}
+                  </span>
+                  <span className="font-mono text-[11px] text-[#2B59D1] dark:text-indigo-400 font-semibold">
+                    View Details →
+                  </span>
+                </div>
+              </TactileCard>
             )
           })}
         </div>
       )}
 
-      {totalItems > pageSize && (
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          itemLabel="jobs"
-        />
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="pt-4 flex justify-center">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
+
+      {/* ── 3. Linear Slide-Over Inspector Drawer ── */}
+      {selectedJob && (
+        <LinearDrawer
+          isOpen={!!selectedJob}
+          onClose={() => setSelectedJob(null)}
+          title={selectedJob.title}
+          subtitle={selectedJob.company_name || 'Corporate Partner'}
+          badge={
+            appliedSet.has(selectedJob.id) ? (
+              <LinearStatusDot status="applied" size="sm" />
+            ) : Number(selectedJob.compensation_ctc) >= 20 ? (
+              <PriorityBadge tier="super_dream" size="sm" />
+            ) : (
+              <PriorityBadge tier="eligible" size="sm" />
+            )
+          }
+          footer={
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <span className="block font-mono text-[10px] uppercase text-zinc-400">Compensation Package</span>
+                <span className="font-mono font-bold text-base text-zinc-900 dark:text-white">
+                  {selectedJob.compensation_ctc ? `₹${selectedJob.compensation_ctc} LPA` : 'Standard CTC'}
+                </span>
+              </div>
+
+              {appliedSet.has(selectedJob.id) ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono text-xs font-semibold">
+                  <CheckCircle2 className="w-4 h-4 stroke-[1.5]" />
+                  <span>Application Submitted</span>
+                </div>
+              ) : !getJobPolicyEvaluation(selectedJob).canApply ? (
+                <div className="text-right">
+                  <span className="text-[11px] font-mono text-red-500 font-medium block">
+                    {getJobPolicyEvaluation(selectedJob).reason}
+                  </span>
+                </div>
+              ) : (
+                <TactileButton
+                  variant="primary"
+                  size="md"
+                  isLoading={isApplying}
+                  onClick={() => handleApply(selectedJob.id)}
+                >
+                  1-Click Dispatch Application →
+                </TactileButton>
+              )}
+            </div>
+          }
+        >
+          {/* Compensation Breakdown Box */}
+          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 space-y-2">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400 font-semibold block">
+              Verified Terms
+            </span>
+            <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+              <div>
+                <span className="text-zinc-500 block">Workplace:</span>
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">{selectedJob.workplace_mode}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 block">Employment:</span>
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">{selectedJob.employment_type}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 block">Location:</span>
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">{selectedJob.job_location || 'Pan-India'}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 block">Deadline:</span>
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                  {selectedJob.application_deadline ? formatDate(selectedJob.application_deadline) : 'Rolling'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Policy Evaluation Notice */}
+          {!getJobPolicyEvaluation(selectedJob).canApply && (
+            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 stroke-[1.5] shrink-0 mt-0.5" />
+              <div className="font-mono text-xs text-red-900 dark:text-red-300">
+                <span className="font-bold block mb-1">Policy Restriction</span>
+                {getJobPolicyEvaluation(selectedJob).reason}
+              </div>
+            </div>
+          )}
+
+          {/* Skills Required */}
+          {selectedJob.skills_required && (
+            <div className="space-y-2">
+              <span className="font-mono text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold block">
+                Target Skills
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedJob.skills_required
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .map((skill) => (
+                    <span
+                      key={skill}
+                      className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-[11px] text-zinc-800 dark:text-zinc-200"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Job Description */}
+          <div className="space-y-2">
+            <span className="font-mono text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold block">
+              Job Description
+            </span>
+            <div className="prose prose-sm dark:prose-invert max-w-none font-sans text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">
+              {selectedJob.description || 'No detailed description provided.'}
+            </div>
+          </div>
+        </LinearDrawer>
+      )}
+
     </div>
   )
 }

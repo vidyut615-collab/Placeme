@@ -98,10 +98,16 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger render={<Button variant="outline" className="gap-2 bg-zinc-100/80 hover:bg-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700" />}>
-        <FileText className="h-4 w-4" />
-        View DigiProfile
-      </DialogTrigger>
+      <DialogTrigger render={
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-2 h-8.5 px-3 rounded-lg bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-800 dark:text-zinc-200 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+        >
+          <FileText className="w-3.5 h-3.5 stroke-[1.5]" />
+          <span>View DigiProfile</span>
+        </Button>
+      } />
       
       {/* 
         Use a max-w-4xl so it is large enough, and max-h-[90vh] with overflow-y-auto 

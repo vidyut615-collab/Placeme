@@ -2,25 +2,33 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { User, GraduationCap, Building, Briefcase, FileText, TrendingUp, Award } from 'lucide-react'
+  Briefcase,
+  FileText,
+  TrendingUp,
+  ShieldCheck,
+  ShieldAlert,
+  ArrowRight,
+  ExternalLink,
+  Award,
+  Clock,
+  Sparkles,
+  Compass,
+  FileCheck,
+  CreditCard,
+  Building2,
+  MapPin,
+  ChevronRight,
+  CheckCircle2,
+  CircleDot,
+  AlertTriangle,
+  Lock,
+} from 'lucide-react'
+import { PriorityBadge, LinearStatusDot } from '@/components/ui/linear'
+import { TactileCard, RollingCounter } from '@/components/ui/tactile'
 import { DeclareHiredModal } from '@/components/DeclareHiredModal'
+import { formatDate } from '@/lib/utils'
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-  applied:      { label: 'Applied',      className: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300' },
-  shortlisted:  { label: 'Shortlisted',  className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  interviewing: { label: 'Interviewing', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
-  offered:      { label: 'Offered',      className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  hired:        { label: 'Hired',        className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-}
-
-export default async function StudentDashboard() {
+export default async function StudentDashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -28,272 +36,835 @@ export default async function StudentDashboard() {
     redirect('/login')
   }
 
-  // Fetch student profile and college
+  // 1. Fetch student master profile + college details
   const { data: student } = await supabase
     .from('students')
-    .select(`id, profile_data, college_id, colleges ( name )`)
+    .select(`
+      id,
+      college_id,
+      profile_data,
+      is_blacklisted,
+      policy_counters,
+      access_end_date,
+      credit_balance,
+      colleges (
+        name,
+        logo_url
+      )
+    `)
     .eq('user_id', user.id)
     .single()
 
-  const profile = student?.profile_data || {}
-  const collegeName = (student?.colleges as any)?.name || 'Unknown College'
+  if (!student) {
+    return (
+      <div className="p-8 text-zinc-500 font-mono text-sm">
+        Error loading candidate profile. Please reconnect with your institution.
+      </div>
+    )
+  }
 
-  // Fetch stats + data in parallel
+  const profile = (student.profile_data as Record<string, any>) || {}
+  const collegeName = (student.colleges as any)?.name || 'Campus Placement Cell'
+  const firstName =
+    profile.first_name ||
+    (profile.full_name ? profile.full_name.split(' ')[0] : '') ||
+    user?.user_metadata?.first_name ||
+    user?.email?.split('@')[0] ||
+    'Candidate'
+
+  // 2. Parallel fetch telemetry, applications, jobs, offers, and AI resumes
   const [
-    { data: recentJobs },
-    { data: recentApplications },
-    { count: totalJobsCount },
-    { count: totalAppsCount },
-    { count: progressCount },
-    { data: offers },
+    { data: recentApplications, count: totalAppsCount },
     { data: allApplications },
+    { data: recentJobs, count: totalJobsCount },
+    { data: offers },
+    { data: resumes, count: totalResumesCount },
+    { data: policyDoc },
   ] = await Promise.all([
-    // 3 most recent active, eligible jobs
+    // Up to 5 recent applications with job details
+    supabase
+      .from('applications')
+      .select(
+        `
+        id,
+        status,
+        created_at,
+        jobs (
+          id,
+          title,
+          company_name,
+          compensation_ctc,
+          college_id,
+          workplace_mode,
+          location,
+          deadline,
+          status
+        )
+      `,
+        { count: 'exact' }
+      )
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+
+    // All applications (for status funnel telemetry & modal mapping)
+    supabase
+      .from('applications')
+      .select('id, job_id, status, jobs ( title, company_name, compensation_ctc )')
+      .eq('student_id', student.id),
+
+    // Active eligible jobs for student's college or consortium
     supabase
       .from('jobs')
-      .select('id, title, college_id, created_at')
+      .select(
+        'id, title, company_name, compensation_ctc, college_id, workplace_mode, location, deadline, created_at',
+        { count: 'exact' }
+      )
       .eq('status', 'active')
-      .or(`college_id.is.null,college_id.eq.${student?.college_id}`)
+      .or(`college_id.eq.${student.college_id},is_all_colleges.eq.true`)
       .order('created_at', { ascending: false })
-      .limit(3),
-
-    // 3 most recent applications
-    supabase
-      .from('applications')
-      .select(`id, status, created_at, jobs ( title )`)
-      .eq('student_id', student?.id)
-      .order('created_at', { ascending: false })
-      .limit(3),
-
-    // Count eligible active jobs
-    supabase
-      .from('jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active')
-      .or(`college_id.is.null,college_id.eq.${student?.college_id}`),
-
-    // Count total applications
-    supabase
-      .from('applications')
-      .select('*', { count: 'exact', head: true })
-      .eq('student_id', student?.id),
-
-    // Count shortlisted + interviewing + offered
-    supabase
-      .from('applications')
-      .select('*', { count: 'exact', head: true })
-      .eq('student_id', student?.id)
-      .in('status', ['shortlisted', 'interviewing', 'offered', 'hired']),
+      .limit(5),
 
     // Placement offers declared
     supabase
       .from('student_offers')
       .select('*')
-      .eq('student_id', student?.id)
+      .eq('student_id', student.id)
       .order('created_at', { ascending: false }),
 
-    // All applications for declaration modal
+    // AI resumes generated by student
     supabase
-      .from('applications')
-      .select('id, job_id, jobs ( title, company_name, compensation_ctc )')
-      .eq('student_id', student?.id),
+      .from('ai_resumes')
+      .select('id, title, target_role, created_at', { count: 'exact' })
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+
+    // College placement policies config
+    supabase
+      .from('placement_policies')
+      .select('config')
+      .eq('college_id', student.college_id)
+      .maybeSingle(),
   ])
 
-  const approvedOffer = offers?.find(o => o.status === 'approved')
-  const pendingOffer = offers?.find(o => o.status === 'pending')
+  // Placement Offer Status
+  const approvedOffer = offers?.find((o) => o.status === 'approved')
+  const pendingOffer = offers?.find((o) => o.status === 'pending')
+  const isPlaced = !!approvedOffer
+  const holdingCtc = approvedOffer ? Number(approvedOffer.compensation_ctc) : 0
+  const upgradeMultiplier = (policyDoc?.config as any)?.upgrade?.multiplier || 1.5
+  const upgradeMinCtc = holdingCtc > 0 ? (holdingCtc * upgradeMultiplier).toFixed(1) : '0'
+
+  // Application Funnel Calculations
+  const allApps = allApplications || []
+  const appliedCount = allApps.filter((a) => a.status === 'applied').length
+  const shortlistedCount = allApps.filter((a) => a.status === 'shortlisted').length
+  const interviewingCount = allApps.filter((a) => a.status === 'interviewing').length
+  const offeredCount = allApps.filter((a) =>
+    ['offered', 'hired', 'offer_accepted'].includes(a.status)
+  ).length
+  const inFlightCount = appliedCount + shortlistedCount + interviewingCount
+
+  // Policy Standing & Strikes Calculation
+  const counters = (student.policy_counters as Record<string, any>) || {}
+  const noShowStrikes = counters.no_show_count || 0
+  const withdrawalStrikes =
+    (counters.withdrawal_count || 0) + (counters.post_shortlist_withdrawal_count || 0)
+  const disciplinaryStrikes =
+    (counters.disciplinary_strikes || 0) + (counters.integrity_strikes || 0)
+  const totalStrikes = noShowStrikes + withdrawalStrikes + disciplinaryStrikes
+  const isBlacklisted = student.is_blacklisted || false
+
+  // Applied job IDs set for fast check in Recommended Jobs
+  const appliedJobIdSet = new Set(allApps.map((a) => a.job_id))
 
   return (
-    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 md:space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Welcome back, {profile.full_name || 'Student'}!
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
+      {/* ── 1. Top Header & Welcome Banner ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-full px-2.5 py-0.5 font-semibold">
+              Season 2026 · Cycle I
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700">·</span>
+            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+              {collegeName}
+            </span>
+          </div>
+
+          <h1 className="font-bold text-2xl md:text-3xl text-zinc-900 dark:text-zinc-50 tracking-tight">
+            Welcome back, {firstName}
           </h1>
-          <p className="text-zinc-500 mt-2">Here's what's happening with your placement journey.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Real-time placement velocity, institutional eligibility status, and active drive progression.
+          </p>
         </div>
 
-        <div>
-          <DeclareHiredModal 
-            appliedJobs={allApplications || []} 
+        {/* Top Action Pill: Declare Hired / Placement Offer */}
+        <div className="flex items-center gap-3">
+          <DeclareHiredModal
+            appliedJobs={allApplications || []}
             hasPendingOffer={!!pendingOffer}
-            pendingOfferDetails={pendingOffer ? { company_name: pendingOffer.company_name, job_role: pendingOffer.job_role, created_at: pendingOffer.created_at } : null}
-            approvedOfferDetails={approvedOffer ? { company_name: approvedOffer.company_name, job_role: approvedOffer.job_role, compensation_ctc: Number(approvedOffer.compensation_ctc) } : null}
+            pendingOfferDetails={
+              pendingOffer
+                ? {
+                    company_name: pendingOffer.company_name,
+                    job_role: pendingOffer.job_role,
+                    created_at: pendingOffer.created_at,
+                  }
+                : null
+            }
+            approvedOfferDetails={
+              approvedOffer
+                ? {
+                    company_name: approvedOffer.company_name,
+                    job_role: approvedOffer.job_role,
+                    compensation_ctc: Number(approvedOffer.compensation_ctc),
+                  }
+                : null
+            }
           />
         </div>
       </div>
 
-      {approvedOffer && (
-        <div className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4">
-          <div className="flex items-center gap-3">
-            <Award className="h-6 w-6 text-emerald-600 flex-shrink-0" />
-            <div>
-              <div className="font-semibold text-emerald-900 dark:text-emerald-200">
-                Officially Placed at {approvedOffer.company_name} (₹{approvedOffer.compensation_ctc} LPA)
+      {/* ── 2. Context-Aware Priority Action Horizon (Dynamic Radar) ── */}
+      {approvedOffer ? (
+        // Horizon State 1: Officially Placed Student holding an offer
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-50/40 dark:bg-emerald-950/20 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-300/40 dark:border-emerald-700/50">
+              <Award className="w-5 h-5 stroke-[1.5]" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
+                  Placement Holding Confirmed · {approvedOffer.company_name}
+                </span>
+                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300/40">
+                  ₹{holdingCtc} LPA
+                </span>
               </div>
-              <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-0.5">
-                Congratulations! Your placement offer is officially confirmed. 1-Offer policy is active.
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Institutional holding recorded. The {upgradeMultiplier}× Upgrade Multiplier Policy is active; you are eligible to apply only for dream drives offering $\ge$ ₹{upgradeMinCtc} LPA.
               </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <PriorityBadge tier="multiplier_unlocked" size="md" />
+          </div>
+        </div>
+      ) : pendingOffer ? (
+        // Horizon State 2: Offer Declaration Pending TPO Approval
+        <div className="rounded-xl border border-amber-500/25 bg-amber-50/40 dark:bg-amber-950/20 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 border border-amber-300/40 dark:border-amber-700/50">
+              <Clock className="w-5 h-5 stroke-[1.5]" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-amber-950 dark:text-amber-200">
+                  Offer Verification In Progress · {pendingOffer.company_name}
+                </span>
+                {pendingOffer.compensation_ctc && (
+                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300/40">
+                    ₹{pendingOffer.compensation_ctc} LPA
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Declaration submitted on {formatDate(pendingOffer.created_at)}. TPO verification is underway.
+              </p>
+            </div>
+          </div>
+
+          <span className="font-mono text-xs px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-semibold border border-amber-300/40">
+            Awaiting Verification
+          </span>
+        </div>
+      ) : inFlightCount > 0 ? (
+        // Horizon State 3: Candidate has active applications in pipeline
+        <div className="rounded-xl border border-purple-500/20 bg-purple-50/30 dark:bg-purple-950/15 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0 border border-purple-300/40 dark:border-purple-700/50">
+              <TrendingUp className="w-5 h-5 stroke-[1.5]" />
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                Active Application Velocity · {inFlightCount} in-flight pipeline {inFlightCount === 1 ? 'stage' : 'stages'}
+              </span>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                {interviewingCount > 0
+                  ? `You have ${interviewingCount} role(s) currently in interview/assessment rounds. Check notifications regularly.`
+                  : `${appliedCount + shortlistedCount} submission(s) undergoing recruiter triage and shortlist verification.`}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/student/applications"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 transition-colors shadow-2xs"
+          >
+            <span>Review Stages</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      ) : (
+        // Horizon State 4: Clean standing, ready for new drives
+        <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/40 dark:bg-zinc-900/30 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center shrink-0 border border-zinc-200 dark:border-zinc-700">
+              <ShieldCheck className="w-5 h-5 stroke-[1.5] text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                Placement Docket Clear & Verified
+              </span>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                No pending deadlines or action items today. Explore open campus drives or prepare with AI Resume Studio.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/student/jobs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 transition-colors shadow-2xs"
+          >
+            <span>Explore Open Drives</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       )}
 
-      {/* Profile stat cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Full Name</CardTitle>
-            <User className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold">{profile.full_name || '—'}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">College</CardTitle>
-            <Building className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold truncate" title={collegeName}>{collegeName}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Academic Info</CardTitle>
-            <GraduationCap className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            {profile.type ? (
-              <>
-                <div className="text-lg font-bold">{profile.type} – {profile.year}</div>
-                <p className="text-xs text-zinc-500">{profile.department}</p>
-              </>
-            ) : (
-              <div className="text-lg font-bold text-zinc-400">Not Provided</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">GPA</CardTitle>
-            <Briefcase className="h-4 w-4 text-zinc-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold">{profile.gpa || '—'}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity stats */}
+      {/* ── 3. Telemetry & Institutional Clearance Pulse (3-Module Horizon) ── */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Link href="/student/jobs" className="block h-full">
-          <Card className="h-full border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Jobs Available</CardTitle>
-              <Briefcase className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalJobsCount || 0}</div>
-              <p className="text-xs text-zinc-500">Active openings for you</p>
-            </CardContent>
-          </Card>
+        {/* Module A: Pipeline Funnel Velocity */}
+        <Link href="/student/applications" className="block group">
+          <TactileCard className="h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 mb-3">
+                <span className="font-mono text-xs uppercase tracking-wider font-semibold">
+                  Application Funnel
+                </span>
+                <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
+              </div>
+
+              <div className="flex items-baseline gap-2 mb-3">
+                <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+                  <RollingCounter value={totalAppsCount || 0} />
+                </span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Total Submissions
+                </span>
+              </div>
+
+              {/* Multi-segment conversion micro-bar */}
+              <div className="space-y-1.5 mb-2">
+                <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+                  <div
+                    style={{
+                      width: `${totalAppsCount ? (appliedCount / totalAppsCount) * 100 : 0}%`,
+                    }}
+                    className="bg-blue-500 h-full"
+                    title={`Applied: ${appliedCount}`}
+                  />
+                  <div
+                    style={{
+                      width: `${totalAppsCount ? (shortlistedCount / totalAppsCount) * 100 : 0}%`,
+                    }}
+                    className="bg-purple-500 h-full"
+                    title={`Shortlisted: ${shortlistedCount}`}
+                  />
+                  <div
+                    style={{
+                      width: `${totalAppsCount ? (interviewingCount / totalAppsCount) * 100 : 0}%`,
+                    }}
+                    className="bg-amber-500 h-full"
+                    title={`Interviewing: ${interviewingCount}`}
+                  />
+                  <div
+                    style={{
+                      width: `${totalAppsCount ? (offeredCount / totalAppsCount) * 100 : 0}%`,
+                    }}
+                    className="bg-emerald-500 h-full"
+                    title={`Offered: ${offeredCount}`}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400 pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                    <span>{appliedCount} Sent</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block" />
+                    <span>{shortlistedCount} Shortlist</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                    <span>{interviewingCount} Rounds</span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                    <span>{offeredCount} Offers</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
+              <span className="text-zinc-500 dark:text-zinc-400">Deterministic pipeline</span>
+              <span className="text-purple-600 dark:text-purple-400 font-semibold group-hover:underline flex items-center gap-1">
+                <span>View conveyor</span>
+                <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
+          </TactileCard>
         </Link>
-        <Link href="/student/applications" className="block h-full">
-          <Card className="h-full border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 transition-colors cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Applications Sent</CardTitle>
-              <FileText className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalAppsCount || 0}</div>
-              <p className="text-xs text-zinc-500">Total submitted</p>
-            </CardContent>
-          </Card>
+
+        {/* Module B: Institutional Standing & Clearance */}
+        <Link href="/student/policies" className="block group">
+          <TactileCard className="h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 mb-3">
+                <span className="font-mono text-xs uppercase tracking-wider font-semibold">
+                  Institutional Clearance
+                </span>
+                {isBlacklisted ? (
+                  <ShieldAlert className="w-4 h-4 text-red-500 stroke-[1.5]" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[1.5]" />
+                )}
+              </div>
+
+              <div className="flex items-baseline gap-2 mb-3">
+                <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+                  {profile.gpa ? `${profile.gpa} GPA` : 'Verified'}
+                </span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {profile.department || 'Department Registered'}
+                </span>
+              </div>
+
+              {/* Metrics row */}
+              <div className="space-y-2 mb-2 font-mono text-[11px]">
+                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                  <span className="text-zinc-500 dark:text-zinc-400">Policy Standing:</span>
+                  {isBlacklisted ? (
+                    <span className="text-red-600 dark:text-red-400 font-bold">Blacklisted / Cooldown</span>
+                  ) : totalStrikes > 0 ? (
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">{totalStrikes} Strike(s) Active</span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">Clean · 0 Strikes</span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                  <span className="text-zinc-500 dark:text-zinc-400">Backlogs Status:</span>
+                  <span className="text-zinc-800 dark:text-zinc-200 font-semibold">
+                    {profile.backlogs ?? 0} Active Backlogs
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
+              <span className="text-zinc-500 dark:text-zinc-400">20-Policy rulebook</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold group-hover:underline flex items-center gap-1">
+                <span>View thresholds</span>
+                <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
+          </TactileCard>
         </Link>
-        <Link href="/student/applications" className="block h-full">
-          <Card className="h-full border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{progressCount || 0}</div>
-              <p className="text-xs text-zinc-500">Shortlisted / Interviewing / Offered</p>
-            </CardContent>
-          </Card>
+
+        {/* Module C: AI Workspace Fuel & Resumes */}
+        <Link href="/student/billing" className="block group">
+          <TactileCard className="h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 mb-3">
+                <span className="font-mono text-xs uppercase tracking-wider font-semibold">
+                  AI Fuel & Readiness
+                </span>
+                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
+              </div>
+
+              <div className="flex items-baseline gap-2 mb-3">
+                <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+                  <RollingCounter value={student.credit_balance || 0} />
+                </span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Available Credits
+                </span>
+              </div>
+
+              {/* Telemetry info */}
+              <div className="space-y-2 mb-2 font-mono text-[11px]">
+                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                  <span className="text-zinc-500 dark:text-zinc-400">Compiled Resumes:</span>
+                  <span className="text-purple-600 dark:text-purple-400 font-bold">
+                    {totalResumesCount || 0} LaTeX Versions
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                  <span className="text-zinc-500 dark:text-zinc-400">AI Job Scraper:</span>
+                  <span className="text-zinc-800 dark:text-zinc-200 font-semibold">LinkedIn + Internshala</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
+              <span className="text-zinc-500 dark:text-zinc-400">Top-up & ledger</span>
+              <span className="text-purple-600 dark:text-purple-400 font-semibold group-hover:underline flex items-center gap-1">
+                <span>Refuel balance</span>
+                <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
+          </TactileCard>
         </Link>
       </div>
 
-      {/* Recent jobs + recent applications */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex items-center justify-between">
+      {/* ── 4. Split Workstream: Application Conveyor (60%) vs Recommended Drives (40%) ── */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Left Column (7 cols ≈ 58%): Active Application Conveyor */}
+        <div className="lg:col-span-7 bg-white dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-2xs flex flex-col">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/60">
             <div>
-              <CardTitle>Recent Job Postings</CardTitle>
-              <CardDescription>Latest openings available for you</CardDescription>
+              <h2 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                Application Pipeline Conveyor
+              </h2>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Deterministic stage tracking across visiting campus recruiters
+              </p>
             </div>
-            <Link href="/student/jobs" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-              View all →
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!recentJobs || recentJobs.length === 0 ? (
-              <p className="text-sm text-zinc-500">No active jobs available right now.</p>
-            ) : (
-              recentJobs.map((job: any) => (
-                <div key={job.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{job.title}</span>
-                    <span className="text-xs text-zinc-500">
-                      {job.college_id ? 'College Exclusive' : 'Global Placement'}
-                    </span>
-                  </div>
-                  <Link
-                    href="/student/jobs"
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400 shrink-0"
-                  >
-                    Apply
-                  </Link>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <div>
-              <CardTitle>My Applications</CardTitle>
-              <CardDescription>Track your recent submissions</CardDescription>
-            </div>
-            <Link href="/student/applications" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-              View all →
+            <Link
+              href="/student/applications"
+              className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-semibold"
+            >
+              <span>View All ({totalAppsCount || 0})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
-          </CardHeader>
-          <CardContent className="space-y-3">
+          </div>
+
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60 flex-1">
             {!recentApplications || recentApplications.length === 0 ? (
-              <p className="text-sm text-zinc-500">You haven't applied to any jobs yet.</p>
+              <div className="p-10 text-center space-y-2.5">
+                <FileText className="w-9 h-9 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  No applications submitted yet
+                </p>
+                <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                  Browse matching campus drives from corporate hiring partners and apply with 1-click.
+                </p>
+                <Link
+                  href="/student/jobs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-colors"
+                >
+                  <span>Explore Jobs</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
             ) : (
               recentApplications.map((app: any) => {
-                const config = statusConfig[app.status] || { label: app.status, className: 'bg-zinc-100 text-zinc-800' }
+                const job = app.jobs || {}
+                const ctc = job.compensation_ctc ? Number(job.compensation_ctc) : null
+                const status = app.status || 'applied'
+
+                // Determine active stage indices (0: Applied, 1: Shortlisted, 2: Interviewing, 3: Offered)
+                const stageIndex =
+                  status === 'hired' || status === 'offered' || status === 'offer_accepted'
+                    ? 3
+                    : status === 'interviewing'
+                    ? 2
+                    : status === 'shortlisted'
+                    ? 1
+                    : 0
+
+                const isTerminalFailure =
+                  status === 'rejected' || status === 'dropped' || status === 'withdrawn'
+
                 return (
-                  <div key={app.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <span className="text-sm font-medium truncate max-w-[60%]">
-                      {app.jobs?.title || 'Unknown Job'}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className={`${config.className} border-transparent text-xs`}
-                    >
-                      {config.label}
-                    </Badge>
+                  <div key={app.id} className="p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-850/30 transition-colors space-y-3">
+                    {/* Top Row: Job Title, Company, CTC & Status Dot */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                            {job.title || 'Placement Drive'}
+                          </span>
+                          {ctc && (
+                            <span className="font-mono text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                              ₹{ctc} LPA
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                          <span>{job.company_name || 'Visiting Recruiter'}</span>
+                          <span>·</span>
+                          <span>Applied {formatDate(app.created_at)}</span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        <LinearStatusDot status={status} size="sm" />
+                      </div>
+                    </div>
+
+                    {/* Stage Stepper: 4 Visual Milestones */}
+                    <div className="pt-1">
+                      <div className="flex items-center justify-between relative">
+                        {/* Connecting track line */}
+                        <div className="absolute top-2 left-3 right-3 h-0.5 bg-zinc-200 dark:bg-zinc-800 -z-0" />
+                        
+                        {['Applied', 'Shortlisted', 'Interviewing', 'Offered'].map((stepLabel, idx) => {
+                          const isCompleted = !isTerminalFailure && idx <= stageIndex
+                          const isCurrent = !isTerminalFailure && idx === stageIndex
+
+                          return (
+                            <div key={stepLabel} className="flex flex-col items-center relative z-10">
+                              <div
+                                className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border transition-colors ${
+                                  isTerminalFailure && idx === stageIndex
+                                    ? 'bg-red-500 text-white border-red-500'
+                                    : isCurrent
+                                    ? 'bg-purple-600 text-white border-purple-600 ring-2 ring-purple-500/20'
+                                    : isCompleted
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-white dark:bg-zinc-900 text-zinc-400 border-zinc-300 dark:border-zinc-700'
+                                }`}
+                              >
+                                {isTerminalFailure && idx === stageIndex ? (
+                                  '×'
+                                ) : isCompleted && !isCurrent ? (
+                                  '✓'
+                                ) : (
+                                  ''
+                                )}
+                              </div>
+                              <span
+                                className={`text-[9px] font-mono mt-1 ${
+                                  isCurrent
+                                    ? 'text-purple-600 dark:text-purple-400 font-bold'
+                                    : isCompleted
+                                    ? 'text-zinc-800 dark:text-zinc-200 font-medium'
+                                    : 'text-zinc-400 dark:text-zinc-500'
+                                }`}
+                              >
+                                {stepLabel}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )
               })
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {/* Right Column (5 cols ≈ 42%): Recommended Campus Drives (Jobs) */}
+        <div className="lg:col-span-5 bg-white dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-2xs flex flex-col">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/60">
+            <div>
+              <h2 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+                Recommended Campus Drives
+              </h2>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Verified openings tailored to your cohort eligibility
+              </p>
+            </div>
+
+            <Link
+              href="/student/jobs"
+              className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-semibold"
+            >
+              <span>Explore ({totalJobsCount || 0})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60 flex-1">
+            {!recentJobs || recentJobs.length === 0 ? (
+              <div className="p-10 text-center space-y-2">
+                <Briefcase className="w-9 h-9 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  No active drives right now
+                </p>
+                <p className="text-xs text-zinc-500">
+                  New campus placement drives are published directly by the Placement Cell.
+                </p>
+              </div>
+            ) : (
+              recentJobs.map((job: any) => {
+                const ctc = Number(job.compensation_ctc)
+                const isDream = ctc >= 10 && ctc < 20
+                const isSuperDream = ctc >= 20
+                const hasApplied = appliedJobIdSet.has(job.id)
+                const isMultiplierGated = isPlaced && ctc < holdingCtc * upgradeMultiplier
+
+                return (
+                  <div key={job.id} className="p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-850/30 transition-colors space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-0.5">
+                        <Link
+                          href="/student/jobs"
+                          className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors line-clamp-1"
+                        >
+                          {job.title}
+                        </Link>
+                        <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                          <span>{job.company_name || 'Corporate Partner'}</span>
+                          <span>·</span>
+                          <span className="capitalize">{job.workplace_mode || 'On-site'}</span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {isSuperDream ? (
+                          <PriorityBadge tier="super_dream" size="sm" />
+                        ) : isDream ? (
+                          <PriorityBadge tier="dream" size="sm" />
+                        ) : (
+                          <PriorityBadge tier="core" size="sm" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Metadata & Clearance Status */}
+                    <div className="flex items-center justify-between text-[11px] pt-1">
+                      <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                        ₹{job.compensation_ctc} LPA
+                      </span>
+
+                      {hasApplied ? (
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800/40">
+                          Applied ✓
+                        </span>
+                      ) : isMultiplierGated ? (
+                        <span
+                          className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/40 flex items-center gap-1"
+                          title={`Locked by 1.5x Multiplier Policy (< ₹${upgradeMinCtc} LPA)`}
+                        >
+                          <Lock className="w-2.5 h-2.5" />
+                          <span>1.5× Gated</span>
+                        </span>
+                      ) : (
+                        <Link
+                          href="/student/jobs"
+                          className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 font-semibold border border-emerald-200 dark:border-emerald-800/40 transition-colors"
+                        >
+                          Eligible · Apply →
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 5. Tactile Command Dock (One-Touch Launchpad) ── */}
+      <div className="pt-2">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold mb-3 px-1">
+          Career Copilot Launchpad
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Card 1: AI Resume Studio */}
+          <Link href="/student/ai-resume" className="block group">
+            <TactileCard className="h-full flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-3 border border-purple-200 dark:border-purple-800/50">
+                  <Sparkles className="w-4 h-4 stroke-[1.5]" />
+                </div>
+                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                  AI Resume Studio
+                </h3>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
+                  Compile ATS-tailored LaTeX resumes matched against specific job descriptions.
+                </p>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-purple-600 dark:text-purple-400 font-semibold">
+                <span>Open Studio</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </TactileCard>
+          </Link>
+
+          {/* Card 2: Scraped Job Feed */}
+          <Link href="/student/ai-job-search" className="block group">
+            <TactileCard className="h-full flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3 border border-blue-200 dark:border-blue-800/50">
+                  <Compass className="w-4 h-4 stroke-[1.5]" />
+                </div>
+                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Scraped Job Feed
+                </h3>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
+                  Search live off-campus internships and graduate roles across LinkedIn & Internshala.
+                </p>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
+                <span>Explore External</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </TactileCard>
+          </Link>
+
+          {/* Card 3: Placement Policies */}
+          <Link href="/student/policies" className="block group">
+            <TactileCard className="h-full flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 border border-emerald-200 dark:border-emerald-800/50">
+                  <FileCheck className="w-4 h-4 stroke-[1.5]" />
+                </div>
+                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  20 Placement Policies
+                </h3>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
+                  Inspect CGPA thresholds, no-show strike quotas, and 1.5× offer multiplier gates.
+                </p>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span>View Rules</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </TactileCard>
+          </Link>
+
+          {/* Card 4: Credit Balance & Billing */}
+          <Link href="/student/billing" className="block group">
+            <TactileCard className="h-full flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 border border-amber-200 dark:border-amber-800/50">
+                  <CreditCard className="w-4 h-4 stroke-[1.5]" />
+                </div>
+                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                  Credit Fuel & Ledger
+                </h3>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
+                  Review transaction ledgers, download GST invoices, and top up AI credits.
+                </p>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                <span>Manage Billing</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </TactileCard>
+          </Link>
+        </div>
       </div>
     </div>
   )

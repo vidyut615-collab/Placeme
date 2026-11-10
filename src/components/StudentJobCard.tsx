@@ -16,7 +16,9 @@ import {
   FileText, 
   ShieldCheck, 
   Tag,
-  Briefcase
+  Briefcase,
+  Lock,
+  AlertCircle
 } from 'lucide-react'
 import { JobDetailsModal, JobDetailsData } from '@/components/JobDetailsModal'
 import { formatDate } from '@/lib/utils'
@@ -103,12 +105,12 @@ export function StudentJobCard({
           </span>
 
           {job.has_bond ? (
-            <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/60" title="Service Agreement Required">
-              ⚠️ Bond
+            <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/60 flex items-center gap-1" title="Service Agreement Required">
+              <AlertCircle className="w-3 h-3 stroke-[1.5]" /> Bond
             </span>
           ) : (
-            <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/60" title="No Bond Required">
-              🛡️ No Bond
+            <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/60 flex items-center gap-1" title="No Bond Required">
+              <ShieldCheck className="w-3 h-3 stroke-[1.5]" /> No Bond
             </span>
           )}
         </div>
@@ -202,7 +204,7 @@ export function StudentJobCard({
             {isPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : accessStatus !== 'active' ? (
-              <span className="flex items-center">🔒 Unlock to Apply</span>
+              <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 stroke-[1.5]" /> Unlock to Apply</span>
             ) : hasApplied ? (
               'Applied'
             ) : isUpgrade ? (

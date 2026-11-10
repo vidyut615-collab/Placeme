@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Trash2, Loader2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { TactileButton } from '@/components/ui/tactile/TactileButton'
 import { createClient } from '@/utils/supabase/client'
 
 export function DeleteResumeButton({ resumeId }: { resumeId: string }) {
@@ -42,36 +42,41 @@ export function DeleteResumeButton({ resumeId }: { resumeId: string }) {
 
   return (
     <>
-      <Button 
-        variant="outline" 
-        size="icon" 
-        className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 border-red-200"
+      <button 
+        type="button"
+        className="p-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-950/20 border border-zinc-800 hover:border-rose-900/40 transition shrink-0"
         onClick={() => setOpen(true)}
+        title="Delete Resume"
       >
-        <Trash2 className="w-4 h-4" />
-      </Button>
+        <Trash2 className="w-3.5 h-3.5 stroke-[1.5]" />
+      </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[420px] bg-zinc-950 border border-zinc-800 text-zinc-100 p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="w-5 h-5" />
-              Delete Resume
+            <DialogTitle className="flex items-center gap-2 text-rose-400 text-base">
+              <AlertTriangle className="w-4 h-4 stroke-[1.5]" />
+              Delete AI Resume
             </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this AI Resume? This action cannot be undone. 
-              <br/><br/>
-              Note: The AI credits used to generate this resume will not be refunded.
+            <DialogDescription className="text-xs text-zinc-400 pt-1">
+              Are you sure you want to permanently delete this resume version? Previously spent AI generation credits will not be refunded.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-3 mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={isDeleting}>
+
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-800">
+            <TactileButton variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isDeleting} className="text-xs">
               Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
-            </Button>
+            </TactileButton>
+            <TactileButton 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleDelete} 
+              disabled={isDeleting}
+              className="text-xs"
+              icon={isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </TactileButton>
           </div>
         </DialogContent>
       </Dialog>

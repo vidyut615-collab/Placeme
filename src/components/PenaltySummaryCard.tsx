@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { ShieldAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -17,7 +17,7 @@ export function PenaltySummaryCard({ logs }: { logs: LogEntry[] }) {
   if (totalBlacklists === 0) return null
 
   const reasonMapping: Record<string, string> = {
-    'Exceeded No-Show Limit': 'No-Show (Mid-Process)',
+    'Exceeded No-Show Limit': 'Interview No-Show (Mid-Process)',
     'Exceeded Withdrawal Limit': 'Application Withdrawal (Mid-Process)',
     'Exceeded Application Withdrawal Limit': 'Application Withdrawal (Mid-Process)',
     'Exceeded Post-Shortlist Withdrawal Limit': 'Post-Shortlist Withdrawal (Critical Dropout)',
@@ -45,28 +45,39 @@ export function PenaltySummaryCard({ logs }: { logs: LogEntry[] }) {
   })
 
   return (
-    <Card className="mt-6 border-red-200 dark:border-red-900/50 shadow-sm overflow-hidden">
-      <div className="bg-red-50 dark:bg-red-900/10 px-6 py-4 flex items-center gap-3 border-b border-red-100 dark:border-red-900/30">
-        <div className="bg-red-100 dark:bg-red-900/30 p-2 rounded-full">
-          <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400" />
+    <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 overflow-hidden shadow-2xs">
+      <div className="px-5 py-4 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/60">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
+            <ShieldAlert className="w-4 h-4 stroke-[1.5]" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Disciplinary Infractions Summary
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Aggregated historical tally of policy infractions and restrictions.
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-red-900 dark:text-red-400">Total Blacklists: {totalBlacklists}</h3>
-          <p className="text-sm text-red-700/80 dark:text-red-400/80">Lifetime count of policy violations</p>
-        </div>
+        <Badge
+          variant="outline"
+          className="font-mono text-xs bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/50"
+        >
+          {totalBlacklists} Total Action(s)
+        </Badge>
       </div>
-      <CardContent className="p-0">
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {Object.entries(distribution).map(([reason, count]) => (
-            <div key={reason} className="px-6 py-3 flex justify-between items-center bg-white dark:bg-zinc-950">
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{reason}</span>
-              <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                {count} {count === 1 ? 'time' : 'times'}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+
+      <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+        {Object.entries(distribution).map(([reason, count]) => (
+          <div key={reason} className="px-5 py-3 flex justify-between items-center bg-white dark:bg-zinc-900/20">
+            <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">{reason}</span>
+            <span className="font-mono text-xs text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+              {count} {count === 1 ? 'incident' : 'incidents'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

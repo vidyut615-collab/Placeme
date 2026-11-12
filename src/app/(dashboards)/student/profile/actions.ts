@@ -3,6 +3,15 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+interface PolicyConfigRecord {
+  profile_audit_enabled?: boolean
+  [key: string]: unknown
+}
+
+interface PlacementPolicyDoc {
+  config?: PolicyConfigRecord | null
+}
+
 export async function updateStudentProfile(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -11,13 +20,13 @@ export async function updateStudentProfile(formData: FormData) {
     return { error: 'Unauthorized.' }
   }
 
-  let profile_data: any = {}
+  let profile_data: Record<string, unknown> = {}
   
   const rawJson = formData.get('profile_data_json') as string
   if (rawJson) {
     try {
-      profile_data = JSON.parse(rawJson)
-    } catch (e) {
+      profile_data = JSON.parse(rawJson) as Record<string, unknown>
+    } catch {
       return { error: 'Invalid profile data format.' }
     }
   } else {
@@ -46,7 +55,10 @@ export async function updateStudentProfile(formData: FormData) {
     }
   }
 
-  if (!profile_data.first_name?.trim() || !profile_data.last_name?.trim()) {
+  const firstName = typeof profile_data.first_name === 'string' ? profile_data.first_name.trim() : ''
+  const lastName = typeof profile_data.last_name === 'string' ? profile_data.last_name.trim() : ''
+
+  if (!firstName || !lastName) {
     return { error: 'First and Last name are required.' }
   }
 
@@ -64,7 +76,8 @@ export async function updateStudentProfile(formData: FormData) {
     .eq('college_id', studentDoc.college_id)
     .maybeSingle()
 
-  const policyAuditEnabled = policy?.config?.profile_audit_enabled !== false
+  const policyDoc = policy as PlacementPolicyDoc | null
+  const policyAuditEnabled = policyDoc?.config?.profile_audit_enabled !== false
 
   const CRITICAL_KEYS = [
     'first_name', 'last_name', 'middle_name', 'phone', 
@@ -74,7 +87,7 @@ export async function updateStudentProfile(formData: FormData) {
     'education'
   ]
 
-  const currentProfile = studentDoc.profile_data || {}
+  const currentProfile = (studentDoc.profile_data as Record<string, unknown>) || {}
   const hasCriticalChanges = CRITICAL_KEYS.some(key => {
     const oldVal = currentProfile[key]
     const newVal = profile_data[key]
@@ -109,8 +122,8 @@ export async function updateStudentProfile(formData: FormData) {
     if (reqError) return { error: reqError.message }
   } else {
     // Audit disabled, direct update
-    const counters = studentDoc.policy_counters || {}
-    counters.profile_updates = (counters.profile_updates || 0) + 1
+    const counters = (studentDoc.policy_counters as Record<string, unknown>) || {}
+    counters.profile_updates = (Number(counters.profile_updates) || 0) + 1
 
     const { error: updateError } = await supabase
       .from('students')

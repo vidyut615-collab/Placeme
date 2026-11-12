@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,22 +34,72 @@ import {
   Code2,
   Award,
   Sparkles,
-  ShieldCheck,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Image from 'next/image'
 import { ImageCropperModal } from './ImageCropperModal'
 
-type OnboardingFields = {
+export interface EducationEntry {
+  level: string
+  institution: string
+  board: string
+  passing_year: string
+  score: string
+}
+
+export interface ExperienceEntry {
+  type?: string
+  company: string
+  role: string
+  start_date: string
+  end_date: string
+  tech?: string
+  description: string
+}
+
+export interface ProjectEntry {
+  title: string
+  tech?: string
+  link?: string
+  description: string
+}
+
+export interface ActivityEntry {
+  org: string
+  role: string
+  start_date: string
+  end_date: string
+  description: string
+}
+
+export interface RecognitionEntry {
+  award: string
+  issuer: string
+  date: string
+  description: string
+}
+
+export interface SkillsState {
+  languages: string
+  frameworks: string
+  tools: string
+}
+
+export interface LinksState {
+  linkedin: string
+  github: string
+  portfolio: string
+}
+
+export interface OnboardingFields {
   years: string[]
   types: string[]
   departments: string[]
 }
 
-type StudentProfileFormProps = {
-  profile: Record<string, any>
+export interface StudentProfileFormProps {
+  profile: Record<string, unknown>
   onboardingFields: OnboardingFields
   hasPendingRequest?: boolean
   auditEnabled?: boolean
@@ -77,31 +126,31 @@ export function StudentProfileForm({
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
 
   const [formState, setFormState] = useState({
-    first_name: profile.first_name || '',
-    middle_name: profile.middle_name || '',
-    last_name: profile.last_name || '',
-    phone: profile.phone || '',
-    gpa: profile.gpa || '',
-    year: profile.year || '',
-    type: profile.type || '',
-    department: profile.department || '',
-    academic_10th: profile.academic_10th || '',
-    academic_12th: profile.academic_12th || '',
-    diploma_percentage: profile.diploma_percentage || '',
-    graduation_percentage: profile.graduation_percentage || '',
-    active_backlogs: profile.active_backlogs ?? '',
-    historical_backlogs: profile.historical_backlogs ?? '',
-    academic_gap_years: profile.academic_gap_years ?? '',
-    profile_picture: profile.profile_picture || '',
+    first_name: (profile.first_name as string) || '',
+    middle_name: (profile.middle_name as string) || '',
+    last_name: (profile.last_name as string) || '',
+    phone: (profile.phone as string) || '',
+    gpa: String(profile.gpa ?? ''),
+    year: (profile.year as string) || '',
+    type: (profile.type as string) || '',
+    department: (profile.department as string) || '',
+    academic_10th: String(profile.academic_10th ?? ''),
+    academic_12th: String(profile.academic_12th ?? ''),
+    diploma_percentage: String(profile.diploma_percentage ?? ''),
+    graduation_percentage: String(profile.graduation_percentage ?? ''),
+    active_backlogs: String(profile.active_backlogs ?? ''),
+    historical_backlogs: String(profile.historical_backlogs ?? ''),
+    academic_gap_years: String(profile.academic_gap_years ?? ''),
+    profile_picture: (profile.profile_picture as string) || '',
 
     // Expanded Section Arrays
-    education: profile.education || [],
-    experience: profile.experience || [],
-    projects: profile.projects || [],
-    activities: profile.activities || [],
-    recognitions: profile.recognitions || [],
-    skills: profile.skills || { languages: '', frameworks: '', tools: '' },
-    links: profile.links || { linkedin: '', github: '', portfolio: '' },
+    education: (Array.isArray(profile.education) ? profile.education : []) as EducationEntry[],
+    experience: (Array.isArray(profile.experience) ? profile.experience : []) as ExperienceEntry[],
+    projects: (Array.isArray(profile.projects) ? profile.projects : []) as ProjectEntry[],
+    activities: (Array.isArray(profile.activities) ? profile.activities : []) as ActivityEntry[],
+    recognitions: (Array.isArray(profile.recognitions) ? profile.recognitions : []) as RecognitionEntry[],
+    skills: ((profile.skills as SkillsState) || { languages: '', frameworks: '', tools: '' }),
+    links: ((profile.links as LinksState) || { linkedin: '', github: '', portfolio: '' }),
   })
 
   const handleChange =
@@ -110,9 +159,9 @@ export function StudentProfileForm({
       setFormState((s) => ({ ...s, [field]: e.target.value }))
     }
 
-  const handleSelect = (field: string) => (value: string) => {
+  const handleSelect = (field: string) => (value: string | null) => {
     setSuccess(false)
-    setFormState((s) => ({ ...s, [field]: value }))
+    setFormState((s) => ({ ...s, [field]: value || '' }))
   }
 
   const handleNestedChange = (category: 'skills' | 'links', field: string, value: string) => {
@@ -123,29 +172,49 @@ export function StudentProfileForm({
     }))
   }
 
-  const handleArrayChange = (
-    category: 'education' | 'experience' | 'projects' | 'activities' | 'recognitions',
-    index: number,
-    field: string,
-    value: string
-  ) => {
+  const handleEducationChange = (index: number, field: keyof EducationEntry, value: string) => {
     setSuccess(false)
     setFormState((s) => {
-      const newArray = [...s[category]]
+      const newArray = [...s.education]
       newArray[index] = { ...newArray[index], [field]: value }
-      return { ...s, [category]: newArray }
+      return { ...s, education: newArray }
     })
   }
 
-  const addArrayItem = (
-    category: 'education' | 'experience' | 'projects' | 'activities' | 'recognitions',
-    template: any
-  ) => {
+  const handleExperienceChange = (index: number, field: keyof ExperienceEntry, value: string) => {
     setSuccess(false)
-    setFormState((s) => ({
-      ...s,
-      [category]: [...s[category], template],
-    }))
+    setFormState((s) => {
+      const newArray = [...s.experience]
+      newArray[index] = { ...newArray[index], [field]: value }
+      return { ...s, experience: newArray }
+    })
+  }
+
+  const handleProjectChange = (index: number, field: keyof ProjectEntry, value: string) => {
+    setSuccess(false)
+    setFormState((s) => {
+      const newArray = [...s.projects]
+      newArray[index] = { ...newArray[index], [field]: value }
+      return { ...s, projects: newArray }
+    })
+  }
+
+  const handleActivityChange = (index: number, field: keyof ActivityEntry, value: string) => {
+    setSuccess(false)
+    setFormState((s) => {
+      const newArray = [...s.activities]
+      newArray[index] = { ...newArray[index], [field]: value }
+      return { ...s, activities: newArray }
+    })
+  }
+
+  const handleRecognitionChange = (index: number, field: keyof RecognitionEntry, value: string) => {
+    setSuccess(false)
+    setFormState((s) => {
+      const newArray = [...s.recognitions]
+      newArray[index] = { ...newArray[index], [field]: value }
+      return { ...s, recognitions: newArray }
+    })
   }
 
   const removeArrayItem = (
@@ -205,9 +274,9 @@ export function StudentProfileForm({
 
       setFormState((s) => ({ ...s, profile_picture: publicUrlData.publicUrl }))
       setSuccess(true)
-    } catch (err: any) {
-      console.error(err)
-      setError(err.message || 'Failed to upload portrait.')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to upload portrait.'
+      setError(message)
     } finally {
       setIsUploadingImage(false)
       setCropImageSrc(null)
@@ -215,25 +284,30 @@ export function StudentProfileForm({
   }
 
   const executeSubmit = () => {
-    const finalData: any = { ...formState }
+    const finalData = { ...formState }
 
     // Auto-extract standardized academic scores
     const extractScore = (levelName: string) => {
-      const entry = finalData.education.find((e: any) => e.level === levelName)
+      const entry = finalData.education.find((e) => e.level === levelName)
       return entry && entry.score ? parseFloat(entry.score) || null : null
     }
 
-    finalData.academic_10th = extractScore('10th') || finalData.academic_10th
-    finalData.academic_12th = extractScore('12th') || finalData.academic_12th
-    finalData.diploma_percentage = extractScore('Diploma') || finalData.diploma_percentage
-    finalData.graduation_percentage = extractScore('UG (UnderGrad)') || finalData.graduation_percentage
+    finalData.academic_10th = String(extractScore('10th') || finalData.academic_10th)
+    finalData.academic_12th = String(extractScore('12th') || finalData.academic_12th)
+    finalData.diploma_percentage = String(extractScore('Diploma') || finalData.diploma_percentage)
+    finalData.graduation_percentage = String(extractScore('UG (UnderGrad)') || finalData.graduation_percentage)
 
-    finalData.full_name = `${finalData.first_name.trim()} ${
+    const fullName = `${finalData.first_name.trim()} ${
       finalData.middle_name ? finalData.middle_name.trim() + ' ' : ''
     }${finalData.last_name.trim()}`.trim()
 
+    const payload = {
+      ...finalData,
+      full_name: fullName,
+    }
+
     const fd = new FormData()
-    fd.append('profile_data_json', JSON.stringify(finalData))
+    fd.append('profile_data_json', JSON.stringify(payload))
 
     startTransition(async () => {
       const res = await updateStudentProfile(fd)
@@ -252,7 +326,7 @@ export function StudentProfileForm({
     setError('')
 
     // Check for CGPA entered instead of percentage in education
-    const hasCgpaError = formState.education.some((edu: any) => {
+    const hasCgpaError = formState.education.some((edu) => {
       const scoreNum = parseFloat(edu.score)
       return !isNaN(scoreNum) && scoreNum > 0 && scoreNum <= 10
     })
@@ -303,7 +377,7 @@ export function StudentProfileForm({
       id: 'basic',
       label: 'Academics & Personal',
       icon: GraduationCap,
-      isComplete: !!(formState.first_name && formState.last_name && formState.gpa && formState.department),
+      isComplete: Boolean(formState.first_name && formState.last_name && formState.gpa && formState.department),
     },
     {
       id: 'education',
@@ -337,7 +411,7 @@ export function StudentProfileForm({
       id: 'skills',
       label: 'Skills & Links',
       icon: Sparkles,
-      isComplete: !!(
+      isComplete: Boolean(
         formState.skills.languages ||
         formState.skills.frameworks ||
         formState.links.linkedin ||
@@ -347,34 +421,34 @@ export function StudentProfileForm({
   ]
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 w-full min-w-0 max-w-full">
       {/* ── Pending Audit Notification ── */}
       {hasPendingRequest ? (
-        <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 p-4 rounded-xl text-xs border border-amber-200 dark:border-amber-900/50 space-y-1 shadow-2xs">
-          <div className="flex items-center gap-2 font-semibold text-sm">
+        <div className="bg-amber-500/[0.08] dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-xs border border-amber-500/20 space-y-1 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+          <div className="flex items-center gap-2 font-medium text-sm">
             <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 stroke-[1.5]" />
             <span>Profile Audit Request Pending</span>
           </div>
-          <p className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed">
+          <p className="text-[#78716C] dark:text-[#8A847A] text-xs leading-relaxed">
             You have a pending profile update request currently undergoing review by {collegeName}. Further modifications are temporarily locked until the placement cell completes verification.
           </p>
         </div>
       ) : (
-        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+        <div className="p-3.5 rounded-xl bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] flex items-center justify-between text-xs text-[#78716C] dark:text-[#8A847A]">
           <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
             <span>Live Recruitment Sync: Verified data feeds directly into recruiter shortlisting and AI resume compiles.</span>
           </div>
-          <span className="hidden sm:inline font-mono text-[11px] text-zinc-400">
+          <span className="hidden sm:inline font-mono text-[11px] text-[#78716C] dark:text-[#8A847A]">
             {auditEnabled ? 'TPO Gated' : 'Direct DB Sync'}
           </span>
         </div>
       )}
 
-      <fieldset disabled={accessStatus !== 'active' || hasPendingRequest} className="space-y-6 border-0 p-0 m-0">
+      <fieldset disabled={accessStatus !== 'active' || hasPendingRequest} className="space-y-6 border-0 p-0 m-0 w-full min-w-0 max-w-full [min-inline-size:0]">
         {/* ── Official Portrait Upload Banner ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 p-4 bg-zinc-50/70 dark:bg-zinc-900/40 rounded-xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
-          <div className="relative h-16 w-16 rounded-xl overflow-hidden bg-white dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 p-4 bg-[#FAF8F5] dark:bg-[#12110F] rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+          <div className="relative h-16 w-16 rounded-xl overflow-hidden bg-white dark:bg-[#191816] shrink-0 border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
             {formState.profile_picture ? (
               <Image
                 src={formState.profile_picture}
@@ -384,7 +458,7 @@ export function StudentProfileForm({
                 className="object-cover"
               />
             ) : (
-              <div className="flex items-center justify-center h-full w-full text-zinc-400">
+              <div className="flex items-center justify-center h-full w-full text-[#78716C] dark:text-[#8A847A]">
                 <Upload className="h-5 w-5 stroke-[1.5]" />
               </div>
             )}
@@ -397,16 +471,17 @@ export function StudentProfileForm({
 
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+              <h3 className="font-medium text-xs text-[#1C1917] dark:text-[#EFECE6]">
                 Official Candidate Portrait
               </h3>
               {formState.profile_picture && (
-                <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 font-semibold">
-                  Uploaded ✓
+                <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/[0.08] dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium inline-flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 stroke-[1.5]" />
+                  Uploaded
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-[#78716C] dark:text-[#8A847A]">
               Clear professional headshot under 500KB. Displayed on your official DigiProfile dossier and company interview rosters.
             </p>
             <div className="flex items-center gap-2 pt-1">
@@ -416,7 +491,7 @@ export function StudentProfileForm({
                   variant="outline"
                   size="sm"
                   disabled={isUploadingImage}
-                  className="cursor-pointer text-xs h-7.5 px-3 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 shadow-2xs hover:bg-zinc-50 dark:hover:bg-zinc-850"
+                  className="cursor-pointer text-xs h-7.5 px-3 bg-white dark:bg-[#191816] border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] text-[#1C1917] dark:text-[#EFECE6] shadow-[0_1px_2px_rgba(28,25,23,0.04)] hover:bg-[#FAF8F5] dark:hover:bg-[#141312]"
                 >
                   {isUploadingImage ? 'Uploading...' : 'Upload Image'}
                 </Button>
@@ -446,7 +521,7 @@ export function StudentProfileForm({
 
         {cropImageSrc && (
           <ImageCropperModal
-            isOpen={!!cropImageSrc}
+            isOpen={Boolean(cropImageSrc)}
             imageSrc={cropImageSrc}
             onClose={() => setCropImageSrc(null)}
             onCropComplete={handleCroppedUpload}
@@ -454,8 +529,8 @@ export function StudentProfileForm({
         )}
 
         {/* ── Tactile Pill Tab Switcher ── */}
-        <div className="border-b border-zinc-200/80 dark:border-zinc-800/80 pb-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
+        <div className="border-b border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] pb-3 w-full max-w-full overflow-hidden">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 w-full max-w-full">
             {tabs.map((tab) => {
               const Icon = tab.icon
               const isActive = activeTab === tab.id
@@ -465,21 +540,21 @@ export function StudentProfileForm({
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer select-none ${
+                  className={`relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all shrink-0 cursor-pointer select-none ${
                     isActive
-                      ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-2xs'
-                      : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100 border border-zinc-200/60 dark:border-zinc-800'
+                      ? 'bg-[#0F766E] text-white dark:bg-[#14B8A6] dark:text-[#12110F] shadow-[0_1px_2px_rgba(15,118,110,0.2)]'
+                      : 'bg-[#FAF8F5] dark:bg-[#12110F] text-[#78716C] dark:text-[#8A847A] hover:bg-white dark:hover:bg-[#191816] hover:text-[#1C1917] dark:hover:text-[#EFECE6] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 stroke-[1.5] ${isActive ? 'text-white dark:text-zinc-900' : 'text-zinc-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 stroke-[1.5] ${isActive ? 'text-white dark:text-[#12110F]' : 'text-[#78716C] dark:text-[#8A847A]'}`} />
                   <span>{tab.label}</span>
 
                   {tab.count !== undefined && tab.count > 0 && (
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-medium ${
                         isActive
-                          ? 'bg-white/20 dark:bg-zinc-900/20 text-white dark:text-zinc-900'
-                          : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                          ? 'bg-white/20 dark:bg-black/20 text-white dark:text-[#12110F]'
+                          : 'bg-[#1C1917]/[0.06] dark:bg-[#EFECE6]/[0.08] text-[#1C1917] dark:text-[#EFECE6]'
                       }`}
                     >
                       {tab.count}
@@ -489,7 +564,7 @@ export function StudentProfileForm({
                   {tab.isComplete && (
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${
-                        isActive ? 'bg-emerald-300 dark:bg-emerald-600' : 'bg-emerald-500'
+                        isActive ? 'bg-white dark:bg-[#12110F]' : 'bg-[#10B981]'
                       }`}
                       title="Section complete"
                     />
@@ -506,17 +581,17 @@ export function StudentProfileForm({
           {activeTab === 'basic' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                   Personal Information
                 </h3>
-                <p className="text-[11px] text-zinc-500 mt-0.5">
+                <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
                   Primary candidate identification used across placement correspondence.
                 </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="first_name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <Label htmlFor="first_name" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                     First Name <span className="text-rose-500">*</span>
                   </Label>
                   <Input
@@ -525,23 +600,25 @@ export function StudentProfileForm({
                     value={formState.first_name}
                     onChange={handleChange('first_name')}
                     placeholder="e.g. Aniket"
+                    className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="middle_name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Middle Name <span className="text-zinc-400 font-normal">(Optional)</span>
+                  <Label htmlFor="middle_name" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    Middle Name <span className="text-[#78716C] dark:text-[#8A847A] font-normal">(Optional)</span>
                   </Label>
                   <Input
                     id="middle_name"
                     value={formState.middle_name}
                     onChange={handleChange('middle_name')}
                     placeholder="e.g. Kumar"
+                    className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="last_name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <Label htmlFor="last_name" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                     Last Name <span className="text-rose-500">*</span>
                   </Label>
                   <Input
@@ -550,11 +627,12 @@ export function StudentProfileForm({
                     value={formState.last_name}
                     onChange={handleChange('last_name')}
                     placeholder="e.g. Sawardekar"
+                    className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                   />
                 </div>
 
                 <div className="space-y-1.5 md:col-span-3">
-                  <Label htmlFor="phone" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <Label htmlFor="phone" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                     Contact Phone Number <span className="text-rose-500">*</span>
                   </Label>
                   <Input
@@ -562,24 +640,25 @@ export function StudentProfileForm({
                     value={formState.phone}
                     onChange={handleChange('phone')}
                     placeholder="+91 98765 43210"
+                    className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                   />
                 </div>
               </div>
 
               {/* Institutional Placement Academics */}
-              <div className="pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80 space-y-4">
+              <div className="pt-5 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] space-y-4">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                  <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                     Institutional Placement Credentials
                   </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                  <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
                     Governed by {collegeName} placement cell policies and company cutoffs.
                   </p>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="gpa" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    <Label htmlFor="gpa" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                       Current CGPA <span className="text-rose-500">*</span>
                     </Label>
                     <Input
@@ -587,13 +666,14 @@ export function StudentProfileForm({
                       value={formState.gpa}
                       onChange={handleChange('gpa')}
                       placeholder="e.g. 8.92"
+                      className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Graduation Year</Label>
+                    <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Graduation Year</Label>
                     <Select value={formState.year} onValueChange={handleSelect('year')}>
-                      <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs">
+                      <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-[#1C1917] dark:text-[#EFECE6] shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
@@ -613,9 +693,9 @@ export function StudentProfileForm({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Degree Type</Label>
+                    <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Degree Type</Label>
                     <Select value={formState.type} onValueChange={handleSelect('type')}>
-                      <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs">
+                      <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-[#1C1917] dark:text-[#EFECE6] shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -635,9 +715,9 @@ export function StudentProfileForm({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Department</Label>
+                    <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Department</Label>
                     <Select value={formState.department} onValueChange={handleSelect('department')}>
-                      <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs">
+                      <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-[#1C1917] dark:text-[#EFECE6] shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -658,13 +738,13 @@ export function StudentProfileForm({
                 </div>
 
                 {/* Backlogs & Academic Gaps */}
-                <div className="pt-4 border-t border-zinc-200/80 dark:border-zinc-800/80">
-                  <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3">
-                    Backlogs & Educational Gaps
+                <div className="pt-4 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+                  <h4 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider mb-3">
+                    Backlogs &amp; Educational Gaps
                   </h4>
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="active_backlogs" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      <Label htmlFor="active_backlogs" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                         Active Backlogs
                       </Label>
                       <Input
@@ -672,11 +752,12 @@ export function StudentProfileForm({
                         type="number"
                         value={formState.active_backlogs}
                         onChange={handleChange('active_backlogs')}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label htmlFor="historical_backlogs" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      <Label htmlFor="historical_backlogs" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                         Historical / Cleared Backlogs
                       </Label>
                       <Input
@@ -684,11 +765,12 @@ export function StudentProfileForm({
                         type="number"
                         value={formState.historical_backlogs}
                         onChange={handleChange('historical_backlogs')}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label htmlFor="academic_gap_years" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      <Label htmlFor="academic_gap_years" className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                         Academic Gap (Years)
                       </Label>
                       <Input
@@ -696,6 +778,7 @@ export function StudentProfileForm({
                         type="number"
                         value={formState.academic_gap_years}
                         onChange={handleChange('academic_gap_years')}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                   </div>
@@ -709,10 +792,10 @@ export function StudentProfileForm({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                  <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                     Detailed Education History
                   </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                  <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
                     Standardized 10th, 12th, Diploma, and Degree records evaluated for company eligibility cutoffs.
                   </p>
                 </div>
@@ -721,38 +804,44 @@ export function StudentProfileForm({
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    addArrayItem('education', {
-                      level: '',
-                      institution: '',
-                      board: '',
-                      passing_year: '',
-                      score: '',
-                    })
+                    setFormState((s) => ({
+                      ...s,
+                      education: [
+                        ...s.education,
+                        {
+                          level: '',
+                          institution: '',
+                          board: '',
+                          passing_year: '',
+                          score: '',
+                        },
+                      ],
+                    }))
                   }
-                  className="h-8 px-3 text-xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 shadow-2xs hover:bg-zinc-50 dark:hover:bg-zinc-850 gap-1.5 font-medium cursor-pointer"
+                  className="h-8 px-3 text-xs bg-white dark:bg-[#191816] border border-[#0F766E]/20 text-[#0F766E] dark:text-[#14B8A6] hover:bg-[#0F766E]/5 gap-1.5 font-medium cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
                   <span>Add Qualification</span>
                 </Button>
               </div>
 
-              {formState.education.map((edu: any, i: number) => {
+              {formState.education.map((edu, i) => {
                 const scoreNum = parseFloat(edu.score)
                 const showScoreWarning = !isNaN(scoreNum) && scoreNum > 0 && scoreNum <= 10
 
                 return (
                   <div
                     key={i}
-                    className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 relative transition-all hover:border-zinc-300 dark:hover:border-zinc-700 space-y-3"
+                    className="p-4 rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] relative transition-all shadow-[0_1px_2px_rgba(28,25,23,0.04)] space-y-3"
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800/60">
-                      <span className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#1C1917]/[0.06] dark:border-[#EFECE6]/[0.06]">
+                      <span className="text-[11px] font-mono font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                         Qualification #{i + 1} {edu.level ? `· ${edu.level}` : ''}
                       </span>
                       <button
                         type="button"
                         onClick={() => removeArrayItem('education', i)}
-                        className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
+                        className="text-[#78716C] hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
                         title="Remove qualification"
                       >
                         <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -761,71 +850,70 @@ export function StudentProfileForm({
 
                     <div className="grid gap-3.5 md:grid-cols-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Education Level</Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Level of Education</Label>
                         <Select
                           value={edu.level}
-                          onValueChange={(v) => handleArrayChange('education', i, 'level', v)}
+                          onValueChange={(val) => handleEducationChange(i, 'level', val || '')}
                         >
-                          <SelectTrigger className="w-full h-9 text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs">
-                            <SelectValue placeholder="Select Level" />
+                          <SelectTrigger className="h-9 text-xs bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1]">
+                            <SelectValue placeholder="Select level" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="10th">10th Standard (SSC / Matric)</SelectItem>
-                            <SelectItem value="12th">12th Standard (HSC / Intermediate)</SelectItem>
-                            <SelectItem value="Diploma">Polytechnic / Diploma</SelectItem>
-                            <SelectItem value="UG (UnderGrad)">Undergraduate (UG / B.Tech / B.E)</SelectItem>
-                            <SelectItem value="PG (PostGrad)">Postgraduate (PG / M.Tech / MBA)</SelectItem>
-                            <SelectItem value="PhD">Doctorate (PhD)</SelectItem>
+                            <SelectItem value="10th">10th Standard / Matriculation</SelectItem>
+                            <SelectItem value="12th">12th Standard / Higher Secondary</SelectItem>
+                            <SelectItem value="Diploma">Diploma (Polytechnic)</SelectItem>
+                            <SelectItem value="UG (UnderGrad)">Undergraduate (B.Tech / B.E / B.Sc)</SelectItem>
+                            <SelectItem value="PG (PostGrad)">Postgraduate (M.Tech / M.E / M.S)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                          Institution Name
-                        </Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">School / College Name</Label>
                         <Input
-                          placeholder="e.g. National Public School"
+                          placeholder="e.g. Delhi Public School / IIT Bombay"
                           value={edu.institution}
-                          onChange={(e) => handleArrayChange('education', i, 'institution', e.target.value)}
+                          onChange={(e) => handleEducationChange(i, 'institution', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                          Board / University
-                        </Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Board / University</Label>
                         <Input
-                          placeholder="e.g. CBSE / State Board / University"
+                          placeholder="e.g. CBSE / ICSE / State Board / Autonomous"
                           value={edu.board}
-                          onChange={(e) => handleArrayChange('education', i, 'board', e.target.value)}
+                          onChange={(e) => handleEducationChange(i, 'board', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Passing Year</Label>
+                          <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Passing Year</Label>
                           <Input
                             placeholder="2022"
                             value={edu.passing_year}
-                            onChange={(e) => handleArrayChange('education', i, 'passing_year', e.target.value)}
+                            onChange={(e) => handleEducationChange(i, 'passing_year', e.target.value)}
+                            className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Score (%)</Label>
+                          <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Score (%)</Label>
                           <Input
                             placeholder="e.g. 92.5"
                             type="number"
                             step="0.01"
                             value={edu.score}
-                            onChange={(e) => handleArrayChange('education', i, 'score', e.target.value)}
+                            onChange={(e) => handleEducationChange(i, 'score', e.target.value)}
+                            className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                           />
                         </div>
                       </div>
                     </div>
 
                     {showScoreWarning && (
-                      <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                      <div className="p-2.5 rounded-lg bg-amber-500/[0.08] dark:bg-amber-500/15 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
                         <AlertCircle className="w-3.5 h-3.5 stroke-[1.5] shrink-0" />
                         <span>
                           Please convert your CGPA to percentage (e.g. 85% instead of 8.5) before saving to comply with recruiting filters.
@@ -837,12 +925,12 @@ export function StudentProfileForm({
               })}
 
               {formState.education.length === 0 && (
-                <div className="p-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
-                  <BookOpen className="w-8 h-8 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                <div className="p-8 text-center border border-dashed border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-xl space-y-2 bg-white dark:bg-[#191816]">
+                  <BookOpen className="w-8 h-8 text-[#78716C] dark:text-[#8A847A] stroke-[1.5] mx-auto" />
+                  <p className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                     No academic records added yet
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-[#78716C] dark:text-[#8A847A]">
                     Add your 10th, 12th, and current degree scores for automated eligibility matching.
                   </p>
                 </div>
@@ -855,10 +943,10 @@ export function StudentProfileForm({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                    Work Experience & Internships
+                  <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
+                    Work Experience &amp; Internships
                   </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                  <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
                     Industry roles, software co-ops, research fellowships, and freelance projects.
                   </p>
                 </div>
@@ -867,36 +955,42 @@ export function StudentProfileForm({
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    addArrayItem('experience', {
-                      type: 'internship',
-                      company: '',
-                      role: '',
-                      start_date: '',
-                      end_date: '',
-                      tech: '',
-                      description: '',
-                    })
+                    setFormState((s) => ({
+                      ...s,
+                      experience: [
+                        ...s.experience,
+                        {
+                          type: 'internship',
+                          company: '',
+                          role: '',
+                          start_date: '',
+                          end_date: '',
+                          tech: '',
+                          description: '',
+                        },
+                      ],
+                    }))
                   }
-                  className="h-8 px-3 text-xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 shadow-2xs hover:bg-zinc-50 dark:hover:bg-zinc-850 gap-1.5 font-medium cursor-pointer"
+                  className="h-8 px-3 text-xs bg-white dark:bg-[#191816] border border-[#0F766E]/20 text-[#0F766E] dark:text-[#14B8A6] hover:bg-[#0F766E]/5 gap-1.5 font-medium cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
                   <span>Add Experience</span>
                 </Button>
               </div>
 
-              {formState.experience.map((exp: any, i: number) => (
+              {formState.experience.map((exp, i) => (
                 <div
                   key={i}
-                  className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 relative transition-all hover:border-zinc-300 dark:hover:border-zinc-700 space-y-3"
+                  className="p-4 rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] relative transition-all shadow-[0_1px_2px_rgba(28,25,23,0.04)] space-y-3"
                 >
-                  <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800/60">
-                    <span className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#1C1917]/[0.06] dark:border-[#EFECE6]/[0.06]">
+                    <span className="text-[11px] font-mono font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                       Role #{i + 1} {exp.company ? `· ${exp.company}` : ''}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeArrayItem('experience', i)}
-                      className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
+                      className="text-[#78716C] hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
                       title="Remove experience"
                     >
                       <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -905,56 +999,61 @@ export function StudentProfileForm({
 
                   <div className="grid gap-3.5 md:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Company Name</Label>
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Company Name</Label>
                       <Input
                         placeholder="e.g. Google India"
                         value={exp.company}
-                        onChange={(e) => handleArrayChange('experience', i, 'company', e.target.value)}
+                        onChange={(e) => handleExperienceChange(i, 'company', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Designation / Role</Label>
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Designation / Role</Label>
                       <Input
                         placeholder="e.g. Software Engineering Intern"
                         value={exp.role}
-                        onChange={(e) => handleArrayChange('experience', i, 'role', e.target.value)}
+                        onChange={(e) => handleExperienceChange(i, 'role', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Start Date</Label>
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Start Date</Label>
                       <Input
                         placeholder="MM/YYYY (e.g. 05/2025)"
                         value={exp.start_date}
-                        onChange={(e) => handleArrayChange('experience', i, 'start_date', e.target.value)}
+                        onChange={(e) => handleExperienceChange(i, 'start_date', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">End Date</Label>
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">End Date</Label>
                       <Input
                         placeholder="MM/YYYY or Present"
                         value={exp.end_date}
-                        onChange={(e) => handleArrayChange('experience', i, 'end_date', e.target.value)}
+                        onChange={(e) => handleExperienceChange(i, 'end_date', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5 md:col-span-2">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Tech Stack Used <span className="text-zinc-400 font-normal">(Optional)</span>
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                        Tech Stack Used <span className="text-[#78716C] dark:text-[#8A847A] font-normal">(Optional)</span>
                       </Label>
                       <Input
                         placeholder="e.g. TypeScript, React, Go, Docker, AWS"
                         value={exp.tech || ''}
-                        onChange={(e) => handleArrayChange('experience', i, 'tech', e.target.value)}
+                        onChange={(e) => handleExperienceChange(i, 'tech', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5 md:col-span-2">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Key Responsibilities & Deliverables
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                        Responsibilities &amp; Achievements
                       </Label>
                       <Textarea
-                        placeholder="Detail your technical contributions, performance improvements, and project impact..."
+                        placeholder="Describe key responsibilities, systems designed, metrics improved..."
                         value={exp.description}
-                        onChange={(e) => handleArrayChange('experience', i, 'description', e.target.value)}
-                        className="min-h-[80px]"
+                        onChange={(e) => handleExperienceChange(i, 'description', e.target.value)}
+                        className="min-h-[80px] bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs"
                       />
                     </div>
                   </div>
@@ -962,29 +1061,29 @@ export function StudentProfileForm({
               ))}
 
               {formState.experience.length === 0 && (
-                <div className="p-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
-                  <Briefcase className="w-8 h-8 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    No work experience added yet
+                <div className="p-8 text-center border border-dashed border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-xl space-y-2 bg-white dark:bg-[#191816]">
+                  <Briefcase className="w-8 h-8 text-[#78716C] dark:text-[#8A847A] stroke-[1.5] mx-auto" />
+                  <p className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    No industry experience recorded
                   </p>
-                  <p className="text-xs text-zinc-500">
-                    Add summer internships, co-ops, or freelance software contracts.
+                  <p className="text-xs text-[#78716C] dark:text-[#8A847A]">
+                    Add past summer internships, part-time developer roles, or technical freelance contracts.
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* Panel 4: Projects & Portfolio */}
+          {/* Panel 4: Projects */}
           {activeTab === 'projects' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                    Engineering & Portfolio Projects
+                  <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
+                    Engineering Projects &amp; Open Source
                   </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
-                    Distributed systems, open-source work, capstones, and full-stack applications.
+                  <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
+                    Highlight capstone systems, production services, and technical repositories.
                   </p>
                 </div>
                 <Button
@@ -992,33 +1091,39 @@ export function StudentProfileForm({
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    addArrayItem('projects', {
-                      title: '',
-                      tech: '',
-                      link: '',
-                      description: '',
-                    })
+                    setFormState((s) => ({
+                      ...s,
+                      projects: [
+                        ...s.projects,
+                        {
+                          title: '',
+                          tech: '',
+                          link: '',
+                          description: '',
+                        },
+                      ],
+                    }))
                   }
-                  className="h-8 px-3 text-xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 shadow-2xs hover:bg-zinc-50 dark:hover:bg-zinc-850 gap-1.5 font-medium cursor-pointer"
+                  className="h-8 px-3 text-xs bg-white dark:bg-[#191816] border border-[#0F766E]/20 text-[#0F766E] dark:text-[#14B8A6] hover:bg-[#0F766E]/5 gap-1.5 font-medium cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
                   <span>Add Project</span>
                 </Button>
               </div>
 
-              {formState.projects.map((proj: any, i: number) => (
+              {formState.projects.map((proj, i) => (
                 <div
                   key={i}
-                  className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 relative transition-all hover:border-zinc-300 dark:hover:border-zinc-700 space-y-3"
+                  className="p-4 rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] relative transition-all shadow-[0_1px_2px_rgba(28,25,23,0.04)] space-y-3"
                 >
-                  <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800/60">
-                    <span className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#1C1917]/[0.06] dark:border-[#EFECE6]/[0.06]">
+                    <span className="text-[11px] font-mono font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                       Project #{i + 1} {proj.title ? `· ${proj.title}` : ''}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeArrayItem('projects', i)}
-                      className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
+                      className="text-[#78716C] hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
                       title="Remove project"
                     >
                       <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -1027,42 +1132,45 @@ export function StudentProfileForm({
 
                   <div className="grid gap-3.5 md:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Project Title</Label>
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Project Title</Label>
                       <Input
                         placeholder="e.g. Distributed Task Orchestrator"
                         value={proj.title}
-                        onChange={(e) => handleArrayChange('projects', i, 'title', e.target.value)}
+                        onChange={(e) => handleProjectChange(i, 'title', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                         Link (GitHub / Live Demo)
                       </Label>
                       <Input
                         placeholder="https://github.com/username/project"
                         value={proj.link}
-                        onChange={(e) => handleArrayChange('projects', i, 'link', e.target.value)}
+                        onChange={(e) => handleProjectChange(i, 'link', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5 md:col-span-2">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Technologies & Frameworks
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                        Technologies &amp; Frameworks
                       </Label>
                       <Input
                         placeholder="e.g. Next.js, Go, PostgreSQL, Redis, Docker"
                         value={proj.tech}
-                        onChange={(e) => handleArrayChange('projects', i, 'tech', e.target.value)}
+                        onChange={(e) => handleProjectChange(i, 'tech', e.target.value)}
+                        className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1.5 md:col-span-2">
-                      <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Architecture & Problem Solved
+                      <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                        Architecture &amp; Problem Solved
                       </Label>
                       <Textarea
                         placeholder="What challenge did this solve? Include architectural choices, benchmarks, or metrics..."
                         value={proj.description}
-                        onChange={(e) => handleArrayChange('projects', i, 'description', e.target.value)}
-                        className="min-h-[80px]"
+                        onChange={(e) => handleProjectChange(i, 'description', e.target.value)}
+                        className="min-h-[80px] bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs"
                       />
                     </div>
                   </div>
@@ -1070,12 +1178,12 @@ export function StudentProfileForm({
               ))}
 
               {formState.projects.length === 0 && (
-                <div className="p-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
-                  <Code2 className="w-8 h-8 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                <div className="p-8 text-center border border-dashed border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-xl space-y-2 bg-white dark:bg-[#191816]">
+                  <Code2 className="w-8 h-8 text-[#78716C] dark:text-[#8A847A] stroke-[1.5] mx-auto" />
+                  <p className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                     No engineering projects recorded
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-[#78716C] dark:text-[#8A847A]">
                     Highlight capstone projects, full-stack web applications, or open-source packages.
                   </p>
                 </div>
@@ -1090,10 +1198,10 @@ export function StudentProfileForm({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                      Leadership & Extracurriculars
+                    <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
+                      Leadership &amp; Extracurriculars
                     </h3>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                    <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
                       Technical societies, student chapters, hackathon committees, and club leadership.
                     </p>
                   </div>
@@ -1102,34 +1210,40 @@ export function StudentProfileForm({
                     variant="outline"
                     size="sm"
                     onClick={() =>
-                      addArrayItem('activities', {
-                        org: '',
-                        role: '',
-                        start_date: '',
-                        end_date: '',
-                        description: '',
-                      })
+                      setFormState((s) => ({
+                        ...s,
+                        activities: [
+                          ...s.activities,
+                          {
+                            org: '',
+                            role: '',
+                            start_date: '',
+                            end_date: '',
+                            description: '',
+                          },
+                        ],
+                      }))
                     }
-                    className="h-8 px-3 text-xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 shadow-2xs hover:bg-zinc-50 dark:hover:bg-zinc-850 gap-1.5 font-medium cursor-pointer"
+                    className="h-8 px-3 text-xs bg-white dark:bg-[#191816] border border-[#0F766E]/20 text-[#0F766E] dark:text-[#14B8A6] hover:bg-[#0F766E]/5 gap-1.5 font-medium cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
                     <span>Add Activity</span>
                   </Button>
                 </div>
 
-                {formState.activities.map((act: any, i: number) => (
+                {formState.activities.map((act, i) => (
                   <div
                     key={i}
-                    className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 relative transition-all hover:border-zinc-300 dark:hover:border-zinc-700 space-y-3"
+                    className="p-4 rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] relative transition-all shadow-[0_1px_2px_rgba(28,25,23,0.04)] space-y-3"
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800/60">
-                      <span className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#1C1917]/[0.06] dark:border-[#EFECE6]/[0.06]">
+                      <span className="text-[11px] font-mono font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                         Activity #{i + 1} {act.org ? `· ${act.org}` : ''}
                       </span>
                       <button
                         type="button"
                         onClick={() => removeArrayItem('activities', i)}
-                        className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
+                        className="text-[#78716C] hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
                         title="Remove activity"
                       >
                         <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -1138,48 +1252,52 @@ export function StudentProfileForm({
 
                     <div className="grid gap-3.5 md:grid-cols-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                           Organization / Chapter <span className="text-rose-500">*</span>
                         </Label>
                         <Input
                           placeholder="e.g. ACM / IEEE Student Branch"
                           value={act.org}
-                          onChange={(e) => handleArrayChange('activities', i, 'org', e.target.value)}
+                          onChange={(e) => handleActivityChange(i, 'org', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Role / Title</Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Role / Title</Label>
                         <Input
                           placeholder="e.g. Lead Technical Organizer"
                           value={act.role}
-                          onChange={(e) => handleArrayChange('activities', i, 'role', e.target.value)}
+                          onChange={(e) => handleActivityChange(i, 'role', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Start Date</Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Start Date</Label>
                         <Input
                           placeholder="MM/YYYY"
                           value={act.start_date}
-                          onChange={(e) => handleArrayChange('activities', i, 'start_date', e.target.value)}
+                          onChange={(e) => handleActivityChange(i, 'start_date', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">End Date</Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">End Date</Label>
                         <Input
                           placeholder="MM/YYYY or Present"
                           value={act.end_date}
-                          onChange={(e) => handleArrayChange('activities', i, 'end_date', e.target.value)}
+                          onChange={(e) => handleActivityChange(i, 'end_date', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5 md:col-span-2">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                          Initiatives & Impact
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                          Initiatives &amp; Impact
                         </Label>
                         <Textarea
                           placeholder="Conducted workshops for 300+ students, managed logistics..."
                           value={act.description}
-                          onChange={(e) => handleArrayChange('activities', i, 'description', e.target.value)}
-                          className="min-h-[70px]"
+                          onChange={(e) => handleActivityChange(i, 'description', e.target.value)}
+                          className="min-h-[70px] bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs"
                         />
                       </div>
                     </div>
@@ -1188,14 +1306,14 @@ export function StudentProfileForm({
               </div>
 
               {/* Awards & Recognitions */}
-              <div className="space-y-4 pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80">
+              <div className="space-y-4 pt-5 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                      Awards & Recognitions
+                    <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
+                      Awards &amp; Recognitions
                     </h3>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
-                      Hackathon podiums, national olympiads, scholarships, and academic dean honors.
+                    <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
+                      Hackathon podiums, national olympiads, scholarships, and academic honors.
                     </p>
                   </div>
                   <Button
@@ -1203,33 +1321,39 @@ export function StudentProfileForm({
                     variant="outline"
                     size="sm"
                     onClick={() =>
-                      addArrayItem('recognitions', {
-                        award: '',
-                        issuer: '',
-                        date: '',
-                        description: '',
-                      })
+                      setFormState((s) => ({
+                        ...s,
+                        recognitions: [
+                          ...s.recognitions,
+                          {
+                            award: '',
+                            issuer: '',
+                            date: '',
+                            description: '',
+                          },
+                        ],
+                      }))
                     }
-                    className="h-8 px-3 text-xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 shadow-2xs hover:bg-zinc-50 dark:hover:bg-zinc-850 gap-1.5 font-medium cursor-pointer"
+                    className="h-8 px-3 text-xs bg-white dark:bg-[#191816] border border-[#0F766E]/20 text-[#0F766E] dark:text-[#14B8A6] hover:bg-[#0F766E]/5 gap-1.5 font-medium cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
                     <span>Add Award</span>
                   </Button>
                 </div>
 
-                {formState.recognitions.map((rec: any, i: number) => (
+                {formState.recognitions.map((rec, i) => (
                   <div
                     key={i}
-                    className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 relative transition-all hover:border-zinc-300 dark:hover:border-zinc-700 space-y-3"
+                    className="p-4 rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] relative transition-all shadow-[0_1px_2px_rgba(28,25,23,0.04)] space-y-3"
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800/60">
-                      <span className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#1C1917]/[0.06] dark:border-[#EFECE6]/[0.06]">
+                      <span className="text-[11px] font-mono font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
                         Award #{i + 1} {rec.award ? `· ${rec.award}` : ''}
                       </span>
                       <button
                         type="button"
                         onClick={() => removeArrayItem('recognitions', i)}
-                        className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
+                        className="text-[#78716C] hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer"
                         title="Remove award"
                       >
                         <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -1238,40 +1362,43 @@ export function StudentProfileForm({
 
                     <div className="grid gap-3.5 md:grid-cols-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                           Award / Honor Title <span className="text-rose-500">*</span>
                         </Label>
                         <Input
-                          placeholder="e.g. 1st Place - Smart India Hackathon"
+                          placeholder="e.g. 1st Place - National Hackathon"
                           value={rec.award}
-                          onChange={(e) => handleArrayChange('recognitions', i, 'award', e.target.value)}
+                          onChange={(e) => handleRecognitionChange(i, 'award', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                           Conferring Organization
                         </Label>
                         <Input
-                          placeholder="e.g. Ministry of Education / AICTE"
+                          placeholder="e.g. Ministry of Education / IEEE"
                           value={rec.issuer}
-                          onChange={(e) => handleArrayChange('recognitions', i, 'issuer', e.target.value)}
+                          onChange={(e) => handleRecognitionChange(i, 'issuer', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Date Received</Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Date Received</Label>
                         <Input
                           placeholder="MM/YYYY or YYYY"
                           value={rec.date}
-                          onChange={(e) => handleArrayChange('recognitions', i, 'date', e.target.value)}
+                          onChange={(e) => handleRecognitionChange(i, 'date', e.target.value)}
+                          className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1.5 md:col-span-2">
-                        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Description</Label>
+                        <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">Description</Label>
                         <Textarea
                           placeholder="Ranked 1st among 2,500 national teams for developing..."
                           value={rec.description}
-                          onChange={(e) => handleArrayChange('recognitions', i, 'description', e.target.value)}
-                          className="min-h-[70px]"
+                          onChange={(e) => handleRecognitionChange(i, 'description', e.target.value)}
+                          className="min-h-[70px] bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs"
                         />
                       </div>
                     </div>
@@ -1286,17 +1413,17 @@ export function StudentProfileForm({
             <div className="space-y-6">
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                    Technical & Domain Competencies
+                  <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
+                    Technical &amp; Domain Competencies
                   </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
-                    Parsed directly by LLM algorithms for job match scoring and ATS keyword alignment.
+                  <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
+                    Parsed directly by algorithms for job match scoring and ATS keyword alignment.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Core Languages & Runtime
+                  <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    Core Languages &amp; Runtime
                   </Label>
                   <TagInput
                     placeholder="Type language and press Enter (e.g. TypeScript, Python, Go, Rust)..."
@@ -1306,8 +1433,8 @@ export function StudentProfileForm({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Frameworks, Libraries & Databases
+                  <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    Frameworks, Libraries &amp; Databases
                   </Label>
                   <TagInput
                     placeholder="Type framework and press Enter (e.g. Next.js, React, Node.js, PostgreSQL, Redis)..."
@@ -1317,8 +1444,8 @@ export function StudentProfileForm({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    DevOps, Cloud Tools & Spoken Languages
+                  <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    DevOps, Cloud Tools &amp; Spoken Languages
                   </Label>
                   <TagInput
                     placeholder="Type tool and press Enter (e.g. Docker, Kubernetes, AWS, Git, English (Fluent))..."
@@ -1329,43 +1456,46 @@ export function StudentProfileForm({
               </div>
 
               {/* Online Links */}
-              <div className="space-y-4 pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80">
+              <div className="space-y-4 pt-5 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                    Professional Profiles & Repositories
+                  <h3 className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6] uppercase tracking-wider">
+                    Professional Profiles &amp; Repositories
                   </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                  <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
                     Included on company evaluation dossiers and candidate interview briefs.
                   </p>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">LinkedIn Profile URL</Label>
+                    <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">LinkedIn Profile URL</Label>
                     <Input
                       placeholder="https://linkedin.com/in/username"
                       value={formState.links.linkedin}
                       onChange={(e) => handleNestedChange('links', 'linkedin', e.target.value)}
+                      className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">GitHub Profile URL</Label>
+                    <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">GitHub Profile URL</Label>
                     <Input
                       placeholder="https://github.com/username"
                       value={formState.links.github}
                       onChange={(e) => handleNestedChange('links', 'github', e.target.value)}
+                      className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                     />
                   </div>
 
                   <div className="space-y-1.5 md:col-span-2">
-                    <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    <Label className="text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
                       Portfolio / Personal Website
                     </Label>
                     <Input
                       placeholder="https://yourname.dev"
                       value={formState.links.portfolio}
                       onChange={(e) => handleNestedChange('links', 'portfolio', e.target.value)}
+                      className="bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-xs h-9"
                     />
                   </div>
                 </div>
@@ -1376,22 +1506,22 @@ export function StudentProfileForm({
 
         {/* ── Error & Success Feedback ── */}
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-rose-500/[0.08] dark:bg-rose-500/15 border border-rose-500/20 text-xs text-rose-700 dark:text-rose-400 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 stroke-[1.5] shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-emerald-500/[0.08] dark:bg-emerald-500/15 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 stroke-[1.5] shrink-0" />
             <span>Profile dossier saved and synchronized successfully!</span>
           </div>
         )}
 
         {/* ── Sticky Bottom Action Bar ── */}
-        <div className="pt-4 border-t border-zinc-200/80 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <p className="text-[11px] text-zinc-500 font-mono">
+        <div className="pt-4 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-[11px] text-[#78716C] dark:text-[#8A847A] font-mono">
             {auditEnabled
               ? 'Institutional policy active: Academic changes route through TPO approval'
               : 'Direct synchronization active: Instant database updates'}
@@ -1400,7 +1530,7 @@ export function StudentProfileForm({
           <Button
             type="submit"
             disabled={isPending || hasPendingRequest || accessStatus !== 'active'}
-            className="h-9 px-6 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg shadow-2xs cursor-pointer gap-2"
+            className="h-9 px-6 text-xs font-medium bg-[#0F766E] hover:bg-[#0D655E] text-white dark:bg-[#14B8A6] dark:hover:bg-[#0F766E] dark:text-[#12110F] rounded-lg shadow-[0_1px_2px_rgba(15,118,110,0.2)] cursor-pointer gap-2"
           >
             {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             <span>{isPending ? 'Synchronizing...' : 'Save Profile Changes'}</span>
@@ -1409,12 +1539,12 @@ export function StudentProfileForm({
 
         {/* ── Confirmation Modal for Audit-Gated Fields ── */}
         <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md bg-white dark:bg-[#191816] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
             <DialogHeader>
-              <DialogTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <DialogTitle className="text-base font-medium text-[#1C1917] dark:text-[#EFECE6]">
                 Submit Profile for Placement Review?
               </DialogTitle>
-              <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+              <DialogDescription className="text-xs text-[#78716C] dark:text-[#8A847A] mt-1 leading-relaxed">
                 You have modified sensitive academic records (e.g. CGPA, backlogs, department). Submitting will route this proposed update to the {collegeName} Placement Cell for verification.
               </DialogDescription>
             </DialogHeader>
@@ -1424,7 +1554,7 @@ export function StudentProfileForm({
                 size="sm"
                 onClick={() => setShowConfirm(false)}
                 type="button"
-                className="text-xs h-8 cursor-pointer"
+                className="text-xs h-8 cursor-pointer bg-white dark:bg-[#141312] border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] text-[#1C1917] dark:text-[#EFECE6]"
               >
                 Cancel
               </Button>
@@ -1433,7 +1563,7 @@ export function StudentProfileForm({
                 disabled={isPending}
                 type="button"
                 size="sm"
-                className="text-xs h-8 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 cursor-pointer"
+                className="text-xs h-8 bg-[#0F766E] hover:bg-[#0D655E] text-white dark:bg-[#14B8A6] dark:hover:bg-[#0F766E] dark:text-[#12110F] cursor-pointer"
               >
                 {isPending ? (
                   <>
@@ -1485,24 +1615,24 @@ function TagInput({
   }
 
   return (
-    <div className="space-y-2 p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/40">
+    <div className="space-y-2 p-3 rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-[#FAF8F5] dark:bg-[#12110F]">
       <Input
         placeholder={placeholder}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="h-8 text-xs bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200/80 dark:border-zinc-800"
+        className="h-8 text-xs bg-white dark:bg-[#141312] border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-[#1C1917] dark:text-[#EFECE6]"
       />
       <div className="flex flex-wrap gap-1.5 pt-1">
         {tags.map((tag, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700 text-xs px-2.5 py-0.5 font-medium font-mono"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#0F766E]/[0.08] dark:bg-[#14B8A6]/15 text-[#0F766E] dark:text-[#14B8A6] border border-[#0F766E]/20 text-xs px-2.5 py-0.5 font-medium font-mono"
           >
             <span>{tag}</span>
             <button
               type="button"
-              className="hover:text-rose-500 rounded text-zinc-400 p-0.5 transition-colors cursor-pointer"
+              className="hover:text-rose-600 rounded text-[#0F766E]/70 dark:text-[#14B8A6]/70 p-0.5 transition-colors cursor-pointer"
               onClick={() => removeTag(tag)}
             >
               <X className="w-3 h-3 stroke-[1.5]" />
@@ -1510,10 +1640,10 @@ function TagInput({
           </span>
         ))}
         {tags.length === 0 && (
-          <span className="text-[11px] text-zinc-400 py-0.5 font-mono">No skills tagged yet.</span>
+          <span className="text-[11px] text-[#78716C] dark:text-[#8A847A] py-0.5 font-mono">No skills tagged yet.</span>
         )}
       </div>
-      <p className="text-[10px] text-zinc-400 font-mono">Press Enter or Comma to add tag.</p>
+      <p className="text-[10px] text-[#78716C] dark:text-[#8A847A] font-mono">Press Enter or Comma to add tag.</p>
     </div>
   )
 }

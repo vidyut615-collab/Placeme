@@ -4,8 +4,6 @@ import { useState, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -18,14 +16,60 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import Image from 'next/image'
 
 // Dynamic import for client-side only PDF generation
 import html2canvas from 'html2canvas-pro'
 import { jsPDF } from 'jspdf'
 
-type DigiProfileModalProps = {
-  profile: Record<string, any>
+export interface DigiProfileEducationEntry {
+  level?: string
+  institution?: string
+  board?: string
+  score?: string
+  passing_year?: string
+}
+
+export interface DigiProfileProjectEntry {
+  title?: string
+  tech?: string
+  link?: string
+  description?: string
+}
+
+export interface DigiProfileExperienceEntry {
+  company?: string
+  role?: string
+  start_date?: string
+  end_date?: string
+  description?: string
+}
+
+export interface DigiProfileModalProps {
+  profile: {
+    first_name?: string
+    last_name?: string
+    full_name?: string
+    phone?: string
+    gpa?: string | number
+    year?: string
+    type?: string
+    department?: string
+    profile_picture?: string
+    education?: DigiProfileEducationEntry[]
+    projects?: DigiProfileProjectEntry[]
+    experience?: DigiProfileExperienceEntry[]
+    skills?: {
+      languages?: string
+      frameworks?: string
+      tools?: string
+    }
+    links?: {
+      linkedin?: string
+      github?: string
+      portfolio?: string
+    }
+    [key: string]: unknown
+  }
   email: string
   collegeName: string
   collegeLogoUrl?: string
@@ -102,63 +146,60 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
         <Button 
           variant="outline" 
           size="sm" 
-          className="gap-2 h-8.5 px-3 rounded-lg bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-800 dark:text-zinc-200 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+          className="gap-2 h-8.5 px-3 rounded-lg bg-white dark:bg-[#191816] border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] hover:bg-[#FAF8F5] dark:hover:bg-[#141312] text-[#1C1917] dark:text-[#EFECE6] text-xs font-medium shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-colors cursor-pointer hover:border-[#0F766E]/40"
         >
           <FileText className="w-3.5 h-3.5 stroke-[1.5]" />
           <span>View DigiProfile</span>
         </Button>
       } />
       
-      {/* 
-        Use a max-w-4xl so it is large enough, and max-h-[90vh] with overflow-y-auto 
-        so it scrolls if the profile is long.
-      */}
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-zinc-100 dark:bg-zinc-950 flex flex-col p-0">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] flex flex-col p-0">
         
         {/* Header toolbar - sticky to top */}
-        <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border-b shadow-sm">
-          <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800/80 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-700 transition-colors">
+        <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white dark:bg-[#191816] border-b border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] shadow-sm">
+          <div className="flex items-center gap-3 bg-[#FAF8F5] dark:bg-[#12110F] px-3 py-2 rounded-lg border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] transition-colors">
             <Switch 
               id="masked-mode" 
               checked={isMasked} 
               onCheckedChange={setIsMasked} 
             />
-            <Label htmlFor="masked-mode" className="flex items-center gap-2 cursor-pointer text-zinc-800 dark:text-zinc-200">
-              <Eye className="h-4 w-4" />
-              <span className="font-medium">Masked View</span>
+            <Label htmlFor="masked-mode" className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[#1C1917] dark:text-[#EFECE6]">
+              <Eye className="h-4 w-4 stroke-[1.5]" />
+              <span>Masked View (Blind Screening)</span>
             </Label>
           </div>
           
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button disabled={isGenerating} className="gap-2" />}>
-              <Download className="h-4 w-4" />
-              {isGenerating ? 'Generating...' : 'Download'}
-              <ChevronDown className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleDownload(false)}>
-                Download Full PDF
+            <DropdownMenuTrigger render={
+              <Button disabled={isGenerating} size="sm" className="gap-2 bg-[#0F766E] hover:bg-[#0D655E] text-white dark:bg-[#14B8A6] dark:hover:bg-[#0F766E] dark:text-[#12110F] text-xs font-medium cursor-pointer shadow-[0_1px_2px_rgba(15,118,110,0.2)]">
+                <Download className="h-4 w-4 stroke-[1.5]" />
+                <span>{isGenerating ? 'Generating...' : 'Download Dossier'}</span>
+                <ChevronDown className="h-3.5 w-3.5 stroke-[1.5]" />
+              </Button>
+            } />
+            <DropdownMenuContent align="end" className="bg-white dark:bg-[#191816] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+              <DropdownMenuItem onClick={() => handleDownload(false)} className="text-xs cursor-pointer">
+                Download Full PDF (Standard)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDownload(true)}>
-                Download Masked PDF
+              <DropdownMenuItem onClick={() => handleDownload(true)} className="text-xs cursor-pointer">
+                Download Masked PDF (Blind Review)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
         {/* The Printable Profile Template area */}
-        <div className="p-8 flex justify-center w-full bg-zinc-100 dark:bg-zinc-950">
+        <div className="p-8 flex justify-center w-full bg-[#FAF8F5] dark:bg-[#12110F]">
           <div 
             ref={printRef} 
-            className="w-[210mm] min-h-[297mm] bg-white text-black p-8 shadow-sm border box-border"
+            className="w-[210mm] min-h-[297mm] bg-white text-black p-8 shadow-sm border border-neutral-300 box-border"
             style={{ 
-              // A4 styling 
               fontFamily: 'Arial, sans-serif'
             }}
           >
             {/* Template Header */}
             <div className="flex gap-6 mb-6">
-              <div className="w-32 h-32 relative bg-gray-200 shrink-0 border">
+              <div className="w-32 h-32 relative bg-gray-200 shrink-0 border border-gray-400">
                 {profile.profile_picture ? (
                    // eslint-disable-next-line @next/next/no-img-element
                   <img src={profile.profile_picture} alt="Profile" className="object-cover w-full h-full" crossOrigin="anonymous" />
@@ -179,24 +220,20 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
                   <div className="font-semibold">CGPA:</div>
                   <div>{profile.gpa || 'N/A'}</div>
                   
-                  {!isMasked && (
-                    <>
-                      <div className="font-semibold">Email:</div>
-                      <div>{email}</div>
-                      
-                      <div className="font-semibold">Mobile:</div>
-                      <div>{profile.phone}</div>
-                    </>
-                  )}
+                  <div className="font-semibold">Email:</div>
+                  <div>{maskEmail(email)}</div>
+                  
+                  <div className="font-semibold">Mobile:</div>
+                  <div>{maskPhone(typeof profile.phone === 'string' ? profile.phone : '')}</div>
                 </div>
               </div>
 
               <div className="w-32 h-32 flex items-center justify-center shrink-0">
                 {collegeLogoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={collegeLogoUrl} alt={collegeName} className="object-contain w-24 h-24 rounded-full border-2 border-blue-800" crossOrigin="anonymous" />
+                  <img src={collegeLogoUrl} alt={collegeName} className="object-contain w-24 h-24 rounded-full border-2 border-[#0F766E]" crossOrigin="anonymous" />
                 ) : (
-                  <div className="w-24 h-24 rounded-full border-2 border-blue-800 flex items-center justify-center text-blue-800 font-bold text-center text-xs p-2">
+                  <div className="w-24 h-24 rounded-full border-2 border-[#0F766E] flex items-center justify-center text-[#0F766E] font-bold text-center text-xs p-2">
                     {collegeName}
                   </div>
                 )}
@@ -218,10 +255,10 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
                   </tr>
                 </thead>
                 <tbody>
-                  {profile.education?.map((edu: any, i: number) => (
+                  {profile.education?.map((edu, i) => (
                     <tr key={i}>
                       <td className="border border-gray-800 p-1.5">{edu.level}</td>
-                      <td className="border border-gray-800 p-1.5">{/* Spec not standard, leave blank or use dept if UG */}
+                      <td className="border border-gray-800 p-1.5">
                         {edu.level === 'UG (UnderGrad)' ? profile.department : ''}
                       </td>
                       <td className="border border-gray-800 p-1.5">{edu.institution}</td>
@@ -255,15 +292,14 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
             <div className="mb-4">
               <div className="bg-gray-200 p-1 border border-gray-800 font-bold text-sm uppercase mb-0">Projects</div>
               <div className="border border-gray-800 border-t-0 p-3 text-sm space-y-4">
-                {profile.projects?.map((proj: any, i: number) => (
+                {profile.projects?.map((proj, i) => (
                   <div key={i}>
-                    <div className="flex justify-between font-bold text-blue-900 mb-1">
+                    <div className="flex justify-between font-bold text-teal-900 mb-1">
                       <div>{proj.title}</div>
-                      {/* Assuming tech acts as a secondary tag here */}
                       <div className="text-gray-600 font-normal text-xs">{proj.tech}</div>
                     </div>
                     {proj.link && (
-                      <div className="text-xs text-blue-600 mb-1 break-all">
+                      <div className="text-xs text-teal-700 mb-1 break-all">
                         {isMasked ? maskLink(proj.link) : <a href={proj.link}>{proj.link}</a>}
                       </div>
                     )}
@@ -281,7 +317,7 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
               <div className="mb-4">
                 <div className="bg-gray-200 p-1 border border-gray-800 font-bold text-sm uppercase mb-0">Work Experience</div>
                 <div className="border border-gray-800 border-t-0 p-3 text-sm space-y-4">
-                  {profile.experience.map((exp: any, i: number) => (
+                  {profile.experience.map((exp, i) => (
                     <div key={i}>
                       <div className="flex justify-between font-bold mb-1">
                         <div>{exp.role} at {exp.company}</div>
@@ -294,7 +330,7 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
               </div>
             )}
             
-            {/* Important Links Section (Instead of certifications) */}
+            {/* Important Links Section */}
             {(profile.links?.linkedin || profile.links?.github || profile.links?.portfolio) && (
               <div className="mb-4">
                 <div className="bg-gray-200 p-1 border border-gray-800 font-bold text-sm uppercase mb-0">Important Links</div>
@@ -303,7 +339,7 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
                     {profile.links.linkedin && (
                       <tr>
                         <td className="border border-gray-800 p-1.5 font-bold w-1/4">LinkedIn</td>
-                        <td className={`border border-gray-800 p-1.5 w-3/4 break-all ${isMasked ? 'text-red-600' : 'text-blue-600'}`}>
+                        <td className={`border border-gray-800 p-1.5 w-3/4 break-all ${isMasked ? 'text-red-600' : 'text-teal-700'}`}>
                           {maskLink(profile.links.linkedin)}
                         </td>
                       </tr>
@@ -311,13 +347,13 @@ export function DigiProfileModal({ profile, email, collegeName, collegeLogoUrl }
                     {profile.links.github && (
                       <tr>
                         <td className="border border-gray-800 p-1.5 font-bold w-1/4">GitHub</td>
-                        <td className="border border-gray-800 p-1.5 w-3/4 text-blue-600 break-all">{profile.links.github}</td>
+                        <td className="border border-gray-800 p-1.5 w-3/4 text-teal-700 break-all">{profile.links.github}</td>
                       </tr>
                     )}
                     {profile.links.portfolio && (
                       <tr>
                         <td className="border border-gray-800 p-1.5 font-bold w-1/4">Portfolio</td>
-                        <td className="border border-gray-800 p-1.5 w-3/4 text-blue-600 break-all">{profile.links.portfolio}</td>
+                        <td className="border border-gray-800 p-1.5 w-3/4 text-teal-700 break-all">{profile.links.portfolio}</td>
                       </tr>
                     )}
                   </tbody>

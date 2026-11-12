@@ -151,9 +151,19 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(120, 113, 108, 0.25) transparent;
+  }
+  html {
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
   }
   body {
     @apply bg-background text-foreground font-sans;
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     letter-spacing: -0.011em;
   }
@@ -164,4 +174,84 @@
   code, pre, .font-mono {
     @apply font-mono;
   }
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Modern slim scrollbar styling */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.25);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.45);
+}
+
+.dark * {
+  scrollbar-color: rgba(239, 236, 230, 0.2) transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(239, 236, 230, 0.2);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: rgba(239, 236, 230, 0.35);
+}
+
+/* Clean utility to completely hide scrollbars where needed */
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Smooth flow-like theme transition */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    fill 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    stroke 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 420ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transition-delay: 0ms !important;
 }

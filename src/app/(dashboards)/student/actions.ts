@@ -208,8 +208,9 @@ export async function applyForJob(jobId: string) {
     revalidatePath('/student/dashboard')
 
     return { success: 'Application submitted successfully.' }
-  } catch (error: any) {
-    return { error: error.message || 'Failed to apply for job.' }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to apply for job.'
+    return { error: message }
   }
 }
 
@@ -258,7 +259,7 @@ export async function withdrawApplication(
       .single()
       
     const config = policyDoc?.config || {}
-    let counters = student.policy_counters || {}
+    const counters = (student.policy_counters as Record<string, number> | null) || {}
     let autoBlacklistReason = null
 
     if (isPostShortlist) {
@@ -290,7 +291,7 @@ export async function withdrawApplication(
       })
       .eq('id', applicationId)
 
-    const studentUpdatePayload: any = { policy_counters: counters }
+    const studentUpdatePayload: Record<string, unknown> = { policy_counters: counters }
     if (autoBlacklistReason) {
       studentUpdatePayload.is_blacklisted = true
       studentUpdatePayload.blacklist_reason = autoBlacklistReason
@@ -310,8 +311,9 @@ export async function withdrawApplication(
     revalidatePath(`/college/jobs/${application.job_id}`)
     
     return { success: 'Application withdrawn successfully.' }
-  } catch (error: any) {
-    return { error: error.message || 'Failed to withdraw application.' }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to withdraw application.'
+    return { error: message }
   }
 }
 
@@ -428,12 +430,15 @@ export async function declareStudentOffer({
     revalidatePath('/student/dashboard')
     revalidatePath('/student/profile')
     revalidatePath('/student/applications')
+    revalidatePath('/student/policies')
+    revalidatePath('/student/jobs')
     revalidatePath('/college/approvals')
     revalidatePath('/college/placed-students')
 
     return { success: 'Offer declaration submitted successfully for college verification!' }
-  } catch (error: any) {
-    return { error: error.message || 'An unexpected error occurred.' }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'An unexpected error occurred.'
+    return { error: message }
   }
 }
 

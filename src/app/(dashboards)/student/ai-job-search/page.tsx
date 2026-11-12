@@ -22,7 +22,7 @@ export default async function AIJobSearchPage() {
     .single()
 
   if (!student) {
-    return <div className="p-8 text-sm text-zinc-500">Error loading student profile.</div>
+    return <div className="p-8 text-sm text-[#78716C] dark:text-[#8A847A] font-mono">Error loading candidate profile.</div>
   }
 
   // 2. Fetch all student's previously generated AI resumes

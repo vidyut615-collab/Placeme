@@ -20,6 +20,8 @@
 
 # production
 /build
+brag-output*/
+brag-output/
 
 # misc
 .DS_Store

@@ -27,7 +27,6 @@ export async function createSubscriptionOrder() {
       
     if (!student) throw new Error('Student profile not found')
     
-    const college = student.colleges as any
     // Fallback to 500 INR if college hasn't set a fee
     const feeAmountINR = 500
     
@@ -56,9 +55,10 @@ export async function createSubscriptionOrder() {
 
     return { orderId: order.id, amount: options.amount }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Order creation failed:", error)
-    return { error: error.message || 'Failed to create order' }
+    const message = error instanceof Error ? error.message : 'Failed to create order'
+    return { error: message }
   }
 }
 
@@ -93,14 +93,16 @@ export async function createCreditTopupOrder(planId: string, amountInr: number, 
       type: 'credit_topup',
       status: 'pending',
       payload: {
-        credits_included: credits
+        credits_included: credits,
+        plan_id: planId
       }
     })
 
     return { orderId: order.id, amount: options.amount }
 
-  } catch (error: any) {
-    console.error("Credit order creation failed:", error)
-    return { error: error.message || 'Failed to create credit topup order' }
+  } catch (error: unknown) {
+    console.error("Topup creation failed:", error)
+    const message = error instanceof Error ? error.message : 'Failed to create order'
+    return { error: message }
   }
 }

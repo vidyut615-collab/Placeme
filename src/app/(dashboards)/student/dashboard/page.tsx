@@ -2,35 +2,116 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Briefcase,
-  FileText,
-  TrendingUp,
-  ShieldCheck,
-  ShieldAlert,
-  ArrowRight,
-  ExternalLink,
   Award,
+  Briefcase,
+  Check,
   Clock,
-  Sparkles,
-  Compass,
-  FileCheck,
-  CreditCard,
-  Building2,
-  MapPin,
-  ChevronRight,
-  CheckCircle2,
-  CircleDot,
-  AlertTriangle,
+  FileText,
   Lock,
+  ShieldAlert,
+  ShieldCheck,
+  TrendingUp,
 } from 'lucide-react'
-import { PriorityBadge, LinearStatusDot } from '@/components/ui/linear'
-import { TactileCard, RollingCounter } from '@/components/ui/tactile'
-import { DeclareHiredModal } from '@/components/DeclareHiredModal'
+import { RollingCounter } from '@/components/ui/tactile'
 import { formatDate } from '@/lib/utils'
+
+interface ProfileData {
+  gpa?: number | string
+  backlogs?: number
+  department?: string
+}
+
+interface CollegeInfo {
+  name?: string | null
+  logo_url?: string | null
+}
+
+interface PolicyConfig {
+  upgrade?: {
+    multiplier?: number
+  }
+}
+
+interface PolicyCounters {
+  no_show_count?: number
+  withdrawal_count?: number
+  post_shortlist_withdrawal_count?: number
+  disciplinary_strikes?: number
+  integrity_strikes?: number
+}
+
+interface DashboardJob {
+  id: string
+  title?: string | null
+  company_name?: string | null
+  compensation_ctc?: number | string | null
+  workplace_mode?: string | null
+  location?: string | null
+}
+
+interface RecentApplicationRow {
+  id: string
+  status?: string | null
+  created_at: string
+  jobs?: DashboardJob | DashboardJob[] | null
+}
+
+function formatCtc(value: unknown): string {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return '—'
+  return `₹${num.toFixed(1)} LPA`
+}
+
+function pluralize(count: number, singular: string, plural?: string): string {
+  return `${count} ${count === 1 ? singular : (plural ?? `${singular}s`)}`
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  applied: 'Applied',
+  shortlisted: 'Shortlisted',
+  interviewing: 'Interviewing',
+  selected: 'Selected',
+  offered: 'Offered',
+  offer_accepted: 'Offer accepted',
+  offer_declined: 'Offer declined',
+  hired: 'Hired',
+  joined: 'Joined',
+  not_joined: 'Not joined',
+  withdrawn: 'Withdrawn',
+  rejected: 'Not selected',
+  dropped: 'Dropped',
+  forfeited: 'Forfeited',
+}
+
+function getStageProgress(status: string): { step: number; percent: number; isTerminal: boolean; isPositive: boolean } {
+  switch (status) {
+    case 'selected':
+    case 'offered':
+    case 'offer_accepted':
+    case 'hired':
+    case 'joined':
+      return { step: 4, percent: 100, isTerminal: false, isPositive: true }
+    case 'interviewing':
+      return { step: 3, percent: 75, isTerminal: false, isPositive: true }
+    case 'shortlisted':
+      return { step: 2, percent: 50, isTerminal: false, isPositive: true }
+    case 'rejected':
+    case 'dropped':
+    case 'withdrawn':
+    case 'forfeited':
+    case 'offer_declined':
+    case 'not_joined':
+      return { step: 1, percent: 100, isTerminal: true, isPositive: false }
+    default:
+      return { step: 1, percent: 25, isTerminal: false, isPositive: false }
+  }
+}
 
 export default async function StudentDashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user || user.app_metadata.role !== 'student') {
     redirect('/login')
@@ -39,7 +120,8 @@ export default async function StudentDashboardPage() {
   // 1. Fetch student master profile + college details
   const { data: student } = await supabase
     .from('students')
-    .select(`
+    .select(
+      `
       id,
       college_id,
       profile_data,
@@ -51,37 +133,36 @@ export default async function StudentDashboardPage() {
         name,
         logo_url
       )
-    `)
+    `
+    )
     .eq('user_id', user.id)
     .single()
 
   if (!student) {
     return (
-      <div className="p-8 text-zinc-500 font-mono text-sm">
-        Error loading candidate profile. Please reconnect with your institution.
+      <div className="min-h-full w-full bg-[#FAF8F5] dark:bg-[#12110F] p-8">
+        <div className="max-w-7xl mx-auto rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] p-6 text-[14px] text-[#57534E] dark:text-[#ACA59A]">
+          Unable to load your student profile. Please contact your campus placement office.
+        </div>
       </div>
     )
   }
 
-  const profile = (student.profile_data as Record<string, any>) || {}
-  const collegeName = (student.colleges as any)?.name || 'Campus Placement Cell'
-  const firstName =
-    profile.first_name ||
-    (profile.full_name ? profile.full_name.split(' ')[0] : '') ||
-    user?.user_metadata?.first_name ||
-    user?.email?.split('@')[0] ||
-    'Candidate'
+  const profile = (student.profile_data as ProfileData | null) ?? {}
+  const collegeRel = student.colleges as CollegeInfo | CollegeInfo[] | null
+  const collegeName =
+    (Array.isArray(collegeRel) ? collegeRel[0]?.name : collegeRel?.name) ||
+    'Campus Placement Cell'
 
-  // 2. Parallel fetch telemetry, applications, jobs, offers, and AI resumes
+  // 2. Parallel fetch applications, active jobs, offers, AI resumes, and policy config
   const [
     { data: recentApplications, count: totalAppsCount },
     { data: allApplications },
     { data: recentJobs, count: totalJobsCount },
     { data: offers },
-    { data: resumes, count: totalResumesCount },
+    { count: totalResumesCount },
     { data: policyDoc },
   ] = await Promise.all([
-    // Up to 5 recent applications with job details
     supabase
       .from('applications')
       .select(
@@ -107,13 +188,11 @@ export default async function StudentDashboardPage() {
       .order('created_at', { ascending: false })
       .limit(5),
 
-    // All applications (for status funnel telemetry & modal mapping)
     supabase
       .from('applications')
       .select('id, job_id, status, jobs ( title, company_name, compensation_ctc )')
       .eq('student_id', student.id),
 
-    // Active eligible jobs for student's college or consortium
     supabase
       .from('jobs')
       .select(
@@ -125,21 +204,17 @@ export default async function StudentDashboardPage() {
       .order('created_at', { ascending: false })
       .limit(5),
 
-    // Placement offers declared
     supabase
       .from('student_offers')
       .select('*')
       .eq('student_id', student.id)
       .order('created_at', { ascending: false }),
 
-    // AI resumes generated by student
     supabase
       .from('ai_resumes')
-      .select('id, title, target_role, created_at', { count: 'exact' })
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false }),
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id),
 
-    // College placement policies config
     supabase
       .from('placement_policies')
       .select('config')
@@ -147,26 +222,24 @@ export default async function StudentDashboardPage() {
       .maybeSingle(),
   ])
 
-  // Placement Offer Status
+  // Offer & Upgrade Gate calculation
   const approvedOffer = offers?.find((o) => o.status === 'approved')
   const pendingOffer = offers?.find((o) => o.status === 'pending')
   const isPlaced = !!approvedOffer
   const holdingCtc = approvedOffer ? Number(approvedOffer.compensation_ctc) : 0
-  const upgradeMultiplier = (policyDoc?.config as any)?.upgrade?.multiplier || 1.5
-  const upgradeMinCtc = holdingCtc > 0 ? (holdingCtc * upgradeMultiplier).toFixed(1) : '0'
+  const upgradeMultiplier =
+    (policyDoc?.config as PolicyConfig | null)?.upgrade?.multiplier || 1.5
+  const upgradeMinCtc = holdingCtc > 0 ? (holdingCtc * upgradeMultiplier).toFixed(1) : '0.0'
 
-  // Application Funnel Calculations
+  // Application funnel metrics
   const allApps = allApplications || []
   const appliedCount = allApps.filter((a) => a.status === 'applied').length
   const shortlistedCount = allApps.filter((a) => a.status === 'shortlisted').length
   const interviewingCount = allApps.filter((a) => a.status === 'interviewing').length
-  const offeredCount = allApps.filter((a) =>
-    ['offered', 'hired', 'offer_accepted'].includes(a.status)
-  ).length
   const inFlightCount = appliedCount + shortlistedCount + interviewingCount
 
-  // Policy Standing & Strikes Calculation
-  const counters = (student.policy_counters as Record<string, any>) || {}
+  // Policy standing & strikes
+  const counters = (student.policy_counters as PolicyCounters | null) ?? {}
   const noShowStrikes = counters.no_show_count || 0
   const withdrawalStrikes =
     (counters.withdrawal_count || 0) + (counters.post_shortlist_withdrawal_count || 0)
@@ -174,697 +247,433 @@ export default async function StudentDashboardPage() {
     (counters.disciplinary_strikes || 0) + (counters.integrity_strikes || 0)
   const totalStrikes = noShowStrikes + withdrawalStrikes + disciplinaryStrikes
   const isBlacklisted = student.is_blacklisted || false
+  const activeBacklogs = Number(profile.backlogs ?? 0)
 
-  // Applied job IDs set for fast check in Recommended Jobs
   const appliedJobIdSet = new Set(allApps.map((a) => a.job_id))
 
   return (
-    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
-      {/* ── 1. Top Header & Welcome Banner ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-full px-2.5 py-0.5 font-semibold">
-              Season 2026 · Cycle I
+    <div className="min-h-full w-full min-w-0 bg-[#FAF8F5] dark:bg-[#12110F] text-[#1C1917] dark:text-[#EFECE6]">
+      <div className="max-w-7xl mx-auto w-full min-w-0 px-6 py-7 md:px-8 md:py-8 space-y-6">
+        {/* ── 1. Page Header ── */}
+        <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-[28px] font-medium tracking-[-0.02em] leading-[1.15] text-[#1C1917] dark:text-[#EFECE6]">
+              Placement Overview
+            </h1>
+            <p className="text-[14px] text-[#57534E] dark:text-[#ACA59A] mt-1">
+              {collegeName} · Cycle I — Track active drives, interview stages, and offer eligibility
+            </p>
+          </div>
+        </header>
+
+        {/* ── 2. Standing & Offer Gate Banner (Primary Focal Moment) ── */}
+        {approvedOffer ? (
+          <section className="rounded-[14px] border border-[#0F766E]/20 dark:border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E]/[0.07] via-[#10B981]/[0.03] to-white dark:from-[#0F766E]/[0.18] dark:via-[#10B981]/[0.06] dark:to-[#191816] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-10 h-10 rounded-[10px] bg-[#ECFDF8] dark:bg-[#0F766E]/25 border border-[#0F766E]/20 dark:border-[#14B8A6]/30 text-[#115E59] dark:text-[#5EEAD4] flex items-center justify-center shrink-0">
+                <Award className="w-4 h-4 stroke-[1.5]" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    Offer holding confirmed · {approvedOffer.company_name}
+                  </span>
+                  <span className="font-mono text-[12px] font-medium tabular-nums px-2 py-0.5 rounded-md bg-[#ECFEFF] dark:bg-[#0F766E]/30 text-[#0F766E] dark:text-[#5EEAD4] border border-[#0F766E]/20 dark:border-[#14B8A6]/30">
+                    {formatCtc(holdingCtc)}
+                  </span>
+                </div>
+                <p className="text-[13px] text-[#57534E] dark:text-[#ACA59A]">
+                  The {upgradeMultiplier}× upgrade policy is active on your record — you can apply to dream roles offering ≥ ₹{upgradeMinCtc} LPA
+                </p>
+              </div>
+            </div>
+
+            <div className="md:text-right shrink-0 md:pl-5 md:border-l border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+              <div className="text-[12px] text-[#78716C] dark:text-[#8A847A]">
+                Minimum upgrade floor
+              </div>
+              <div className="font-mono text-[16px] font-medium tabular-nums text-[#115E59] dark:text-[#5EEAD4] mt-0.5">
+                ≥ ₹{upgradeMinCtc} LPA
+              </div>
+            </div>
+          </section>
+        ) : pendingOffer ? (
+          <section className="rounded-[14px] border border-[#B45309]/25 dark:border-[#F59E0B]/25 bg-gradient-to-br from-[#D97706]/[0.07] via-[#F59E0B]/[0.02] to-white dark:from-[#D97706]/[0.16] dark:via-transparent dark:to-[#191816] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-10 h-10 rounded-[10px] bg-[#FEF3C7] dark:bg-[#B45309]/25 border border-[#B45309]/20 text-[#B45309] dark:text-[#FCD34D] flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4 stroke-[1.5]" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    Offer verification in progress · {pendingOffer.company_name}
+                  </span>
+                  {pendingOffer.compensation_ctc ? (
+                    <span className="font-mono text-[12px] font-medium tabular-nums px-2 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-[#B45309]/30 text-[#B45309] dark:text-[#FCD34D] border border-[#B45309]/20">
+                      {formatCtc(pendingOffer.compensation_ctc)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-[13px] text-[#57534E] dark:text-[#ACA59A]">
+                  Submitted on {formatDate(pendingOffer.created_at)} — awaiting confirmation from your placement cell
+                </p>
+              </div>
+            </div>
+
+            <span className="font-mono text-[12px] font-medium px-2.5 py-1 rounded-md bg-[#FEF3C7] dark:bg-[#B45309]/25 text-[#B45309] dark:text-[#FCD34D] border border-[#B45309]/20 shrink-0">
+              Awaiting review
             </span>
-            <span className="text-zinc-300 dark:text-zinc-700">·</span>
-            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-              {collegeName}
-            </span>
-          </div>
-
-          <h1 className="font-bold text-2xl md:text-3xl text-zinc-900 dark:text-zinc-50 tracking-tight">
-            Welcome back, {firstName}
-          </h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Real-time placement velocity, institutional eligibility status, and active drive progression.
-          </p>
-        </div>
-
-        {/* Top Action Pill: Declare Hired / Placement Offer */}
-        <div className="flex items-center gap-3">
-          <DeclareHiredModal
-            appliedJobs={allApplications || []}
-            hasPendingOffer={!!pendingOffer}
-            pendingOfferDetails={
-              pendingOffer
-                ? {
-                    company_name: pendingOffer.company_name,
-                    job_role: pendingOffer.job_role,
-                    created_at: pendingOffer.created_at,
-                  }
-                : null
-            }
-            approvedOfferDetails={
-              approvedOffer
-                ? {
-                    company_name: approvedOffer.company_name,
-                    job_role: approvedOffer.job_role,
-                    compensation_ctc: Number(approvedOffer.compensation_ctc),
-                  }
-                : null
-            }
-          />
-        </div>
-      </div>
-
-      {/* ── 2. Context-Aware Priority Action Horizon (Dynamic Radar) ── */}
-      {approvedOffer ? (
-        // Horizon State 1: Officially Placed Student holding an offer
-        <div className="rounded-xl border border-emerald-500/25 bg-emerald-50/40 dark:bg-emerald-950/20 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-300/40 dark:border-emerald-700/50">
-              <Award className="w-5 h-5 stroke-[1.5]" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
-                  Placement Holding Confirmed · {approvedOffer.company_name}
-                </span>
-                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300/40">
-                  ₹{holdingCtc} LPA
-                </span>
+          </section>
+        ) : inFlightCount > 0 ? (
+          <section className="rounded-[14px] border border-[#0F766E]/20 dark:border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E]/[0.07] via-[#10B981]/[0.03] to-white dark:from-[#0F766E]/[0.18] dark:via-[#10B981]/[0.06] dark:to-[#191816] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-10 h-10 rounded-[10px] bg-[#ECFDF8] dark:bg-[#0F766E]/25 border border-[#0F766E]/20 dark:border-[#14B8A6]/30 text-[#115E59] dark:text-[#5EEAD4] flex items-center justify-center shrink-0">
+                <TrendingUp className="w-4 h-4 stroke-[1.5]" />
               </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Institutional holding recorded. The {upgradeMultiplier}× Upgrade Multiplier Policy is active; you are eligible to apply only for dream drives offering $\ge$ ₹{upgradeMinCtc} LPA.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <PriorityBadge tier="multiplier_unlocked" size="md" />
-          </div>
-        </div>
-      ) : pendingOffer ? (
-        // Horizon State 2: Offer Declaration Pending TPO Approval
-        <div className="rounded-xl border border-amber-500/25 bg-amber-50/40 dark:bg-amber-950/20 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 border border-amber-300/40 dark:border-amber-700/50">
-              <Clock className="w-5 h-5 stroke-[1.5]" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-bold text-amber-950 dark:text-amber-200">
-                  Offer Verification In Progress · {pendingOffer.company_name}
-                </span>
-                {pendingOffer.compensation_ctc && (
-                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300/40">
-                    ₹{pendingOffer.compensation_ctc} LPA
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Declaration submitted on {formatDate(pendingOffer.created_at)}. TPO verification is underway.
-              </p>
-            </div>
-          </div>
-
-          <span className="font-mono text-xs px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-semibold border border-amber-300/40">
-            Awaiting Verification
-          </span>
-        </div>
-      ) : inFlightCount > 0 ? (
-        // Horizon State 3: Candidate has active applications in pipeline
-        <div className="rounded-xl border border-purple-500/20 bg-purple-50/30 dark:bg-purple-950/15 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0 border border-purple-300/40 dark:border-purple-700/50">
-              <TrendingUp className="w-5 h-5 stroke-[1.5]" />
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Active Application Velocity · {inFlightCount} in-flight pipeline {inFlightCount === 1 ? 'stage' : 'stages'}
-              </span>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                {interviewingCount > 0
-                  ? `You have ${interviewingCount} role(s) currently in interview/assessment rounds. Check notifications regularly.`
-                  : `${appliedCount + shortlistedCount} submission(s) undergoing recruiter triage and shortlist verification.`}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/student/applications"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 transition-colors shadow-2xs"
-          >
-            <span>Review Stages</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      ) : (
-        // Horizon State 4: Clean standing, ready for new drives
-        <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/40 dark:bg-zinc-900/30 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center shrink-0 border border-zinc-200 dark:border-zinc-700">
-              <ShieldCheck className="w-5 h-5 stroke-[1.5] text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Placement Docket Clear & Verified
-              </span>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                No pending deadlines or action items today. Explore open campus drives or prepare with AI Resume Studio.
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/student/jobs"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 transition-colors shadow-2xs"
-          >
-            <span>Explore Open Drives</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      )}
-
-      {/* ── 3. Telemetry & Institutional Clearance Pulse (3-Module Horizon) ── */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Module A: Pipeline Funnel Velocity */}
-        <Link href="/student/applications" className="block group">
-          <TactileCard className="h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 mb-3">
-                <span className="font-mono text-xs uppercase tracking-wider font-semibold">
-                  Application Funnel
-                </span>
-                <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
-              </div>
-
-              <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  <RollingCounter value={totalAppsCount || 0} />
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Total Submissions
-                </span>
-              </div>
-
-              {/* Multi-segment conversion micro-bar */}
-              <div className="space-y-1.5 mb-2">
-                <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
-                  <div
-                    style={{
-                      width: `${totalAppsCount ? (appliedCount / totalAppsCount) * 100 : 0}%`,
-                    }}
-                    className="bg-blue-500 h-full"
-                    title={`Applied: ${appliedCount}`}
-                  />
-                  <div
-                    style={{
-                      width: `${totalAppsCount ? (shortlistedCount / totalAppsCount) * 100 : 0}%`,
-                    }}
-                    className="bg-purple-500 h-full"
-                    title={`Shortlisted: ${shortlistedCount}`}
-                  />
-                  <div
-                    style={{
-                      width: `${totalAppsCount ? (interviewingCount / totalAppsCount) * 100 : 0}%`,
-                    }}
-                    className="bg-amber-500 h-full"
-                    title={`Interviewing: ${interviewingCount}`}
-                  />
-                  <div
-                    style={{
-                      width: `${totalAppsCount ? (offeredCount / totalAppsCount) * 100 : 0}%`,
-                    }}
-                    className="bg-emerald-500 h-full"
-                    title={`Offered: ${offeredCount}`}
-                  />
+              <div className="space-y-1">
+                <div className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                  {pluralize(inFlightCount, 'active application')} in progress
                 </div>
-
-                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400 pt-0.5">
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-                    <span>{appliedCount} Sent</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block" />
-                    <span>{shortlistedCount} Shortlist</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-                    <span>{interviewingCount} Rounds</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                    <span>{offeredCount} Offers</span>
-                  </span>
-                </div>
+                <p className="text-[13px] text-[#57534E] dark:text-[#ACA59A]">
+                  {interviewingCount > 0
+                    ? `${pluralize(interviewingCount, 'role')} currently in interview rounds — keep your resume updated for upcoming panels`
+                    : `${pluralize(appliedCount + shortlistedCount, 'submission')} under recruiter review and shortlist checks`}
+                </p>
               </div>
-            </div>
-
-            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500 dark:text-zinc-400">Deterministic pipeline</span>
-              <span className="text-purple-600 dark:text-purple-400 font-semibold group-hover:underline flex items-center gap-1">
-                <span>View conveyor</span>
-                <ArrowRight className="w-3 h-3" />
-              </span>
-            </div>
-          </TactileCard>
-        </Link>
-
-        {/* Module B: Institutional Standing & Clearance */}
-        <Link href="/student/policies" className="block group">
-          <TactileCard className="h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 mb-3">
-                <span className="font-mono text-xs uppercase tracking-wider font-semibold">
-                  Institutional Clearance
-                </span>
-                {isBlacklisted ? (
-                  <ShieldAlert className="w-4 h-4 text-red-500 stroke-[1.5]" />
-                ) : (
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[1.5]" />
-                )}
-              </div>
-
-              <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  {profile.gpa ? `${profile.gpa} GPA` : 'Verified'}
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {profile.department || 'Department Registered'}
-                </span>
-              </div>
-
-              {/* Metrics row */}
-              <div className="space-y-2 mb-2 font-mono text-[11px]">
-                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
-                  <span className="text-zinc-500 dark:text-zinc-400">Policy Standing:</span>
-                  {isBlacklisted ? (
-                    <span className="text-red-600 dark:text-red-400 font-bold">Blacklisted / Cooldown</span>
-                  ) : totalStrikes > 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400 font-bold">{totalStrikes} Strike(s) Active</span>
-                  ) : (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">Clean · 0 Strikes</span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
-                  <span className="text-zinc-500 dark:text-zinc-400">Backlogs Status:</span>
-                  <span className="text-zinc-800 dark:text-zinc-200 font-semibold">
-                    {profile.backlogs ?? 0} Active Backlogs
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500 dark:text-zinc-400">20-Policy rulebook</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold group-hover:underline flex items-center gap-1">
-                <span>View thresholds</span>
-                <ArrowRight className="w-3 h-3" />
-              </span>
-            </div>
-          </TactileCard>
-        </Link>
-
-        {/* Module C: AI Workspace Fuel & Resumes */}
-        <Link href="/student/billing" className="block group">
-          <TactileCard className="h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 mb-3">
-                <span className="font-mono text-xs uppercase tracking-wider font-semibold">
-                  AI Fuel & Readiness
-                </span>
-                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
-              </div>
-
-              <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                  <RollingCounter value={student.credit_balance || 0} />
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Available Credits
-                </span>
-              </div>
-
-              {/* Telemetry info */}
-              <div className="space-y-2 mb-2 font-mono text-[11px]">
-                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
-                  <span className="text-zinc-500 dark:text-zinc-400">Compiled Resumes:</span>
-                  <span className="text-purple-600 dark:text-purple-400 font-bold">
-                    {totalResumesCount || 0} LaTeX Versions
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200/60 dark:border-zinc-800/60">
-                  <span className="text-zinc-500 dark:text-zinc-400">AI Job Scraper:</span>
-                  <span className="text-zinc-800 dark:text-zinc-200 font-semibold">LinkedIn + Internshala</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500 dark:text-zinc-400">Top-up & ledger</span>
-              <span className="text-purple-600 dark:text-purple-400 font-semibold group-hover:underline flex items-center gap-1">
-                <span>Refuel balance</span>
-                <ArrowRight className="w-3 h-3" />
-              </span>
-            </div>
-          </TactileCard>
-        </Link>
-      </div>
-
-      {/* ── 4. Split Workstream: Application Conveyor (60%) vs Recommended Drives (40%) ── */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left Column (7 cols ≈ 58%): Active Application Conveyor */}
-        <div className="lg:col-span-7 bg-white dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-2xs flex flex-col">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/60">
-            <div>
-              <h2 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
-                Application Pipeline Conveyor
-              </h2>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Deterministic stage tracking across visiting campus recruiters
-              </p>
             </div>
 
             <Link
               href="/student/applications"
-              className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-semibold"
+              className="inline-flex items-center justify-center h-9 px-4 rounded-lg text-[13px] font-medium bg-white dark:bg-[#24221F] hover:bg-[#F3EFE9] dark:hover:bg-[#2D2A26] text-[#115E59] dark:text-[#5EEAD4] border border-[#0F766E]/20 dark:border-[#14B8A6]/25 transition-colors duration-150 shrink-0"
             >
-              <span>View All ({totalAppsCount || 0})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              Review applications
             </Link>
-          </div>
-
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60 flex-1">
-            {!recentApplications || recentApplications.length === 0 ? (
-              <div className="p-10 text-center space-y-2.5">
-                <FileText className="w-9 h-9 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
-                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  No applications submitted yet
-                </p>
-                <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                  Browse matching campus drives from corporate hiring partners and apply with 1-click.
-                </p>
-                <Link
-                  href="/student/jobs"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-colors"
-                >
-                  <span>Explore Jobs</span>
-                  <ArrowRight className="w-3 h-3" />
-                </Link>
+          </section>
+        ) : (
+          <section className="rounded-[14px] border border-[#0F766E]/20 dark:border-[#14B8A6]/25 bg-gradient-to-br from-[#0F766E]/[0.06] via-[#10B981]/[0.02] to-white dark:from-[#0F766E]/[0.16] dark:via-transparent dark:to-[#191816] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-10 h-10 rounded-[10px] bg-[#ECFDF8] dark:bg-[#0F766E]/25 border border-[#0F766E]/20 dark:border-[#14B8A6]/30 text-[#115E59] dark:text-[#5EEAD4] flex items-center justify-center shrink-0">
+                {isBlacklisted ? (
+                  <ShieldAlert className="w-4 h-4 stroke-[1.5] text-[#DC2626] dark:text-[#F87171]" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 stroke-[1.5]" />
+                )}
               </div>
-            ) : (
-              recentApplications.map((app: any) => {
-                const job = app.jobs || {}
-                const ctc = job.compensation_ctc ? Number(job.compensation_ctc) : null
-                const status = app.status || 'applied'
-
-                // Determine active stage indices (0: Applied, 1: Shortlisted, 2: Interviewing, 3: Offered)
-                const stageIndex =
-                  status === 'hired' || status === 'offered' || status === 'offer_accepted'
-                    ? 3
-                    : status === 'interviewing'
-                    ? 2
-                    : status === 'shortlisted'
-                    ? 1
-                    : 0
-
-                const isTerminalFailure =
-                  status === 'rejected' || status === 'dropped' || status === 'withdrawn'
-
-                return (
-                  <div key={app.id} className="p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-850/30 transition-colors space-y-3">
-                    {/* Top Row: Job Title, Company, CTC & Status Dot */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-0.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
-                            {job.title || 'Placement Drive'}
-                          </span>
-                          {ctc && (
-                            <span className="font-mono text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                              ₹{ctc} LPA
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                          <span>{job.company_name || 'Visiting Recruiter'}</span>
-                          <span>·</span>
-                          <span>Applied {formatDate(app.created_at)}</span>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        <LinearStatusDot status={status} size="sm" />
-                      </div>
-                    </div>
-
-                    {/* Stage Stepper: 4 Visual Milestones */}
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between relative">
-                        {/* Connecting track line */}
-                        <div className="absolute top-2 left-3 right-3 h-0.5 bg-zinc-200 dark:bg-zinc-800 -z-0" />
-                        
-                        {['Applied', 'Shortlisted', 'Interviewing', 'Offered'].map((stepLabel, idx) => {
-                          const isCompleted = !isTerminalFailure && idx <= stageIndex
-                          const isCurrent = !isTerminalFailure && idx === stageIndex
-
-                          return (
-                            <div key={stepLabel} className="flex flex-col items-center relative z-10">
-                              <div
-                                className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border transition-colors ${
-                                  isTerminalFailure && idx === stageIndex
-                                    ? 'bg-red-500 text-white border-red-500'
-                                    : isCurrent
-                                    ? 'bg-purple-600 text-white border-purple-600 ring-2 ring-purple-500/20'
-                                    : isCompleted
-                                    ? 'bg-emerald-600 text-white border-emerald-600'
-                                    : 'bg-white dark:bg-zinc-900 text-zinc-400 border-zinc-300 dark:border-zinc-700'
-                                }`}
-                              >
-                                {isTerminalFailure && idx === stageIndex ? (
-                                  '×'
-                                ) : isCompleted && !isCurrent ? (
-                                  '✓'
-                                ) : (
-                                  ''
-                                )}
-                              </div>
-                              <span
-                                className={`text-[9px] font-mono mt-1 ${
-                                  isCurrent
-                                    ? 'text-purple-600 dark:text-purple-400 font-bold'
-                                    : isCompleted
-                                    ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                                    : 'text-zinc-400 dark:text-zinc-500'
-                                }`}
-                              >
-                                {stepLabel}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Right Column (5 cols ≈ 42%): Recommended Campus Drives (Jobs) */}
-        <div className="lg:col-span-5 bg-white dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-2xs flex flex-col">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/60">
-            <div>
-              <h2 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
-                Recommended Campus Drives
-              </h2>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Verified openings tailored to your cohort eligibility
-              </p>
+              <div className="space-y-1">
+                <div className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                  {isBlacklisted ? 'Placement access paused' : 'Eligible for open campus drives'}
+                </div>
+                <p className="text-[13px] text-[#57534E] dark:text-[#ACA59A]">
+                  {isBlacklisted
+                    ? 'A cooldown restriction is active on your account — check your placement rules for details'
+                    : 'No pending actions today — browse open campus drives or prepare a tailored resume'}
+                </p>
+              </div>
             </div>
 
             <Link
-              href="/student/jobs"
-              className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-semibold"
+              href={isBlacklisted ? '/student/policies' : '/student/jobs'}
+              className="inline-flex items-center justify-center h-9 px-4 rounded-lg text-[13px] font-medium bg-gradient-to-b from-[#13857C] to-[#0C635C] hover:from-[#10736B] hover:to-[#0A554F] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_1px_2px_rgba(28,25,23,0.12)] transition-colors duration-150 shrink-0"
             >
-              <span>Explore ({totalJobsCount || 0})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {isBlacklisted ? 'View policy rules' : 'Explore open drives'}
             </Link>
-          </div>
+          </section>
+        )}
 
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60 flex-1">
-            {!recentJobs || recentJobs.length === 0 ? (
-              <div className="p-10 text-center space-y-2">
-                <Briefcase className="w-9 h-9 text-zinc-300 dark:text-zinc-600 stroke-[1.5] mx-auto" />
-                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  No active drives right now
-                </p>
-                <p className="text-xs text-zinc-500">
-                  New campus placement drives are published directly by the Placement Cell.
+        {/* ── 3. Three Compact Stat Cards (Numbers, label, and comparison only) ── */}
+        <section className="grid gap-4 md:grid-cols-3">
+          <Link
+            href="/student/applications"
+            className="block rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] hover:border-[#1C1917]/20 dark:hover:border-[#EFECE6]/20 p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-colors duration-150"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[13px] font-normal text-[#57534E] dark:text-[#ACA59A]">
+                Active applications
+              </span>
+              <span className="font-mono text-[12px] text-[#78716C] dark:text-[#8A847A]">
+                Cycle I
+              </span>
+            </div>
+            <div className="text-[30px] font-mono font-medium tabular-nums leading-none tracking-[-0.02em] text-[#1C1917] dark:text-[#EFECE6]">
+              <RollingCounter value={totalAppsCount || 0} />
+            </div>
+            <p className="text-[13px] text-[#78716C] dark:text-[#8A847A] mt-2.5">
+              <span className="text-[#115E59] dark:text-[#5EEAD4] font-medium">
+                {interviewingCount} in interviews
+              </span>{' '}
+              · {shortlistedCount} shortlisted
+            </p>
+          </Link>
+
+          <Link
+            href="/student/policies"
+            className="block rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] hover:border-[#1C1917]/20 dark:hover:border-[#EFECE6]/20 p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-colors duration-150"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[13px] font-normal text-[#57534E] dark:text-[#ACA59A]">
+                Academic standing
+              </span>
+              <span className="font-mono text-[12px] text-[#78716C] dark:text-[#8A847A]">
+                {profile.department || 'Verified'}
+              </span>
+            </div>
+            <div className="text-[30px] font-mono font-medium tabular-nums leading-none tracking-[-0.02em] text-[#1C1917] dark:text-[#EFECE6]">
+              {profile.gpa ? `${Number(profile.gpa).toFixed(2)} GPA` : 'Verified'}
+            </div>
+            <p className="text-[13px] text-[#78716C] dark:text-[#8A847A] mt-2.5">
+              {isBlacklisted ? (
+                <span className="text-[#DC2626] dark:text-[#F87171] font-medium">
+                  Cooldown active
+                </span>
+              ) : totalStrikes > 0 ? (
+                <span className="text-[#B45309] dark:text-[#FCD34D] font-medium">
+                  {pluralize(totalStrikes, 'strike')} active
+                </span>
+              ) : (
+                <span>0 strikes</span>
+              )}{' '}
+              · {pluralize(activeBacklogs, 'active backlog')}
+            </p>
+          </Link>
+
+          <Link
+            href="/student/billing"
+            className="block rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] hover:border-[#1C1917]/20 dark:hover:border-[#EFECE6]/20 p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-colors duration-150"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[13px] font-normal text-[#57534E] dark:text-[#ACA59A]">
+                Resume credits
+              </span>
+              <span className="font-mono text-[12px] text-[#78716C] dark:text-[#8A847A]">
+                Balance
+              </span>
+            </div>
+            <div className="text-[30px] font-mono font-medium tabular-nums leading-none tracking-[-0.02em] text-[#1C1917] dark:text-[#EFECE6]">
+              <RollingCounter value={student.credit_balance || 0} />
+            </div>
+            <p className="text-[13px] text-[#78716C] dark:text-[#8A847A] mt-2.5">
+              {pluralize(totalResumesCount || 0, 'tailored resume')} compiled
+            </p>
+          </Link>
+        </section>
+
+        {/* ── 4. Split Workstream: Active Applications (7 cols) vs Recommended Drives (5 cols) ── */}
+        <section className="grid gap-5 lg:grid-cols-12">
+          {/* Left Column: Active Applications */}
+          <div className="lg:col-span-7 rounded-[14px] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] overflow-hidden shadow-[0_1px_2px_rgba(28,25,23,0.04)] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+              <div>
+                <h2 className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                  Active Applications
+                </h2>
+                <p className="text-[13px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
+                  Stage updates from visiting campus recruiters
                 </p>
               </div>
-            ) : (
-              recentJobs.map((job: any) => {
-                const ctc = Number(job.compensation_ctc)
-                const isDream = ctc >= 10 && ctc < 20
-                const isSuperDream = ctc >= 20
-                const hasApplied = appliedJobIdSet.has(job.id)
-                const isMultiplierGated = isPlaced && ctc < holdingCtc * upgradeMultiplier
 
-                return (
-                  <div key={job.id} className="p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-850/30 transition-colors space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-0.5">
-                        <Link
-                          href="/student/jobs"
-                          className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors line-clamp-1"
-                        >
-                          {job.title}
-                        </Link>
-                        <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                          <span>{job.company_name || 'Corporate Partner'}</span>
-                          <span>·</span>
-                          <span className="capitalize">{job.workplace_mode || 'On-site'}</span>
+              <Link
+                href="/student/applications"
+                className="text-[13px] font-medium text-[#115E59] dark:text-[#5EEAD4] hover:underline shrink-0"
+              >
+                View all {totalAppsCount || 0}
+              </Link>
+            </div>
+
+            <div className="divide-y divide-[#1C1917]/[0.08] dark:divide-[#EFECE6]/[0.08] flex-1">
+              {!recentApplications || recentApplications.length === 0 ? (
+                <div className="px-6 py-12 text-center space-y-3">
+                  <div className="w-10 h-10 rounded-[10px] bg-[#F3EFE9] dark:bg-[#24221F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] text-[#78716C] dark:text-[#8A847A] flex items-center justify-center mx-auto">
+                    <FileText className="w-4 h-4 stroke-[1.5]" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[14px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                      No applications submitted yet
+                    </p>
+                    <p className="text-[13px] text-[#78716C] dark:text-[#8A847A] max-w-sm mx-auto">
+                      Browse matching campus drives from corporate partners and apply in one click
+                    </p>
+                  </div>
+                  <Link
+                    href="/student/jobs"
+                    className="inline-flex items-center justify-center h-9 px-4 rounded-lg text-[13px] font-medium bg-gradient-to-b from-[#13857C] to-[#0C635C] hover:from-[#10736B] hover:to-[#0A554F] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.20)] transition-colors duration-150"
+                  >
+                    Explore campus jobs
+                  </Link>
+                </div>
+              ) : (
+                (recentApplications as RecentApplicationRow[]).map((app) => {
+                  const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) ?? ({} as Partial<DashboardJob>)
+                  const status = app.status || 'applied'
+                  const label = STAGE_LABELS[status] || status
+                  const progress = getStageProgress(status)
+
+                  return (
+                    <div
+                      key={app.id}
+                      className="px-5 py-4 hover:bg-[#FAF8F5] dark:hover:bg-[#24221F]/60 transition-colors duration-150 space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[14px] font-medium text-[#1C1917] dark:text-[#EFECE6] truncate">
+                            {job.title || 'Placement Drive'}
+                            {job.company_name ? ` · ${job.company_name}` : ''}
+                          </div>
+                          <div className="text-[13px] text-[#57534E] dark:text-[#ACA59A] mt-0.5">
+                            {job.location || job.workplace_mode || 'Campus drive'} · Applied{' '}
+                            {formatDate(app.created_at)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          {job.compensation_ctc ? (
+                            <span className="font-mono text-[13px] font-medium tabular-nums text-[#1C1917] dark:text-[#EFECE6]">
+                              {formatCtc(job.compensation_ctc)}
+                            </span>
+                          ) : null}
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-0.5 rounded-md border ${
+                              progress.isTerminal
+                                ? 'bg-[#FEF2F2] dark:bg-[#7F1D1D]/30 text-[#B91C1C] dark:text-[#FCA5A5] border-[#DC2626]/20'
+                                : progress.isPositive
+                                  ? 'bg-[#ECFDF8] dark:bg-[#0F766E]/25 text-[#115E59] dark:text-[#5EEAD4] border-[#0F766E]/20 dark:border-[#14B8A6]/30'
+                                  : 'bg-[#F3EFE9] dark:bg-[#24221F] text-[#57534E] dark:text-[#ACA59A] border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                progress.isTerminal
+                                  ? 'bg-[#DC2626] dark:bg-[#F87171]'
+                                  : progress.isPositive
+                                    ? 'bg-[#0F766E] dark:bg-[#2DD4BF]'
+                                    : 'bg-[#78716C] dark:bg-[#8A847A]'
+                              }`}
+                            />
+                            <span>{label}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-1.5 rounded-full bg-[#F3EFE9] dark:bg-[#24221F] overflow-hidden">
+                          <div
+                            style={{ width: `${progress.percent}%` }}
+                            className={`h-full rounded-full ${
+                              progress.isTerminal
+                                ? 'bg-[#DC2626]/60 dark:bg-[#F87171]/60'
+                                : progress.isPositive
+                                  ? 'bg-gradient-to-r from-[#0F766E] to-[#10B981]'
+                                  : 'bg-[#78716C]/45 dark:bg-[#8A847A]/45'
+                            }`}
+                          />
+                        </div>
+                        <span className="font-mono text-[12px] tabular-nums text-[#78716C] dark:text-[#8A847A] w-24 text-right shrink-0">
+                          {progress.isTerminal ? 'Closed' : `Stage ${progress.step} of 4`}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Recommended Drives */}
+          <div className="lg:col-span-5 rounded-[14px] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] overflow-hidden shadow-[0_1px_2px_rgba(28,25,23,0.04)] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+              <div>
+                <h2 className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                  Recommended Drives
+                </h2>
+                <p className="text-[13px] text-[#78716C] dark:text-[#8A847A] mt-0.5">
+                  Filtered against your CGPA and upgrade floor
+                </p>
+              </div>
+
+              <Link
+                href="/student/jobs"
+                className="text-[13px] font-medium text-[#115E59] dark:text-[#5EEAD4] hover:underline shrink-0"
+              >
+                Explore {totalJobsCount || 0}
+              </Link>
+            </div>
+
+            <div className="divide-y divide-[#1C1917]/[0.08] dark:divide-[#EFECE6]/[0.08] flex-1">
+              {!recentJobs || recentJobs.length === 0 ? (
+                <div className="px-6 py-12 text-center space-y-3">
+                  <div className="w-10 h-10 rounded-[10px] bg-[#F3EFE9] dark:bg-[#24221F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] text-[#78716C] dark:text-[#8A847A] flex items-center justify-center mx-auto">
+                    <Briefcase className="w-4 h-4 stroke-[1.5]" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[14px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                      No active drives right now
+                    </p>
+                    <p className="text-[13px] text-[#78716C] dark:text-[#8A847A]">
+                      New campus drives appear here as soon as your placement cell publishes them
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                (recentJobs as DashboardJob[]).map((job) => {
+                  const ctc = Number(job.compensation_ctc)
+                  const tierLabel = ctc >= 20 ? 'Super Dream' : ctc >= 10 ? 'Dream' : 'Core'
+                  const hasApplied = appliedJobIdSet.has(job.id)
+                  const isMultiplierGated = isPlaced && ctc < holdingCtc * upgradeMultiplier
+
+                  return (
+                    <div
+                      key={job.id}
+                      className="px-5 py-4 hover:bg-[#FAF8F5] dark:hover:bg-[#24221F]/60 transition-colors duration-150 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href="/student/jobs"
+                            className="text-[14px] font-medium text-[#1C1917] dark:text-[#EFECE6] hover:text-[#0F766E] dark:hover:text-[#5EEAD4] transition-colors duration-150 truncate"
+                          >
+                            {job.title}
+                          </Link>
+                          <span className="text-[12px] text-[#78716C] dark:text-[#8A847A] shrink-0">
+                            {tierLabel}
+                          </span>
+                        </div>
+                        <div className="text-[13px] text-[#57534E] dark:text-[#ACA59A] mt-0.5 truncate">
+                          {job.company_name || 'Corporate Partner'} ·{' '}
+                          <span className="capitalize">{job.workplace_mode || 'On-site'}</span> ·{' '}
+                          <span className="font-mono tabular-nums">{formatCtc(job.compensation_ctc)}</span>
                         </div>
                       </div>
 
                       <div className="shrink-0">
-                        {isSuperDream ? (
-                          <PriorityBadge tier="super_dream" size="sm" />
-                        ) : isDream ? (
-                          <PriorityBadge tier="dream" size="sm" />
+                        {hasApplied ? (
+                          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md bg-[#ECFEFF] dark:bg-[#0F766E]/25 text-[#0F766E] dark:text-[#5EEAD4] border border-[#0F766E]/20 dark:border-[#14B8A6]/30">
+                            <Check className="w-3.5 h-3.5 stroke-[1.5]" />
+                            <span>Applied</span>
+                          </span>
+                        ) : isMultiplierGated ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md bg-[#FEF3C7] dark:bg-[#B45309]/25 text-[#B45309] dark:text-[#FCD34D] border border-[#B45309]/20"
+                            title={`Locked by ${upgradeMultiplier}× Multiplier Policy (< ₹${upgradeMinCtc} LPA)`}
+                          >
+                            <Lock className="w-3.5 h-3.5 stroke-[1.5]" />
+                            <span>{upgradeMultiplier}× Gated</span>
+                          </span>
                         ) : (
-                          <PriorityBadge tier="core" size="sm" />
+                          <Link
+                            href="/student/jobs"
+                            className="inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-md bg-[#ECFDF8] dark:bg-[#0F766E]/25 text-[#115E59] dark:text-[#5EEAD4] hover:bg-[#D1FAE5] dark:hover:bg-[#0F766E]/40 border border-[#0F766E]/20 dark:border-[#14B8A6]/30 transition-colors duration-150"
+                          >
+                            Eligible · Apply
+                          </Link>
                         )}
                       </div>
                     </div>
-
-                    {/* Bottom Metadata & Clearance Status */}
-                    <div className="flex items-center justify-between text-[11px] pt-1">
-                      <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
-                        ₹{job.compensation_ctc} LPA
-                      </span>
-
-                      {hasApplied ? (
-                        <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800/40">
-                          Applied ✓
-                        </span>
-                      ) : isMultiplierGated ? (
-                        <span
-                          className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/40 flex items-center gap-1"
-                          title={`Locked by 1.5x Multiplier Policy (< ₹${upgradeMinCtc} LPA)`}
-                        >
-                          <Lock className="w-2.5 h-2.5" />
-                          <span>1.5× Gated</span>
-                        </span>
-                      ) : (
-                        <Link
-                          href="/student/jobs"
-                          className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 font-semibold border border-emerald-200 dark:border-emerald-800/40 transition-colors"
-                        >
-                          Eligible · Apply →
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                )
-              })
-            )}
+                  )
+                })
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* ── 5. Tactile Command Dock (One-Touch Launchpad) ── */}
-      <div className="pt-2">
-        <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold mb-3 px-1">
-          Career Copilot Launchpad
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: AI Resume Studio */}
-          <Link href="/student/ai-resume" className="block group">
-            <TactileCard className="h-full flex flex-col justify-between">
-              <div>
-                <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-3 border border-purple-200 dark:border-purple-800/50">
-                  <Sparkles className="w-4 h-4 stroke-[1.5]" />
-                </div>
-                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                  AI Resume Studio
-                </h3>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
-                  Compile ATS-tailored LaTeX resumes matched against specific job descriptions.
-                </p>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-purple-600 dark:text-purple-400 font-semibold">
-                <span>Open Studio</span>
-                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </TactileCard>
-          </Link>
-
-          {/* Card 2: Scraped Job Feed */}
-          <Link href="/student/ai-job-search" className="block group">
-            <TactileCard className="h-full flex flex-col justify-between">
-              <div>
-                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3 border border-blue-200 dark:border-blue-800/50">
-                  <Compass className="w-4 h-4 stroke-[1.5]" />
-                </div>
-                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                  Scraped Job Feed
-                </h3>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
-                  Search live off-campus internships and graduate roles across LinkedIn & Internshala.
-                </p>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
-                <span>Explore External</span>
-                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </TactileCard>
-          </Link>
-
-          {/* Card 3: Placement Policies */}
-          <Link href="/student/policies" className="block group">
-            <TactileCard className="h-full flex flex-col justify-between">
-              <div>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 border border-emerald-200 dark:border-emerald-800/50">
-                  <FileCheck className="w-4 h-4 stroke-[1.5]" />
-                </div>
-                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                  20 Placement Policies
-                </h3>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
-                  Inspect CGPA thresholds, no-show strike quotas, and 1.5× offer multiplier gates.
-                </p>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                <span>View Rules</span>
-                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </TactileCard>
-          </Link>
-
-          {/* Card 4: Credit Balance & Billing */}
-          <Link href="/student/billing" className="block group">
-            <TactileCard className="h-full flex flex-col justify-between">
-              <div>
-                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 border border-amber-200 dark:border-amber-800/50">
-                  <CreditCard className="w-4 h-4 stroke-[1.5]" />
-                </div>
-                <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                  Credit Fuel & Ledger
-                </h3>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
-                  Review transaction ledgers, download GST invoices, and top up AI credits.
-                </p>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
-                <span>Manage Billing</span>
-                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </TactileCard>
-          </Link>
-        </div>
+        </section>
       </div>
     </div>
   )

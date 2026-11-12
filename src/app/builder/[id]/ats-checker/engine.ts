@@ -366,7 +366,7 @@ export function evaluateResumeQuality(
              ATS EXTRACTED TEXT STREAM SIMULATOR
 ========================================================
 [CANDIDATE IDENTIFICATION]
-Name: ${fullName.toUpperCase()}
+Name: ${String(fullName || 'Candidate').toUpperCase()}
 Email: ${email || 'N/A'}
 Phone: ${phone || 'N/A'}
 LinkedIn: ${linkedin || 'N/A'}
@@ -493,7 +493,7 @@ export function executeOneClickFix(
     case 'clean_linkedin': {
       const rawLinkedin = updatedResume.profile_overrides?.linkedin || profile.links?.linkedin || ''
       if (rawLinkedin) {
-        let clean = rawLinkedin
+        const clean = rawLinkedin
           .replace(/^https?:\/\/(www\.)?/, '')
           .replace(/\?.*$/, '')
           .replace(/\/$/, '')

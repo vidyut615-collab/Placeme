@@ -1,30 +1,20 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Building2,
-  Calendar,
-  DollarSign,
-  Search,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  ShieldCheck,
   Ban,
-  FileCheck2,
-  ExternalLink,
-  Info,
+  Briefcase,
+  Check,
   ChevronRight,
-  Briefcase
+  Info,
+  Search,
+  X,
 } from 'lucide-react'
-import { LinearStatusDot } from '@/components/ui/linear/LinearStatusDot'
 import { LinearDrawer } from '@/components/ui/linear/LinearDrawer'
-import { TactileButton } from '@/components/ui/tactile/TactileButton'
 import { WithdrawButton } from '@/components/WithdrawButton'
 import { formatDate } from '@/lib/utils'
 
-interface ApplicationItem {
+export interface ApplicationItem {
   id: string
   job_id: string
   status: string
@@ -46,18 +36,20 @@ interface StudentApplicationsDirectoryProps {
   initialApplications: ApplicationItem[]
 }
 
+type FilterKey = 'all' | 'active' | 'interview' | 'offered' | 'closed'
+
 const formatStudentDropReason = (reason: string | null) => {
-  if (!reason) return 'Application dropped / process concluded'
+  if (!reason) return 'Application dropped or process concluded'
   const map: Record<string, string> = {
-    non_participation: 'Non-Participation Penalty (Eligible candidate did not submit application)',
-    excused_absence: 'Excused Non-Applicant (Approved by Placement Cell — No Strike)',
-    student_withdrew: 'Withdrew Mid-Process (Candidate Opted Out)',
-    student_withdrew_post_shortlist: 'Withdrew Post-Shortlist (Placement Strike Warning)',
-    did_not_qualify: 'Did Not Qualify Assessment Round',
-    no_show: 'No-Show at Scheduled Drive / Interview',
-    unprofessional_conduct: 'Unprofessional Conduct Report',
-    data_fraud: 'Discrepancy / Data Verification Failure',
-    revoked_by_company: 'Role Cancelled / Revoked by Corporate Partner'
+    non_participation: 'Non-participation penalty (eligible candidate did not apply)',
+    excused_absence: 'Excused absence (approved by placement cell — no strike)',
+    student_withdrew: 'Withdrew mid-process',
+    student_withdrew_post_shortlist: 'Withdrew after shortlist (placement strike warning)',
+    did_not_qualify: 'Did not qualify assessment round',
+    no_show: 'No-show at scheduled drive or interview',
+    unprofessional_conduct: 'Unprofessional conduct report',
+    data_fraud: 'Profile verification discrepancy',
+    revoked_by_company: 'Role cancelled or revoked by partner',
   }
   return map[reason] || reason
 }
@@ -70,60 +62,104 @@ const STAGES_PIPELINE = [
   { key: 'stage3', label: 'Round 3' },
   { key: 'interviewing', label: 'Interview' },
   { key: 'offered', label: 'Offer' },
-  { key: 'hired', label: 'Placed' }
+  { key: 'hired', label: 'Placed' },
 ]
 
-export function StudentApplicationsDirectory({ initialApplications }: StudentApplicationsDirectoryProps) {
+const OFFERED_STATES = new Set(['selected', 'offered', 'offer_accepted', 'hired', 'joined'])
+const INTERVIEW_STATES = new Set(['interviewing', 'stage1', 'stage2', 'stage3'])
+const CLOSED_STATES = new Set([
+  'closed',
+  'dropped',
+  'cancelled',
+  'rejected',
+  'withdrawn',
+  'forfeited',
+  'offer_declined',
+  'not_joined',
+])
+
+const STATUS_LABELS: Record<string, string> = {
+  applied: 'Applied',
+  shortlisted: 'Shortlisted',
+  stage1: 'Round 1',
+  stage2: 'Round 2',
+  stage3: 'Round 3',
+  interviewing: 'Interviewing',
+  selected: 'Selected',
+  offered: 'Offered',
+  offer_accepted: 'Offer accepted',
+  offer_declined: 'Offer declined',
+  hired: 'Hired',
+  joined: 'Joined',
+  not_joined: 'Not joined',
+  withdrawn: 'Withdrawn',
+  rejected: 'Not selected',
+  dropped: 'Dropped',
+  forfeited: 'Forfeited',
+  cancelled: 'Cancelled',
+  closed: 'Closed',
+}
+
+function formatCtc(value: unknown): string {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return 'Disclosed on selection'
+  return `₹${num.toFixed(1)} LPA`
+}
+
+function getStatusTone(status: string): 'positive' | 'progress' | 'terminal' | 'neutral' {
+  const s = status.toLowerCase()
+  if (OFFERED_STATES.has(s)) return 'positive'
+  if (INTERVIEW_STATES.has(s) || s === 'shortlisted') return 'progress'
+  if (CLOSED_STATES.has(s)) return 'terminal'
+  return 'neutral'
+}
+
+export function StudentApplicationsDirectory({
+  initialApplications,
+}: StudentApplicationsDirectoryProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'interview' | 'offered' | 'closed'>('all')
+  const [selectedFilter, setSelectedFilter] = useState<FilterKey>('all')
   const [activeApp, setActiveApp] = useState<ApplicationItem | null>(null)
 
   const counts = useMemo(() => {
-    let active = 0
+    let screening = 0
     let interview = 0
     let offered = 0
     let closed = 0
 
-    initialApplications.forEach(app => {
+    initialApplications.forEach((app) => {
       const s = app.status?.toLowerCase() || ''
-      if (['offered', 'hired', 'selected'].includes(s)) offered++
-      else if (['interviewing', 'stage1', 'stage2', 'stage3'].includes(s)) interview++
-      else if (['closed', 'dropped', 'cancelled'].includes(s)) closed++
-      else active++
+      if (OFFERED_STATES.has(s)) offered++
+      else if (INTERVIEW_STATES.has(s)) interview++
+      else if (CLOSED_STATES.has(s)) closed++
+      else screening++
     })
 
     return {
       all: initialApplications.length,
-      active: active + interview,
+      active: screening,
       interview,
       offered,
-      closed
+      closed,
     }
   }, [initialApplications])
 
   const filteredApps = useMemo(() => {
-    return initialApplications.filter(app => {
+    const query = searchQuery.toLowerCase().trim()
+    return initialApplications.filter((app) => {
       const company = (app.jobs?.company_name || '').toLowerCase()
       const title = (app.jobs?.title || '').toLowerCase()
-      const query = searchQuery.toLowerCase().trim()
 
-      const matchesSearch = query === '' || company.includes(query) || title.includes(query)
-      if (!matchesSearch) return false
+      if (query !== '' && !company.includes(query) && !title.includes(query)) {
+        return false
+      }
 
       const s = app.status?.toLowerCase() || ''
       if (selectedFilter === 'all') return true
-      if (selectedFilter === 'active') {
-        return ['applied', 'shortlisted'].includes(s)
-      }
-      if (selectedFilter === 'interview') {
-        return ['interviewing', 'stage1', 'stage2', 'stage3'].includes(s)
-      }
-      if (selectedFilter === 'offered') {
-        return ['offered', 'hired', 'selected'].includes(s)
-      }
-      if (selectedFilter === 'closed') {
-        return ['closed', 'dropped', 'cancelled'].includes(s)
-      }
+      if (selectedFilter === 'active') return !OFFERED_STATES.has(s) && !INTERVIEW_STATES.has(s) && !CLOSED_STATES.has(s)
+      if (selectedFilter === 'interview') return INTERVIEW_STATES.has(s)
+      if (selectedFilter === 'offered') return OFFERED_STATES.has(s)
+      if (selectedFilter === 'closed') return CLOSED_STATES.has(s)
       return true
     })
   }, [initialApplications, searchQuery, selectedFilter])
@@ -136,64 +172,90 @@ export function StudentApplicationsDirectory({ initialApplications }: StudentApp
     if (s === 'stage2') return 3
     if (s === 'stage3') return 4
     if (s === 'interviewing') return 5
-    if (s === 'selected' || s === 'offered') return 6
-    if (s === 'hired') return 7
+    if (s === 'selected' || s === 'offered' || s === 'offer_accepted') return 6
+    if (s === 'hired' || s === 'joined') return 7
     return -1
   }
 
-  const getCustomLabel = (app: ApplicationItem) => {
+  const getStatusLabel = (app: ApplicationItem) => {
     if (app.status === 'stage1') {
-      return app.jobs?.custom_stages?.stage_1 || app.jobs?.custom_stages?.stage_1_label || 'Round 1 (Stage 1)'
+      return (
+        app.jobs?.custom_stages?.stage_1 ||
+        app.jobs?.custom_stages?.stage_1_label ||
+        'Round 1'
+      )
     }
     if (app.status === 'stage2') {
-      return app.jobs?.custom_stages?.stage_2 || app.jobs?.custom_stages?.stage_2_label || 'Round 2 (Stage 2)'
+      return (
+        app.jobs?.custom_stages?.stage_2 ||
+        app.jobs?.custom_stages?.stage_2_label ||
+        'Round 2'
+      )
     }
     if (app.status === 'stage3') {
-      return app.jobs?.custom_stages?.stage_3 || app.jobs?.custom_stages?.stage_3_label || 'Round 3 (Stage 3)'
+      return (
+        app.jobs?.custom_stages?.stage_3 ||
+        app.jobs?.custom_stages?.stage_3_label ||
+        'Round 3'
+      )
     }
-    return undefined
+    return STATUS_LABELS[app.status?.toLowerCase()] || app.status
   }
 
+  const tabs: Array<{ id: FilterKey; label: string; count: number }> = [
+    { id: 'all', label: 'All', count: counts.all },
+    { id: 'active', label: 'Screening', count: counts.active },
+    { id: 'interview', label: 'Rounds', count: counts.interview },
+    { id: 'offered', label: 'Offers', count: counts.offered },
+    { id: 'closed', label: 'Archived', count: counts.closed },
+  ]
+
+  const activeStageIdx = activeApp ? getStageIndex(activeApp.status) : -1
+  const activeIsClosed = activeApp ? CLOSED_STATES.has(activeApp.status.toLowerCase()) : false
+
   return (
-    <div className="space-y-4">
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900/60 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
-        {/* Search Input */}
+    <div className="space-y-5">
+      {/* ── 1. Search & Filter Bar ── */}
+      <div className="rounded-[14px] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] p-3.5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+          <Search className="w-4 h-4 stroke-[1.5] text-[#78716C] dark:text-[#8A847A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="Filter by company, role title..."
+            placeholder="Filter by company or role"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-50 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-700 transition"
+            className="w-full h-9 pl-9 pr-8 rounded-lg bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] text-[13px] text-[#1C1917] dark:text-[#EFECE6] placeholder:text-[#78716C] dark:placeholder:text-[#8A847A] focus:outline-none focus:border-[#0F766E] dark:focus:border-[#14B8A6] transition-colors duration-150"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="p-1 rounded text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#EFECE6] absolute right-2 top-1/2 -translate-y-1/2"
+              aria-label="Clear filter"
+            >
+              <X className="w-3.5 h-3.5 stroke-[1.5]" />
+            </button>
+          )}
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {[
-            { id: 'all', label: 'All', count: counts.all },
-            { id: 'active', label: 'Screening', count: counts.active },
-            { id: 'interview', label: 'Rounds', count: counts.interview },
-            { id: 'offered', label: 'Offers', count: counts.offered },
-            { id: 'closed', label: 'Archived', count: counts.closed }
-          ].map(tab => {
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+          {tabs.map((tab) => {
             const isActive = selectedFilter === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => setSelectedFilter(tab.id as any)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap cursor-pointer ${
+                type="button"
+                onClick={() => setSelectedFilter(tab.id)}
+                className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors duration-150 cursor-pointer ${
                   isActive
-                    ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-2xs font-semibold'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/40'
+                    ? 'bg-[#0F766E] text-white'
+                    : 'bg-[#FAF8F5] dark:bg-[#12110F] text-[#57534E] dark:text-[#ACA59A] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] hover:text-[#1C1917] dark:hover:text-[#EFECE6]'
                 }`}
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    isActive ? 'bg-zinc-700 text-zinc-100 dark:bg-zinc-300 dark:text-zinc-900' : 'bg-zinc-200/60 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                  className={`font-mono text-[12px] tabular-nums ${
+                    isActive ? 'text-white/85' : 'text-[#78716C] dark:text-[#8A847A]'
                   }`}
                 >
                   {tab.count}
@@ -204,190 +266,281 @@ export function StudentApplicationsDirectory({ initialApplications }: StudentApp
         </div>
       </div>
 
-      {/* Applications List */}
-      <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-950/40 divide-y divide-zinc-100 dark:divide-zinc-800/60 overflow-hidden shadow-xs">
+      {/* ── 2. Applications List ── */}
+      <div className="rounded-[14px] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#191816] divide-y divide-[#1C1917]/[0.08] dark:divide-[#EFECE6]/[0.08] overflow-hidden shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
         {filteredApps.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
-            <Briefcase className="w-8 h-8 text-zinc-400 dark:text-zinc-600 mx-auto stroke-[1.5]" />
+          <div className="px-6 py-16 text-center space-y-3">
+            <div className="w-10 h-10 rounded-[10px] bg-[#F3EFE9] dark:bg-[#24221F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] text-[#78716C] dark:text-[#8A847A] flex items-center justify-center mx-auto">
+              <Briefcase className="w-4 h-4 stroke-[1.5]" />
+            </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-300">No applications found</p>
-              <p className="text-xs text-zinc-500">
-                {searchQuery ? 'Try matching another company name or role' : 'You have not submitted applications under this view'}
+              <p className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                No applications found
+              </p>
+              <p className="text-[13px] text-[#78716C] dark:text-[#8A847A]">
+                {searchQuery
+                  ? 'Try matching another company name or role title'
+                  : 'No applications match this filter'}
               </p>
             </div>
           </div>
         ) : (
           filteredApps.map((app) => {
-            const customLabel = getCustomLabel(app)
+            const label = getStatusLabel(app)
+            const tone = getStatusTone(app.status)
+            const isSelected = activeApp?.id === app.id
 
             return (
-              <motion.div
+              <div
                 key={app.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setActiveApp(app)}
-                className="group flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 cursor-pointer transition select-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setActiveApp(app)
+                  }
+                }}
+                className={`group px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] ${
+                  isSelected
+                    ? 'bg-[#ECFDF8]/60 dark:bg-[#0F766E]/15'
+                    : 'hover:bg-[#FAF8F5] dark:hover:bg-[#24221F]/60'
+                }`}
               >
-                {/* Left: Company & Role */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-800 dark:text-zinc-300 font-semibold text-xs group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition flex-shrink-0">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg bg-[#F3EFE9] dark:bg-[#24221F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] flex items-center justify-center text-[#1C1917] dark:text-[#EFECE6] font-medium text-[13px] shrink-0">
                     {(app.jobs?.company_name?.[0] || 'C').toUpperCase()}
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 truncate group-hover:text-purple-600 dark:group-hover:text-purple-300 transition">
-                        {app.jobs?.company_name || 'Organization'}
-                      </span>
-                      <span className="text-zinc-400 dark:text-zinc-600 text-xs">•</span>
-                      <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate">
-                        {app.jobs?.title || 'Job Opening'}
-                      </span>
+
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="text-[14px] font-medium text-[#1C1917] dark:text-[#EFECE6] truncate">
+                      {app.jobs?.company_name || 'Organization'}
+                      {app.jobs?.title ? ` · ${app.jobs.title}` : ''}
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-0.5">
-                      <span className="flex items-center gap-1 font-mono text-zinc-600 dark:text-zinc-400 font-medium">
-                        ₹{app.jobs?.compensation_ctc ? `${app.jobs.compensation_ctc} LPA` : 'Disclosed on selection'}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-[#57534E] dark:text-[#ACA59A]">
+                      <span className="font-mono tabular-nums text-[#1C1917] dark:text-[#EFECE6]">
+                        {formatCtc(app.jobs?.compensation_ctc)}
                       </span>
-                      <span>•</span>
-                      <span>{app.jobs?.college_id ? 'Campus Exclusive' : 'Global Drive'}</span>
-                      <span>•</span>
-                      <span className="text-zinc-400 dark:text-zinc-500" suppressHydrationWarning>
+                      <span>·</span>
+                      <span>{app.jobs?.college_id ? 'Campus drive' : 'Global drive'}</span>
+                      <span>·</span>
+                      <span className="text-[#78716C] dark:text-[#8A847A]" suppressHydrationWarning>
                         Applied {formatDate(app.created_at)}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Status Pill & Actions */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 self-end sm:self-auto w-full sm:w-auto">
-                  <LinearStatusDot status={app.status} labelOverride={customLabel} />
+                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-0.5 rounded-md border ${
+                      tone === 'positive'
+                        ? 'bg-[#ECFEFF] dark:bg-[#0F766E]/30 text-[#0F766E] dark:text-[#5EEAD4] border-[#0F766E]/20 dark:border-[#14B8A6]/30'
+                        : tone === 'progress'
+                          ? 'bg-[#ECFDF8] dark:bg-[#0F766E]/25 text-[#115E59] dark:text-[#5EEAD4] border-[#0F766E]/20 dark:border-[#14B8A6]/30'
+                          : tone === 'terminal'
+                            ? 'bg-[#FEF2F2] dark:bg-[#7F1D1D]/30 text-[#B91C1C] dark:text-[#FCA5A5] border-[#DC2626]/20'
+                            : 'bg-[#F3EFE9] dark:bg-[#24221F] text-[#57534E] dark:text-[#ACA59A] border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        tone === 'positive' || tone === 'progress'
+                          ? 'bg-[#0F766E] dark:bg-[#2DD4BF]'
+                          : tone === 'terminal'
+                            ? 'bg-[#DC2626] dark:bg-[#F87171]'
+                            : 'bg-[#78716C] dark:bg-[#8A847A]'
+                      }`}
+                    />
+                    <span>{label}</span>
+                  </span>
 
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {app.status === 'cancelled' ? (
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 px-2 py-0.5 rounded">
-                        Quota Safe
+                      <span className="text-[12px] font-medium text-[#0F766E] dark:text-[#5EEAD4] bg-[#ECFDF8] dark:bg-[#0F766E]/20 border border-[#0F766E]/20 px-2 py-0.5 rounded-md">
+                        Quota safe
                       </span>
-                    ) : app.status === 'dropped' ? (
-                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 rounded">
-                        Concluded
-                      </span>
-                    ) : (
+                    ) : CLOSED_STATES.has(app.status.toLowerCase()) ? null : (
                       <WithdrawButton applicationId={app.id} status={app.status} />
                     )}
-                    <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 group-hover:translate-x-0.5 transition" />
+                    <ChevronRight className="w-4 h-4 stroke-[1.5] text-[#78716C] dark:text-[#8A847A] group-hover:text-[#1C1917] dark:group-hover:text-[#EFECE6] transition-colors duration-150" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )
           })
         )}
       </div>
 
-      {/* Slide-over Inspector Drawer */}
+      {/* ── 3. Slide-Over Application Inspector ── */}
       <LinearDrawer
         isOpen={!!activeApp}
         onClose={() => setActiveApp(null)}
-        title={activeApp?.jobs?.company_name || 'Application Overview'}
-        description={`Application ID: ${activeApp?.id.slice(0, 8)}...`}
+        title={activeApp?.jobs?.company_name || 'Application Details'}
+        subtitle={activeApp ? `Ref ${activeApp.id.slice(0, 8)}` : undefined}
         width="w-full sm:max-w-lg"
+        className="bg-[#FAF8F5] dark:bg-[#191816] border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]"
+        footer={
+          activeApp ? (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveApp(null)}
+                className="inline-flex items-center justify-center h-9 px-4 rounded-lg text-[13px] font-medium bg-white dark:bg-[#24221F] text-[#1C1917] dark:text-[#EFECE6] border border-[#1C1917]/[0.10] dark:border-[#EFECE6]/[0.10] hover:bg-[#F3EFE9] dark:hover:bg-[#2D2A26] transition-colors duration-150 cursor-pointer flex-1"
+              >
+                Close
+              </button>
+
+              {!CLOSED_STATES.has(activeApp.status.toLowerCase()) &&
+                !['hired', 'joined'].includes(activeApp.status.toLowerCase()) && (
+                  <div className="flex-1 flex justify-end">
+                    <WithdrawButton
+                      applicationId={activeApp.id}
+                      status={activeApp.status}
+                      onSuccess={() => setActiveApp(null)}
+                    />
+                  </div>
+                )}
+            </div>
+          ) : null
+        }
       >
         {activeApp && (
-          <div className="space-y-6">
-            {/* Header Card */}
-            <div className="p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 space-y-3">
+          <div className="space-y-5">
+            {/* Role Summary Card */}
+            <div className="rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#12110F] p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                    {activeApp.jobs?.title || 'Software Engineer'}
+                  <h3 className="text-[15px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    {activeApp.jobs?.title || 'Placement Drive'}
                   </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{activeApp.jobs?.company_name}</p>
+                  <p className="text-[13px] text-[#57534E] dark:text-[#ACA59A] mt-0.5">
+                    {activeApp.jobs?.company_name || 'Organization'}
+                  </p>
                 </div>
-                <LinearStatusDot status={activeApp.status} labelOverride={getCustomLabel(activeApp)} />
+
+                <span
+                  className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-0.5 rounded-md border shrink-0 ${
+                    getStatusTone(activeApp.status) === 'positive' ||
+                    getStatusTone(activeApp.status) === 'progress'
+                      ? 'bg-[#ECFDF8] dark:bg-[#0F766E]/25 text-[#115E59] dark:text-[#5EEAD4] border-[#0F766E]/20'
+                      : getStatusTone(activeApp.status) === 'terminal'
+                        ? 'bg-[#FEF2F2] dark:bg-[#7F1D1D]/30 text-[#B91C1C] dark:text-[#FCA5A5] border-[#DC2626]/20'
+                        : 'bg-[#F3EFE9] dark:bg-[#24221F] text-[#57534E] dark:text-[#ACA59A] border-[#1C1917]/[0.08]'
+                  }`}
+                >
+                  {getStatusLabel(activeApp)}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/80 text-xs">
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[#1C1917]/[0.06] dark:border-[#EFECE6]/[0.06] text-[13px]">
                 <div>
-                  <span className="text-zinc-500 block text-[11px]">Annual CTC</span>
-                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                    ₹{activeApp.jobs?.compensation_ctc ? `${activeApp.jobs.compensation_ctc} LPA` : 'Open'}
+                  <span className="text-[#78716C] dark:text-[#8A847A] block text-[12px]">
+                    Annual CTC
+                  </span>
+                  <span className="font-mono font-medium tabular-nums text-[#115E59] dark:text-[#5EEAD4]">
+                    {formatCtc(activeApp.jobs?.compensation_ctc)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block text-[11px]">Applied On</span>
-                  <span className="text-zinc-700 dark:text-zinc-300 font-mono" suppressHydrationWarning>
+                  <span className="text-[#78716C] dark:text-[#8A847A] block text-[12px]">
+                    Submitted on
+                  </span>
+                  <span
+                    className="font-mono tabular-nums text-[#1C1917] dark:text-[#EFECE6]"
+                    suppressHydrationWarning
+                  >
                     {formatDate(activeApp.created_at)}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Lifecycle Conveyor Timeline */}
-            <div className="space-y-3">
+            {/* Recruitment Timeline */}
+            <div className="rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] bg-white dark:bg-[#12110F] p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-300 uppercase tracking-wider font-mono">
-                  Recruitment Pipeline
+                <h4 className="text-[13px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                  Recruitment progress
                 </h4>
-                <span className="text-[11px] text-zinc-500 font-mono">
-                  Stage {Math.max(1, getStageIndex(activeApp.status) + 1)} of {STAGES_PIPELINE.length}
+                <span className="font-mono text-[12px] tabular-nums text-[#78716C] dark:text-[#8A847A]">
+                  {activeIsClosed || activeStageIdx < 0
+                    ? 'Closed'
+                    : `Stage ${activeStageIdx + 1} of ${STAGES_PIPELINE.length}`}
                 </span>
               </div>
 
-              {/* Step Conveyor */}
-              <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[1px] before:bg-zinc-200 dark:before:bg-zinc-800">
+              <div className="relative pl-6 space-y-4 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-[#1C1917]/[0.10] dark:before:bg-[#EFECE6]/[0.10]">
                 {STAGES_PIPELINE.map((stage, idx) => {
-                  const currentIdx = getStageIndex(activeApp.status)
-                  const isPassed = currentIdx > idx
-                  const isCurrent = currentIdx === idx
-                  const isTerminalOut = ['dropped', 'cancelled', 'closed'].includes(activeApp.status.toLowerCase())
+                  const isPassed = activeStageIdx > idx
+                  const isCurrent = activeStageIdx === idx
 
                   let displayLabel = stage.label
-                  if (stage.key === 'stage1' && (activeApp.jobs?.custom_stages?.stage_1 || activeApp.jobs?.custom_stages?.stage_1_label)) {
-                    displayLabel = activeApp.jobs.custom_stages.stage_1 || activeApp.jobs.custom_stages.stage_1_label
-                  } else if (stage.key === 'stage2' && (activeApp.jobs?.custom_stages?.stage_2 || activeApp.jobs?.custom_stages?.stage_2_label)) {
-                    displayLabel = activeApp.jobs.custom_stages.stage_2 || activeApp.jobs.custom_stages.stage_2_label
-                  } else if (stage.key === 'stage3' && (activeApp.jobs?.custom_stages?.stage_3 || activeApp.jobs?.custom_stages?.stage_3_label)) {
-                    displayLabel = activeApp.jobs.custom_stages.stage_3 || activeApp.jobs.custom_stages.stage_3_label
+                  if (
+                    stage.key === 'stage1' &&
+                    (activeApp.jobs?.custom_stages?.stage_1 ||
+                      activeApp.jobs?.custom_stages?.stage_1_label)
+                  ) {
+                    displayLabel =
+                      activeApp.jobs.custom_stages.stage_1 ||
+                      activeApp.jobs.custom_stages.stage_1_label
+                  } else if (
+                    stage.key === 'stage2' &&
+                    (activeApp.jobs?.custom_stages?.stage_2 ||
+                      activeApp.jobs?.custom_stages?.stage_2_label)
+                  ) {
+                    displayLabel =
+                      activeApp.jobs.custom_stages.stage_2 ||
+                      activeApp.jobs.custom_stages.stage_2_label
+                  } else if (
+                    stage.key === 'stage3' &&
+                    (activeApp.jobs?.custom_stages?.stage_3 ||
+                      activeApp.jobs?.custom_stages?.stage_3_label)
+                  ) {
+                    displayLabel =
+                      activeApp.jobs.custom_stages.stage_3 ||
+                      activeApp.jobs.custom_stages.stage_3_label
                   }
 
                   return (
-                    <div key={stage.key} className="relative flex items-center justify-between group">
-                      {/* Step Indicator Dot */}
+                    <div key={stage.key} className="relative flex items-center justify-between">
                       <div
-                        className={`absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border flex items-center justify-center transition ${
+                        className={`absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border flex items-center justify-center ${
                           isPassed
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-600 dark:bg-emerald-950 dark:border-emerald-500 dark:text-emerald-400'
+                            ? 'bg-[#0F766E] border-[#0F766E] text-white'
                             : isCurrent
-                            ? isTerminalOut
-                              ? 'bg-rose-50 border-rose-500 text-rose-600 dark:bg-rose-950 dark:border-rose-500 dark:text-rose-400'
-                              : 'bg-purple-50 border-purple-500 text-purple-600 dark:bg-indigo-950 dark:border-indigo-500 dark:text-indigo-400 ring-2 ring-purple-500/20'
-                            : 'bg-zinc-100 border-zinc-300 text-zinc-400 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-600'
+                              ? activeIsClosed
+                                ? 'bg-[#FEF2F2] border-[#DC2626] text-[#DC2626]'
+                                : 'bg-[#ECFDF8] dark:bg-[#0F766E]/30 border-[#0F766E] dark:border-[#14B8A6] text-[#0F766E] dark:text-[#5EEAD4]'
+                              : 'bg-[#FAF8F5] dark:bg-[#191816] border-[#1C1917]/20 dark:border-[#EFECE6]/20'
                         }`}
                       >
                         {isPassed ? (
-                          <CheckCircle2 className="w-2.5 h-2.5 stroke-[2.5]" />
-                        ) : (
-                          <div
+                          <Check className="w-2.5 h-2.5 stroke-[2.2]" />
+                        ) : isCurrent ? (
+                          <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              isCurrent ? (isTerminalOut ? 'bg-rose-500' : 'bg-purple-600 dark:bg-indigo-400') : 'bg-transparent'
+                              activeIsClosed ? 'bg-[#DC2626]' : 'bg-[#0F766E] dark:bg-[#2DD4BF]'
                             }`}
                           />
-                        )}
+                        ) : null}
                       </div>
 
-                      <div className="flex-1">
-                        <span
-                          className={`text-xs font-medium block ${
-                            isCurrent
-                              ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
-                              : isPassed
-                              ? 'text-zinc-700 dark:text-zinc-300'
-                              : 'text-zinc-400 dark:text-zinc-600'
-                          }`}
-                        >
-                          {displayLabel}
-                        </span>
-                      </div>
+                      <span
+                        className={`text-[13px] ${
+                          isCurrent
+                            ? 'text-[#1C1917] dark:text-[#EFECE6] font-medium'
+                            : isPassed
+                              ? 'text-[#57534E] dark:text-[#ACA59A]'
+                              : 'text-[#78716C] dark:text-[#8A847A]'
+                        }`}
+                      >
+                        {displayLabel}
+                      </span>
 
                       {isCurrent && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                          Active Phase
+                        <span className="text-[12px] font-medium px-2 py-0.5 rounded-md bg-[#ECFDF8] dark:bg-[#0F766E]/25 text-[#115E59] dark:text-[#5EEAD4] border border-[#0F766E]/20">
+                          Current
                         </span>
                       )}
                     </div>
@@ -396,51 +549,33 @@ export function StudentApplicationsDirectory({ initialApplications }: StudentApp
               </div>
             </div>
 
-            {/* Special Notification / Warning Boxes */}
+            {/* Cancellation / Drop Attribution */}
             {activeApp.status === 'cancelled' && (
-              <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/20 space-y-1 text-xs">
-                <div className="flex items-center gap-1.5 font-semibold text-rose-700 dark:text-rose-400">
+              <div className="rounded-xl border border-[#DC2626]/20 bg-[#FEF2F2]/70 dark:bg-[#7F1D1D]/20 p-4 space-y-1.5 text-[13px]">
+                <div className="flex items-center gap-2 font-medium text-[#B91C1C] dark:text-[#FCA5A5]">
                   <Ban className="w-4 h-4 stroke-[1.5]" />
-                  <span>Drive Cancelled by Placement Cell</span>
+                  <span>Drive cancelled by placement cell</span>
                 </div>
-                <p className="text-zinc-600 dark:text-zinc-400 text-[11px] leading-relaxed">
-                  Reason: {activeApp.jobs?.cancellation_reason || 'Administrative reschedule by corporate partner'}
+                <p className="text-[#57534E] dark:text-[#ACA59A]">
+                  {activeApp.jobs?.cancellation_reason || 'Administrative reschedule by corporate partner'}
                 </p>
-                <p className="text-emerald-600 dark:text-emerald-400 text-[10px] font-mono mt-1 font-semibold">
-                  ✓ Placement quota preserved. 0 strike penalty accrued.
+                <p className="text-[#0F766E] dark:text-[#5EEAD4] text-[12px] font-medium">
+                  Application quota preserved · 0 strike penalty
                 </p>
               </div>
             )}
 
-            {activeApp.status === 'dropped' && (
-              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 space-y-1 text-xs">
-                <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+            {(activeApp.status === 'dropped' || activeApp.dropped_reason) && (
+              <div className="rounded-xl border border-[#B45309]/25 bg-[#FEF3C7]/60 dark:bg-[#B45309]/15 p-4 space-y-1.5 text-[13px]">
+                <div className="flex items-center gap-2 font-medium text-[#B45309] dark:text-[#FCD34D]">
                   <Info className="w-4 h-4 stroke-[1.5]" />
-                  <span>Concluded / Drop Attribution</span>
+                  <span>Closure reason</span>
                 </div>
-                <p className="text-zinc-600 dark:text-zinc-300 text-[11px] leading-relaxed">
+                <p className="text-[#57534E] dark:text-[#ACA59A]">
                   {formatStudentDropReason(activeApp.dropped_reason)}
                 </p>
               </div>
             )}
-
-            {/* Action Buttons in Drawer */}
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
-              <TactileButton
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveApp(null)}
-                className="w-full text-xs"
-              >
-                Close Inspector
-              </TactileButton>
-
-              {!['dropped', 'hired', 'forfeited', 'cancelled', 'closed'].includes(activeApp.status.toLowerCase()) && (
-                <div className="w-full">
-                  <WithdrawButton applicationId={activeApp.id} status={activeApp.status} />
-                </div>
-              )}
-            </div>
           </div>
         )}
       </LinearDrawer>

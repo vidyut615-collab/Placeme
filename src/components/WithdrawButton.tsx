@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
@@ -35,18 +36,44 @@ const WITHDRAWAL_REASONS = [
   { value: 'Other personal reasons', label: 'Other (specify details below)' },
 ]
 
-export function WithdrawButton({ applicationId, status }: { applicationId: string, status: string }) {
+export function WithdrawButton({
+  applicationId,
+  status,
+  onSuccess,
+}: {
+  applicationId: string
+  status: string
+  onSuccess?: () => void
+}) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [reasonCategory, setReasonCategory] = useState(WITHDRAWAL_REASONS[0].value)
   const [reasonDetails, setReasonDetails] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // Disallow withdrawing once hired, already dropped/closed, or forfeited
-  const cannotWithdraw = ['dropped', 'hired', 'forfeited', 'joined'].includes(status)
+  const cannotWithdraw = [
+    'dropped',
+    'hired',
+    'joined',
+    'forfeited',
+    'rejected',
+    'withdrawn',
+    'closed',
+    'cancelled',
+    'offer_declined',
+    'not_joined',
+  ].includes(status.toLowerCase())
   if (cannotWithdraw) return null
 
-  const isPostShortlist = ['shortlisted', 'stage1', 'stage2', 'stage3', 'interviewing', 'offered'].includes(status)
+  const isPostShortlist = [
+    'shortlisted',
+    'stage1',
+    'stage2',
+    'stage3',
+    'interviewing',
+    'offered',
+  ].includes(status.toLowerCase())
 
   const handleWithdraw = async () => {
     if (!reasonDetails.trim()) {
@@ -63,58 +90,75 @@ export function WithdrawButton({ applicationId, status }: { applicationId: strin
       setErrorMsg(result.error)
       toast.error(result.error)
     } else {
-      toast.success(result.success)
+      toast.success(result.success || 'Application withdrawn')
+      setReasonDetails('')
       setIsOpen(false)
+      onSuccess?.()
+      router.refresh()
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs h-8" />}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 rounded-lg text-[12px] font-medium text-[#B91C1C] dark:text-[#FCA5A5] border-[#DC2626]/20 hover:bg-[#FEF2F2] dark:hover:bg-[#7F1D1D]/25 hover:text-[#991B1B] transition-colors duration-150 cursor-pointer"
+          />
+        }
+      >
         Withdraw
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent className="sm:max-w-[460px] bg-[#FAF8F5] dark:bg-[#191816] border-[#1C1917]/[0.10] dark:border-[#EFECE6]/[0.10]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base text-red-600 dark:text-red-500">
-            <AlertTriangle className="h-5 w-5" />
-            Withdraw Application
+          <DialogTitle className="flex items-center gap-2 text-[16px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+            <AlertTriangle className="h-4 w-4 stroke-[1.5] text-[#DC2626] dark:text-[#F87171]" />
+            <span>Withdraw application</span>
           </DialogTitle>
-          <DialogDescription className="text-xs text-zinc-500 pt-1">
-            Please review the policy consequences and select your reason for opting out of this placement drive.
+          <DialogDescription className="text-[13px] text-[#57534E] dark:text-[#ACA59A] pt-1">
+            Review the placement policy impact and provide your reason before confirming
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {errorMsg && (
-            <div className="p-3 text-xs text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-md">
+            <div className="p-3 text-[13px] text-[#B91C1C] dark:text-[#FCA5A5] bg-[#FEF2F2] dark:bg-[#7F1D1D]/25 border border-[#DC2626]/20 rounded-lg">
               {errorMsg}
             </div>
           )}
 
-          {/* Policy Warning Box */}
-          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 p-3 rounded-lg text-amber-900 dark:text-amber-300 text-xs space-y-1">
-            <p className="font-semibold flex items-center gap-1.5">
-              Placement Policy Consequence
+          <div className="bg-[#FEF3C7]/70 dark:bg-[#B45309]/20 border border-[#B45309]/25 p-3.5 rounded-xl text-[13px] space-y-1">
+            <p className="font-medium text-[#1C1917] dark:text-[#EFECE6]">
+              Policy consequence
             </p>
-            <p className="leading-relaxed text-amber-800 dark:text-amber-400">
-              {isPostShortlist 
-                ? "You are withdrawing after shortlisting / round advancement. This will incur a 'Post-Shortlist Withdrawal' penalty strike. Exceeding college limits will lead to automatic blacklisting." 
-                : "Withdrawing will log a general withdrawal strike in your placement profile according to your college's policy limits."}
+            <p className="leading-relaxed text-[#57534E] dark:text-[#ACA59A]">
+              {isPostShortlist
+                ? 'Withdrawing after shortlisting or round advancement logs a post-shortlist withdrawal strike. Exceeding college limits can trigger automatic suspension.'
+                : 'Withdrawing logs a standard withdrawal strike under your college policy rules.'}
             </p>
           </div>
 
-          {/* Structured Reason Category */}
           <div className="space-y-1.5">
-            <Label htmlFor="withdrawal-reason-select" className="text-xs font-semibold">
-              Primary Reason for Withdrawal *
+            <Label htmlFor="withdrawal-reason-select" className="text-[13px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+              Primary reason
             </Label>
-            <Select value={reasonCategory} onValueChange={(val) => { if (val) setReasonCategory(val) }}>
-              <SelectTrigger id="withdrawal-reason-select" className="h-9 text-xs">
+            <Select
+              value={reasonCategory}
+              onValueChange={(val) => {
+                if (val) setReasonCategory(val)
+              }}
+            >
+              <SelectTrigger
+                id="withdrawal-reason-select"
+                className="h-9 text-[13px] bg-white dark:bg-[#12110F] border-[#1C1917]/[0.10] dark:border-[#EFECE6]/[0.10]"
+              >
                 <SelectValue placeholder="Select a reason" />
               </SelectTrigger>
               <SelectContent>
-                {WITHDRAWAL_REASONS.map(r => (
-                  <SelectItem key={r.value} value={r.value} className="text-xs">
+                {WITHDRAWAL_REASONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value} className="text-[13px]">
                     {r.label}
                   </SelectItem>
                 ))}
@@ -122,28 +166,39 @@ export function WithdrawButton({ applicationId, status }: { applicationId: strin
             </Select>
           </div>
 
-          {/* Detailed Explanation */}
           <div className="space-y-1.5">
-            <Label htmlFor="withdrawal-details" className="text-xs font-semibold">
-              Brief Explanation (Required for TPO Records) *
+            <Label htmlFor="withdrawal-details" className="text-[13px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+              Brief explanation
             </Label>
             <Textarea
               id="withdrawal-details"
-              placeholder="e.g., Selected in Microsoft off-campus drive, joining July 2026..."
+              placeholder="Explain why you are withdrawing for placement cell records"
               value={reasonDetails}
-              onChange={e => setReasonDetails(e.target.value)}
-              className="text-xs min-h-[80px]"
+              onChange={(e) => setReasonDetails(e.target.value)}
+              className="text-[13px] min-h-[84px] bg-white dark:bg-[#12110F] border-[#1C1917]/[0.10] dark:border-[#EFECE6]/[0.10]"
             />
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0 pt-3 border-t">
-          <Button variant="outline" size="sm" onClick={() => setIsOpen(false)} disabled={isWithdrawing}>
-            Keep Application
+        <DialogFooter className="gap-2 pt-3 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsOpen(false)}
+            disabled={isWithdrawing}
+            className="h-9 px-4 rounded-lg text-[13px] font-medium cursor-pointer"
+          >
+            Keep application
           </Button>
-          <Button variant="destructive" size="sm" onClick={handleWithdraw} disabled={isWithdrawing || !reasonDetails.trim()}>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleWithdraw}
+            disabled={isWithdrawing || !reasonDetails.trim()}
+            className="h-9 px-4 rounded-lg text-[13px] font-medium cursor-pointer"
+          >
             {isWithdrawing && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            Confirm Withdrawal
+            Confirm withdrawal
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -2,7 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Loader2, AlertCircle, Plus, FileText, CheckCircle2, ArrowRight, ShieldCheck, Coins } from 'lucide-react'
+import {
+  Loader2,
+  AlertCircle,
+  Plus,
+  FileText,
+  ArrowRight,
+  Coins,
+  Building2,
+  Briefcase,
+  CheckCircle2,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -10,55 +20,143 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { TactileButton } from '@/components/ui/tactile/TactileButton'
+} from '@/components/ui/dialog'
 import { createAIResume } from './actions'
+
+export interface CampusJobOption {
+  id: string
+  title: string
+  company_name: string
+  description: string | null
+}
 
 interface Props {
   creditBalance: number
   isActive: boolean
   hasProfileData: boolean
+  activeJobs?: CampusJobOption[]
+  initialJobId?: string
+  triggerButton?: React.ReactElement
 }
 
-const AI_RESUME_CREDIT_COST = 30
+const AI_RESUME_CREDIT_COST = 50
 
-export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: Props) {
+export function CreateResumeModal({
+  creditBalance,
+  isActive,
+  hasProfileData,
+  activeJobs = [],
+  initialJobId,
+  triggerButton,
+}: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+
+  const matchedInitialJob = initialJobId
+    ? activeJobs.find((j) => j.id === initialJobId)
+    : undefined
+  const canPreopen = Boolean(
+    matchedInitialJob && isActive && creditBalance >= AI_RESUME_CREDIT_COST
+  )
+
+  const [open, setOpen] = useState(canPreopen)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [selectedCampusJobId, setSelectedCampusJobId] = useState<string>(
+    matchedInitialJob?.id || ''
+  )
+  const [titleEditedManually, setTitleEditedManually] = useState(false)
 
-  const [formData, setFormData] = useState({
-    title: '',
-    employer: '',
-    role: '',
-    jd: ''
-  })
+  const [formData, setFormData] = useState(() => ({
+    title: matchedInitialJob
+      ? `${matchedInitialJob.company_name} - ${matchedInitialJob.title}`
+      : '',
+    employer: matchedInitialJob?.company_name || '',
+    role: matchedInitialJob?.title || '',
+    jd: matchedInitialJob?.description || '',
+  }))
 
-  const wordCount = formData.jd.trim() ? formData.jd.trim().split(/\s+/).filter(w => w.length > 0).length : 0
+  const wordCount = formData.jd.trim()
+    ? formData.jd
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length > 0).length
+    : 0
   const isOverLimit = wordCount > 750
 
   const handleOpenClick = (e: React.MouseEvent) => {
     e.preventDefault()
     if (!isActive) {
-      toast.error('AI Access Inactive', { description: 'Please activate or renew your subscription in Billing to run AI agents.' })
+      toast.error('Subscription required', {
+        description: 'Activate your placement access in Credit Balance to generate resumes.',
+      })
       return
     }
     if (creditBalance < AI_RESUME_CREDIT_COST) {
-      toast.error('Insufficient Credits', { description: `You need ${AI_RESUME_CREDIT_COST} credits to generate an AI Resume. Current balance: ${creditBalance}.` })
+      toast.error('Insufficient AI credits', {
+        description: `You need ${AI_RESUME_CREDIT_COST} credits to generate a tailored resume. Current balance: ${creditBalance} credits.`,
+      })
       return
     }
     setOpen(true)
   }
 
+  const handleCampusJobSelect = (jobId: string) => {
+    setSelectedCampusJobId(jobId)
+    if (!jobId) {
+      return
+    }
+    const found = activeJobs.find((j) => j.id === jobId)
+    if (!found) return
+
+    const autoTitle = `${found.company_name} - ${found.title}`
+    setTitleEditedManually(false)
+    setFormData({
+      employer: found.company_name,
+      role: found.title,
+      title: autoTitle,
+      jd: (found.description || '').trim(),
+    })
+  }
+
+  const handleEmployerChange = (val: string) => {
+    setSelectedCampusJobId('')
+    setFormData((prev) => ({
+      ...prev,
+      employer: val,
+      title: titleEditedManually
+        ? prev.title
+        : val && prev.role
+        ? `${val} - ${prev.role}`
+        : val || prev.role,
+    }))
+  }
+
+  const handleRoleChange = (val: string) => {
+    setSelectedCampusJobId('')
+    setFormData((prev) => ({
+      ...prev,
+      role: val,
+      title: titleEditedManually
+        ? prev.title
+        : prev.employer && val
+        ? `${prev.employer} - ${val}`
+        : val || prev.employer,
+    }))
+  }
+
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.title.trim() || !formData.role.trim() || !formData.employer.trim() || !formData.jd.trim()) {
-      toast.error('Please complete all required fields.')
+    if (
+      !formData.title.trim() ||
+      !formData.role.trim() ||
+      !formData.employer.trim() ||
+      !formData.jd.trim()
+    ) {
+      toast.error('Please fill in all required fields')
       return
     }
     if (isOverLimit) {
-      toast.error('Job Description exceeds 750 words. Please trim to focus on key responsibilities.')
+      toast.error('Job description exceeds 750 words — trim to key requirements')
       return
     }
     setShowConfirm(true)
@@ -66,26 +164,25 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
 
   const handleFinalSubmit = async () => {
     setIsSubmitting(true)
-    
+
     try {
       const result = await createAIResume(formData)
-      
-      if (result.error) {
-        toast.error('Failed to create resume', { description: result.error })
+
+      if (!result.success || !result.resumeId) {
+        toast.error('Failed to generate resume', { description: result.error })
         setIsSubmitting(false)
         setShowConfirm(false)
         return
       }
 
-      toast.success('Resume Generated Successfully', {
-        description: `Deducted ${AI_RESUME_CREDIT_COST} credits. Opening studio...`
+      toast.success('Resume workspace created', {
+        description: `Deducted ${AI_RESUME_CREDIT_COST} credits. Opening builder...`,
       })
       setOpen(false)
       setShowConfirm(false)
       router.push(`/builder/${result.resumeId}`)
-      
-    } catch (error: any) {
-      toast.error('An unexpected error occurred during synthesis')
+    } catch {
+      toast.error('Unexpected error while creating resume')
       setIsSubmitting(false)
       setShowConfirm(false)
     }
@@ -93,187 +190,266 @@ export function CreateResumeModal({ creditBalance, isActive, hasProfileData }: P
 
   return (
     <>
-      <TactileButton
-        onClick={handleOpenClick}
-        variant="primary"
-        size="sm"
-        className="text-xs"
-        icon={<Plus className="w-3.5 h-3.5 stroke-[2]" />}
-      >
-        New AI Resume
-      </TactileButton>
+      {triggerButton ? (
+        <span onClick={handleOpenClick} className="inline-flex cursor-pointer">
+          {triggerButton}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={handleOpenClick}
+          className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-gradient-to-r from-[#0F766E] to-[#10B981] hover:from-[#0D655E] hover:to-[#0EA572] text-white text-[13px] font-medium shadow-[0_1px_2px_rgba(15,118,110,0.2)] transition-colors duration-150 cursor-pointer"
+        >
+          <Plus className="w-4 h-4 stroke-[1.75]" />
+          <span>New tailored resume</span>
+        </button>
+      )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[620px] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 p-6 shadow-2xl">
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!isSubmitting) {
+            setOpen(nextOpen)
+            if (!nextOpen) setShowConfirm(false)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[620px] bg-white dark:bg-[#191816] border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-[#1C1917] dark:text-[#EFECE6] p-6 shadow-2xl rounded-2xl">
           {!showConfirm ? (
             <form onSubmit={handlePreSubmit} className="space-y-4">
               <DialogHeader>
-                <div className="flex items-center gap-2">
-                  <DialogTitle className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                    Compile Tailored AI Resume
-                  </DialogTitle>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-50 dark:bg-zinc-900 border border-purple-200 dark:border-zinc-800 text-purple-700 dark:text-purple-400 font-semibold">
-                    Cost: 30 Credits
+                <div className="flex items-center justify-between gap-3 pr-6">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[#0F766E]/10 dark:bg-[#14B8A6]/15 text-[#0F766E] dark:text-[#14B8A6] flex items-center justify-center border border-[#0F766E]/20 dark:border-[#14B8A6]/25">
+                      <FileText className="w-4 h-4 stroke-[1.5]" />
+                    </div>
+                    <DialogTitle className="text-[17px] font-medium tracking-[-0.01em] text-[#1C1917] dark:text-[#EFECE6]">
+                      Create tailored resume
+                    </DialogTitle>
+                  </div>
+                  <span className="font-mono text-[11px] tabular-nums px-2.5 py-1 rounded-full bg-[#0F766E]/10 dark:bg-[#14B8A6]/15 border border-[#0F766E]/20 dark:border-[#14B8A6]/25 text-[#0F766E] dark:text-[#14B8A6] font-medium shrink-0">
+                    {AI_RESUME_CREDIT_COST} credits
                   </span>
                 </div>
-                <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Align your profile projects, skills, and metrics to match the recruiter's exact requirements.
+                <DialogDescription className="text-[13px] text-[#57534E] dark:text-[#ACA59A] pt-1 leading-relaxed">
+                  Import your DigiProfile experiences and projects, extract target job requirements, and edit section-by-section in the live builder.
                 </DialogDescription>
               </DialogHeader>
 
               {!hasProfileData && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 stroke-[1.5]" />
-                  <div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    <span className="font-semibold text-amber-800 dark:text-amber-300 block mb-0.5">Profile Experience Empty</span>
-                    You have 0 projects or internships recorded. The AI will synthesize a Fresher profile based on course credentials.
+                <div className="p-3 bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-800/50 rounded-xl flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 stroke-[1.5]" />
+                  <div className="text-[12px] text-[#57534E] dark:text-[#ACA59A] leading-relaxed">
+                    <span className="font-medium text-amber-900 dark:text-amber-200 block">
+                      DigiProfile has no projects or internships yet
+                    </span>
+                    Adding your projects and work history in DigiProfile first produces stronger, quantified resume bullets.
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-mono">
-                    Resume Document Name *
+              {/* Quick-fill from active campus drives */}
+              {activeJobs.length > 0 && (
+                <div className="p-3 rounded-xl bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] space-y-1.5">
+                  <label
+                    htmlFor="campus-job-autofill"
+                    className="text-[12px] font-medium text-[#57534E] dark:text-[#ACA59A] block"
+                  >
+                    Quick-fill from an active campus drive (optional)
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Google - SDE 1 (Latex)"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                    className="w-full bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-500 transition"
-                  />
+                  <select
+                    id="campus-job-autofill"
+                    value={selectedCampusJobId}
+                    onChange={(e) => handleCampusJobSelect(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-[#191816] border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] text-[13px] text-[#1C1917] dark:text-[#EFECE6] focus:outline-none focus:border-[#0F766E] dark:focus:border-[#14B8A6] transition-colors duration-150"
+                  >
+                    <option value="">Enter target role manually...</option>
+                    {activeJobs.map((job) => (
+                      <option key={job.id} value={job.id}>
+                        {job.company_name} — {job.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-medium text-[#1C1917] dark:text-[#EFECE6] block">
+                    Target employer <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 text-[#78716C] dark:text-[#8A847A] absolute left-3 top-2.5 stroke-[1.5]" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Razorpay, Google, Microsoft"
+                      value={formData.employer}
+                      onChange={(e) => handleEmployerChange(e.target.value)}
+                      required
+                      className="w-full h-9 bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-lg pl-9 pr-3 text-[13px] text-[#1C1917] dark:text-[#EFECE6] placeholder:text-[#78716C] dark:placeholder:text-[#8A847A] focus:outline-none focus:border-[#0F766E] dark:focus:border-[#14B8A6] transition-colors duration-150"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-mono">
-                    Target Employer *
+                  <label className="text-[12px] font-medium text-[#1C1917] dark:text-[#EFECE6] block">
+                    Target role <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Google, Atlassian, Razorpay"
-                    value={formData.employer}
-                    onChange={(e) => setFormData({ ...formData, employer: e.target.value })}
-                    required
-                    className="w-full bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-500 transition"
-                  />
+                  <div className="relative">
+                    <Briefcase className="w-4 h-4 text-[#78716C] dark:text-[#8A847A] absolute left-3 top-2.5 stroke-[1.5]" />
+                    <input
+                      type="text"
+                      placeholder="e.g. SDE-1, Full-Stack Engineer"
+                      value={formData.role}
+                      onChange={(e) => handleRoleChange(e.target.value)}
+                      required
+                      className="w-full h-9 bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-lg pl-9 pr-3 text-[13px] text-[#1C1917] dark:text-[#EFECE6] placeholder:text-[#78716C] dark:placeholder:text-[#8A847A] focus:outline-none focus:border-[#0F766E] dark:focus:border-[#14B8A6] transition-colors duration-150"
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-mono">
-                  Target Role / Designation *
+                <label className="text-[12px] font-medium text-[#1C1917] dark:text-[#EFECE6] block">
+                  Document title <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Backend Software Engineer, Product Analyst"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  placeholder="e.g. Razorpay - Backend Engineer"
+                  value={formData.title}
+                  onChange={(e) => {
+                    setTitleEditedManually(true)
+                    setFormData((prev) => ({ ...prev, title: e.target.value }))
+                  }}
                   required
-                  className="w-full bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-500 transition"
+                  className="w-full h-9 bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-lg px-3 text-[13px] text-[#1C1917] dark:text-[#EFECE6] placeholder:text-[#78716C] dark:placeholder:text-[#8A847A] focus:outline-none focus:border-[#0F766E] dark:focus:border-[#14B8A6] transition-colors duration-150"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-mono">
-                    Target Job Description (JD) *
+                  <label className="text-[12px] font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    Target job description <span className="text-rose-500">*</span>
                   </label>
-                  <span className={`text-[10px] font-mono ${isOverLimit ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                  <span
+                    className={`text-[11px] font-mono tabular-nums ${
+                      isOverLimit
+                        ? 'text-rose-600 dark:text-rose-400 font-medium'
+                        : wordCount >= 80
+                        ? 'text-[#0F766E] dark:text-[#14B8A6] font-medium'
+                        : 'text-[#78716C] dark:text-[#8A847A]'
+                    }`}
+                  >
                     {wordCount} / 750 words
+                    {wordCount >= 80 && wordCount <= 600 ? ' (optimal)' : ''}
                   </span>
                 </div>
                 <textarea
                   rows={6}
-                  placeholder="Paste the core requirements, tech stack, and responsibilities from the job listing..."
+                  placeholder="Paste the technical requirements, responsibilities, and preferred skills from the job posting..."
                   value={formData.jd}
-                  onChange={(e) => setFormData({ ...formData, jd: e.target.value })}
+                  onChange={(e) => {
+                    setSelectedCampusJobId('')
+                    setFormData((prev) => ({ ...prev, jd: e.target.value }))
+                  }}
                   required
-                  className="w-full bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-500 transition resize-none leading-relaxed"
+                  className="w-full bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] rounded-lg p-3 text-[13px] text-[#1C1917] dark:text-[#EFECE6] placeholder:text-[#78716C] dark:placeholder:text-[#8A847A] focus:outline-none focus:border-[#0F766E] dark:focus:border-[#14B8A6] transition-colors duration-150 resize-none leading-relaxed"
                 />
               </div>
 
-              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                  <Coins className="w-3.5 h-3.5 text-zinc-400 stroke-[1.5]" />
-                  <span>Deduction: <strong className="text-zinc-900 dark:text-zinc-300 font-mono">30 credits</strong></span>
+              <div className="pt-3 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 text-[12px] text-[#57534E] dark:text-[#ACA59A]">
+                  <Coins className="w-4 h-4 text-[#0F766E] dark:text-[#14B8A6] stroke-[1.5]" />
+                  <span>
+                    Cost:{' '}
+                    <span className="text-[#1C1917] dark:text-[#EFECE6] font-mono tabular-nums font-medium">
+                      {AI_RESUME_CREDIT_COST} credits
+                    </span>
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <TactileButton
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={() => setOpen(false)}
-                    className="text-xs"
+                    className="h-9 px-4 rounded-lg border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] bg-white dark:bg-[#191816] hover:bg-[#FAF8F5] dark:hover:bg-[#24221F] text-[13px] font-medium text-[#1C1917] dark:text-[#EFECE6] transition-colors duration-150 cursor-pointer"
                   >
                     Cancel
-                  </TactileButton>
-                  <TactileButton
+                  </button>
+                  <button
                     type="submit"
-                    variant="primary"
-                    size="sm"
                     disabled={isOverLimit || !formData.jd.trim()}
-                    className="text-xs"
-                    icon={<ArrowRight className="w-3.5 h-3.5 stroke-[2]" />}
+                    className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-gradient-to-r from-[#0F766E] to-[#10B981] hover:from-[#0D655E] hover:to-[#0EA572] text-white text-[13px] font-medium transition-colors duration-150 disabled:opacity-50 cursor-pointer"
                   >
-                    Review & Compile
-                  </TactileButton>
+                    <span>Review & create</span>
+                    <ArrowRight className="w-4 h-4 stroke-[1.5]" />
+                  </button>
                 </div>
               </div>
             </form>
           ) : (
             <div className="space-y-4">
               <DialogHeader>
-                <DialogTitle className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[1.5]" />
-                  Confirm AI Synthesis
+                <DialogTitle className="text-[17px] font-medium text-[#1C1917] dark:text-[#EFECE6] flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] dark:text-[#14B8A6] stroke-[1.5]" />
+                  <span>Confirm resume generation</span>
                 </DialogTitle>
-                <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Review the token and credit commitment before triggering the LaTeX generator agent.
+                <DialogDescription className="text-[13px] text-[#57534E] dark:text-[#ACA59A]">
+                  Review the target details before creating your tailored resume workspace.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
-                  <span className="text-zinc-500">Target Role</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-200">{formData.role}</span>
+              <div className="p-4 bg-[#FAF8F5] dark:bg-[#12110F] rounded-xl border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] divide-y divide-[#1C1917]/[0.06] dark:divide-[#EFECE6]/[0.06] text-[13px]">
+                <div className="flex justify-between py-2 first:pt-0">
+                  <span className="text-[#57534E] dark:text-[#ACA59A]">Target role</span>
+                  <span className="font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    {formData.role}
+                  </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
-                  <span className="text-zinc-500">Target Employer</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-200">{formData.employer}</span>
+                <div className="flex justify-between py-2">
+                  <span className="text-[#57534E] dark:text-[#ACA59A]">Target employer</span>
+                  <span className="font-medium text-[#1C1917] dark:text-[#EFECE6]">
+                    {formData.employer}
+                  </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
-                  <span className="text-zinc-500">Credit Balance After</span>
-                  <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{creditBalance - AI_RESUME_CREDIT_COST} Credits</span>
+                <div className="flex justify-between py-2">
+                  <span className="text-[#57534E] dark:text-[#ACA59A]">Document title</span>
+                  <span className="font-medium text-[#1C1917] dark:text-[#EFECE6] truncate max-w-[260px]">
+                    {formData.title}
+                  </span>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-zinc-500">Compiler Engine</span>
-                  <span className="font-mono text-zinc-600 dark:text-zinc-400 text-[11px]">LaTeX ATS Generator</span>
+                <div className="flex justify-between py-2 last:pb-0">
+                  <span className="text-[#57534E] dark:text-[#ACA59A]">
+                    Remaining credit balance
+                  </span>
+                  <span className="font-mono tabular-nums text-[#0F766E] dark:text-[#14B8A6] font-medium">
+                    {creditBalance - AI_RESUME_CREDIT_COST} credits
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                <TactileButton
-                  variant="ghost"
-                  size="sm"
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
+                <button
+                  type="button"
                   onClick={() => setShowConfirm(false)}
                   disabled={isSubmitting}
-                  className="text-xs"
+                  className="h-9 px-4 rounded-lg border border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] bg-white dark:bg-[#191816] hover:bg-[#FAF8F5] dark:hover:bg-[#24221F] text-[13px] font-medium text-[#1C1917] dark:text-[#EFECE6] transition-colors duration-150 cursor-pointer disabled:opacity-50"
                 >
                   Back
-                </TactileButton>
-                <TactileButton
-                  variant="primary"
-                  size="sm"
+                </button>
+                <button
+                  type="button"
                   onClick={handleFinalSubmit}
                   disabled={isSubmitting}
-                  className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
-                  icon={isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-gradient-to-r from-[#0F766E] to-[#10B981] hover:from-[#0D655E] hover:to-[#0EA572] text-white text-[13px] font-medium transition-colors duration-150 disabled:opacity-60 cursor-pointer"
                 >
-                  {isSubmitting ? 'Synthesizing...' : 'Start Generation'}
-                </TactileButton>
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 stroke-[1.5] animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4 stroke-[1.5]" />
+                  )}
+                  <span>{isSubmitting ? 'Creating workspace...' : 'Create & open builder'}</span>
+                </button>
               </div>
             </div>
           )}

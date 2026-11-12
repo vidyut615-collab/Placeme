@@ -1,11 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { StudentPoliciesViewer } from '@/components/StudentPoliciesViewer'
-import { PenaltyHistoryCard } from '@/components/PenaltyHistoryCard'
-import { PenaltySummaryCard } from '@/components/PenaltySummaryCard'
+import { PenaltyHistoryCard, PenaltyHistoryLogEntry } from '@/components/PenaltyHistoryCard'
+import { PenaltySummaryCard, PenaltyLogEntry } from '@/components/PenaltySummaryCard'
 import { PolicyConfig, DEFAULT_POLICY_CONFIG } from '@/lib/policy-engine'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ShieldAlert, FileText, Scale, ShieldCheck } from 'lucide-react'
+import { ShieldAlert, FileText, ShieldCheck } from 'lucide-react'
+import { DeclareHiredModal } from '@/components/DeclareHiredModal'
 
 export default async function StudentPoliciesPage() {
   const supabase = await createClient()
@@ -33,7 +34,7 @@ export default async function StudentPoliciesPage() {
     .eq('college_id', student.college_id)
     .single()
     
-  const rawConfig = (policyDoc?.config as any) || {}
+  const rawConfig = (policyDoc?.config as unknown as Partial<PolicyConfig>) || {}
   const config = {
     ...DEFAULT_POLICY_CONFIG,
     ...rawConfig,
@@ -83,7 +84,7 @@ export default async function StudentPoliciesPage() {
   // Fetch all applications with job CTC and level
   const { data: applications } = await supabase
     .from('applications')
-    .select('status, created_at, jobs(college_id, compensation_ctc, placement_level_id)')
+    .select('id, job_id, status, created_at, jobs(title, company_name, college_id, compensation_ctc, placement_level_id)')
     .eq('student_id', student.id)
     
   const now = new Date()
@@ -101,7 +102,11 @@ export default async function StudentPoliciesPage() {
 
   if (applications) {
     applications.forEach(app => {
-      const job = app.jobs as any
+      const job = app.jobs as unknown as {
+        college_id: string | null
+        compensation_ctc: number | string | null
+        placement_level_id: string | null
+      } | null
       if (!job) return
 
       const isGlobal = job.college_id === null
@@ -149,8 +154,9 @@ export default async function StudentPoliciesPage() {
   // Fetch offers
   const { data: offers } = await supabase
     .from('student_offers')
-    .select('status, compensation_ctc')
+    .select('id, status, compensation_ctc, company_name, job_role, offer_type, offer_letter_url, created_at')
     .eq('student_id', student.id)
+    .order('created_at', { ascending: false })
     
   // Fetch penalty logs
   const { data: penaltyLogs } = await supabase
@@ -168,8 +174,16 @@ export default async function StudentPoliciesPage() {
     highestOfferCTC = Math.max(0, ...validOffers.map(o => Number(o.compensation_ctc) || 0))
   }
 
-  const profileData = (student.profile_data as any) || {}
-  const policyCounters = (student.policy_counters as any) || {}
+  const approvedOffer = offers?.find((o) => o.status === 'approved')
+  const pendingOffer = offers?.find((o) => o.status === 'pending')
+  const appliedJobsSummary = (applications || []).map((app) => ({
+    id: app.id,
+    job_id: app.job_id,
+    jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs,
+  }))
+
+  const profileData = (student.profile_data as Record<string, unknown>) || {}
+  const policyCounters = (student.policy_counters as Record<string, unknown>) || {}
   const totalStrikes = (Number(policyCounters.non_participation) || 0) + (Number(policyCounters.no_shows) || 0) + (Number(policyCounters.disciplinary) || 0)
 
   const studentMetrics = {
@@ -199,48 +213,76 @@ export default async function StudentPoliciesPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
+    <div className="flex flex-1 flex-col p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full min-w-0">
       {/* Header Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08]">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Placement Governance & Policy</h1>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
-              Institutional Rulebook
+            <h1 className="text-xl font-medium tracking-[-0.02em] text-[#1C1917] dark:text-[#EFECE6]">
+              Placement Governance &amp; Policies
+            </h1>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#0F766E]/10 dark:bg-[#14B8A6]/15 text-[#0F766E] dark:text-[#14B8A6] border border-[#0F766E]/20 dark:border-[#14B8A6]/25 font-medium">
+              Institutional rulebook
             </span>
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Review live quota limitations, strike penalties, and dream upgrade rules active for your batch.
+          <p className="text-xs text-[#78716C] dark:text-[#8A847A] mt-1">
+            Review live quota limitations, strike penalties, and dream upgrade rules active for your graduating batch.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {totalStrikes === 0 ? (
-            <span className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-medium">
+            <span className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-500/[0.08] dark:bg-emerald-500/15 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 stroke-[1.5]" />
               Zero Strikes (Good Standing)
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 font-medium">
+            <span className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-amber-500/[0.08] dark:bg-amber-500/15 border border-amber-500/20 text-amber-700 dark:text-amber-400 font-medium">
               <ShieldAlert className="w-3.5 h-3.5 stroke-[1.5]" />
               {totalStrikes} Strike(s) Active
             </span>
           )}
+
+          <DeclareHiredModal
+            appliedJobs={appliedJobsSummary}
+            hasPendingOffer={Boolean(pendingOffer)}
+            pendingOfferDetails={
+              pendingOffer
+                ? {
+                    company_name: pendingOffer.company_name,
+                    job_role: pendingOffer.job_role,
+                    compensation_ctc: pendingOffer.compensation_ctc,
+                    offer_type: pendingOffer.offer_type,
+                    offer_letter_url: pendingOffer.offer_letter_url,
+                    created_at: pendingOffer.created_at,
+                  }
+                : null
+            }
+            approvedOfferDetails={
+              approvedOffer
+                ? {
+                    company_name: approvedOffer.company_name,
+                    job_role: approvedOffer.job_role,
+                    compensation_ctc: Number(approvedOffer.compensation_ctc),
+                  }
+                : null
+            }
+          />
         </div>
       </div>
 
       <Tabs defaultValue="policies" className="w-full space-y-6">
-        <TabsList className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl h-auto">
+        <TabsList className="bg-[#FAF8F5] dark:bg-[#12110F] border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] p-1 rounded-xl h-auto">
           <TabsTrigger
             value="policies"
-            className="flex items-center gap-2 text-xs py-1.5 px-3 rounded-lg text-zinc-600 dark:text-zinc-400 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-100 data-[state=active]:shadow-2xs font-medium"
+            className="flex items-center gap-2 text-xs py-1.5 px-3 rounded-lg text-[#57534E] dark:text-[#ACA59A] data-[state=active]:bg-white dark:data-[state=active]:bg-[#191816] data-[state=active]:text-[#0F766E] dark:data-[state=active]:text-[#14B8A6] data-[state=active]:shadow-[0_1px_2px_rgba(28,25,23,0.06)] font-medium transition cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5 stroke-[1.5]" />
-            Rules & Quotas
+            Rules &amp; Quotas
           </TabsTrigger>
           <TabsTrigger
             value="disciplinary"
-            className="flex items-center gap-2 text-xs py-1.5 px-3 rounded-lg text-zinc-600 dark:text-zinc-400 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-100 data-[state=active]:shadow-2xs font-medium"
+            className="flex items-center gap-2 text-xs py-1.5 px-3 rounded-lg text-[#57534E] dark:text-[#ACA59A] data-[state=active]:bg-white dark:data-[state=active]:bg-[#191816] data-[state=active]:text-[#0F766E] dark:data-[state=active]:text-[#14B8A6] data-[state=active]:shadow-[0_1px_2px_rgba(28,25,23,0.06)] font-medium transition cursor-pointer"
           >
             <ShieldAlert className="w-3.5 h-3.5 stroke-[1.5]" />
             Disciplinary Ledger
@@ -253,17 +295,17 @@ export default async function StudentPoliciesPage() {
         
         <TabsContent value="disciplinary" className="mt-0 space-y-6">
           {!penaltyLogs || penaltyLogs.length === 0 ? (
-            <div className="text-center p-12 border rounded-xl border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/30 text-zinc-500 space-y-2">
-              <ShieldCheck className="w-8 h-8 mx-auto text-emerald-600 dark:text-emerald-500 stroke-[1.5]" />
-              <h3 className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">Exemplary Standing</h3>
-              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+            <div className="text-center p-12 border rounded-xl border-dashed border-[#1C1917]/[0.1] dark:border-[#EFECE6]/[0.1] bg-white dark:bg-[#191816] text-[#78716C] dark:text-[#8A847A] space-y-2">
+              <ShieldCheck className="w-8 h-8 mx-auto text-emerald-600 dark:text-emerald-400 stroke-[1.5]" />
+              <h3 className="font-medium text-sm text-[#1C1917] dark:text-[#EFECE6]">Exemplary Standing</h3>
+              <p className="text-xs text-[#78716C] dark:text-[#8A847A] max-w-sm mx-auto">
                 No policy violations, interview no-shows, or disciplinary infractions recorded in your institutional ledger.
               </p>
             </div>
           ) : (
             <>
-              <PenaltySummaryCard logs={penaltyLogs as any} />
-              <PenaltyHistoryCard logs={penaltyLogs as any} />
+              <PenaltySummaryCard logs={penaltyLogs as unknown as PenaltyLogEntry[]} />
+              <PenaltyHistoryCard logs={penaltyLogs as unknown as PenaltyHistoryLogEntry[]} />
             </>
           )}
         </TabsContent>

@@ -6,6 +6,41 @@ import { Loader2, CreditCard, Sparkles, Zap } from 'lucide-react'
 import { createSubscriptionOrder, createCreditTopupOrder } from './actions'
 import { toast } from 'sonner'
 
+export interface RazorpaySuccessResponse {
+  razorpay_payment_id: string
+  razorpay_order_id: string
+  razorpay_signature: string
+}
+
+interface RazorpayOptions {
+  key?: string
+  amount: number
+  currency: string
+  name: string
+  description: string
+  order_id: string
+  handler: (response: RazorpaySuccessResponse) => void
+  prefill: {
+    name: string
+    email: string
+    contact: string
+  }
+  theme: {
+    color: string
+  }
+  modal: {
+    ondismiss: () => void
+  }
+}
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => {
+      open: () => void
+    }
+  }
+}
+
 interface CheckoutButtonProps {
   type: 'subscription' | 'credit_topup'
   amount?: number // INR
@@ -57,7 +92,7 @@ export function CheckoutButton({
       }
 
       // 1. Create Order on our Secure Server
-      let orderResponse
+      let orderResponse: { orderId?: string; amount?: number; error?: string }
       if (type === 'subscription') {
         orderResponse = await createSubscriptionOrder()
       } else {
@@ -67,21 +102,21 @@ export function CheckoutButton({
         orderResponse = await createCreditTopupOrder(planId, amount, credits)
       }
 
-      if (orderResponse.error) {
-        toast.error(orderResponse.error)
+      if (orderResponse.error || !orderResponse.orderId || !orderResponse.amount) {
+        toast.error(orderResponse.error || 'Failed to initialize payment')
         setIsLoading(false)
         return
       }
 
       // 2. Open Razorpay Checkout Modal
-      const options = {
+      const options: RazorpayOptions = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: orderResponse.amount, 
         currency: "INR",
         name: "Placeme",
         description: type === 'subscription' ? "12 Months Placement Access Pass" : `AI Intelligence Top-up (${credits} Credits)`,
         order_id: orderResponse.orderId,
-        handler: function (response: any) {
+        handler: function () {
           toast.success('Payment captured successfully!', {
             description: 'Your balance and access pass are updated. Reloading ledger...'
           })
@@ -95,50 +130,48 @@ export function CheckoutButton({
           contact: ""
         },
         theme: {
-          color: "#09090b"
+          color: "#0F766E"
         },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             setIsLoading(false)
           }
         }
       }
 
-      const rzp = new (window as any).Razorpay(options)
-      
-      rzp.on('payment.failed', function (response: any) {
-        toast.error('Payment failed or cancelled', {
-          description: response.error?.description || 'Transaction could not be completed.'
-        })
+      if (!window.Razorpay) {
+        toast.error('Razorpay SDK not found.')
         setIsLoading(false)
-      })
+        return
+      }
 
+      const rzp = new window.Razorpay(options)
       rzp.open()
-      
-    } catch (error: any) {
-      console.error(error)
-      toast.error('An error occurred during payment initiation.')
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Checkout initiation failed'
+      toast.error(message)
       setIsLoading(false)
     }
   }
 
   return (
-    <Button 
-      onClick={handlePayment} 
-      disabled={isLoading || disabled} 
+    <Button
+      onClick={handlePayment}
+      disabled={isLoading || disabled}
       variant={variant}
-      className={className}
+      className={`relative inline-flex items-center justify-center gap-1.5 transition-all select-none cursor-pointer ${className || ''}`}
     >
       {isLoading ? (
-        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
       ) : icon === 'zap' ? (
-        <Zap className="mr-2 h-3.5 w-3.5 stroke-[1.5]" />
+        <Zap className="w-3.5 h-3.5 stroke-[1.5]" />
       ) : icon === 'sparkles' ? (
-        <Sparkles className="mr-2 h-3.5 w-3.5 stroke-[1.5]" />
+        <Sparkles className="w-3.5 h-3.5 stroke-[1.5]" />
       ) : (
-        <CreditCard className="mr-2 h-3.5 w-3.5 stroke-[1.5]" />
+        <CreditCard className="w-3.5 h-3.5 stroke-[1.5]" />
       )}
-      {isLoading ? 'Connecting...' : label}
+      <span>{isLoading ? 'Processing...' : label}</span>
     </Button>
   )
 }

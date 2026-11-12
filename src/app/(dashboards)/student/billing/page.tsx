@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { BillingClient } from './BillingClient'
+import { BillingClient, StudentBillingProfile, CreditLedgerItem, PaymentRequestItem } from './BillingClient'
 
 export default async function BillingPage() {
   const supabase = await createClient()
@@ -29,7 +29,7 @@ export default async function BillingPage() {
   if (!student) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
-        <div className="text-zinc-500 font-mono text-xs border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 bg-white dark:bg-zinc-900">
+        <div className="text-[#78716C] dark:text-[#8A847A] font-mono text-xs border border-[#1C1917]/[0.08] dark:border-[#EFECE6]/[0.08] rounded-xl p-6 bg-white dark:bg-[#191816]">
           Unable to locate student billing profile. Please contact placement cell support.
         </div>
       </div>
@@ -52,10 +52,10 @@ export default async function BillingPage() {
 
   return (
     <BillingClient
-      student={student as any}
+      student={student as unknown as StudentBillingProfile}
       userEmail={user.email || ''}
-      creditLedgers={creditLedgers || []}
-      paymentRequests={paymentHistory || []}
+      creditLedgers={(creditLedgers || []) as CreditLedgerItem[]}
+      paymentRequests={(paymentHistory || []) as PaymentRequestItem[]}
     />
   )
 }

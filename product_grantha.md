@@ -197,38 +197,71 @@ Placeme runs a high-margin, dual-sided credit economy. **No currency values are 
 
 ---
 
-# PART 2: VISUAL & DESIGN SYSTEM DNA
+# PART 2: VISUAL & DESIGN SYSTEM DNA (WARM PAPER & DEEP PINE TEAL)
 
-### 2.1 The Visual Philosophy
-Placeme uses the **Verdana Health & Calm Engineering** design system. It avoids the chaotic, high-saturation, neon aesthetics of generic crypto/SaaS tools. It is built upon:
-* **Deep Navy (`#0F172A`) & Warm Paper Canvas (`#F8FAFC` / `#f6f3f1`):** Represents institutional authority, stability, and clinical readability.
-* **Tertiary Sage (`#059669`) & Vivid Electric Indigo (`#2B59D1`):** Strategic interactive color bursts reserved strictly for active gates, confirmed badges, and Primary CTAs.
-* **Micro-Pills & Soft Surfaces:** Every button and tag utilizes `rounded-full` or soft radii (`rounded-2xl`) to evoke calm reassurance rather than rigid institutional hostility.
+### 2.1 The Visual Philosophy (Unslop Edition)
+Placeme deploys the **Warm Paper Canvas & Deep Pine Teal** design system—a high-craft, humanistic engineering aesthetic built according to the **Unslop Standard** and modern Linear/Cal.com principles. It intentionally eliminates the generic, high-saturation electric purple and neon gradients common in low-effort SaaS, replacing them with:
+* **Warm Paper Canvas (`#FAF8F5` light / `#12110F` dark):** A warm, parchment-toned resting canvas that prevents clinical eye fatigue and evokes tactile paper resumes and physical credentials.
+* **Crisp Elevated Chrome (`#FFFFFF` light / `#191816` dark):** The sidebar, top navigation bar, cards, modals, and slide-overs are rendered in clean elevated surfaces with hairline borders (`#1C1917]/[0.08]` in light, `#EFECE6]/[0.08]` in dark). This intentional contrast creates crisp visual hierarchy between the canvas and interactive content.
+* **Deep Pine Teal to Emerald (`#0F766E` $\to$ `#10B981`):** Represents high precision, stability, and career advancement. Used strictly for brand logomarks, active route highlights, progress meters, and primary CTAs. In dark mode, `#14B8A6` provides luminous contrast against `#12110F`.
+* **Zero-Purple & Zero-Emoji Rule:** Absolutely zero purple or electric indigo slop. Absolutely zero emojis in badges, toasts, status chips, or copy; 100% precision `lucide-react` SVGs with consistent `1.5px` stroke weight.
+* **Fluid Flow-Like Theme Transition:** Theme switching between light and dark uses an organic circular wave transition (`520ms cubic-bezier(0.22, 1, 0.36, 1)`) via modern `document.startViewTransition` with dynamic radial clipping, eliminating harsh direct pops.
 
 ---
 
 ### 2.2 Complete Color Token Matrix
 
-#### Core Brand Tokens (Tailwind v4 Theme inline)
+#### Core Brand Tokens (Tailwind v4 Theme Inline & Component Standards)
 ```css
---color-primary-navy:       #0F172A;   /* Primary dark text, deep headers, active state */
---color-secondary-slate:    #64748B;   /* Secondary subtitles, table metadata, borders */
---color-tertiary-sage:      #059669;   /* Success CTAs, active highlights, health markers */
---color-background-light:   #F8FAFC;   /* Main page background */
---color-surface-light:      #FFFFFF;   /* Clean white cards, modals, dropdown panels */
---color-success:            #22C55E;   /* Healthy status, verified GPA, offer accepted */
---color-warning:            #EAB308;   /* Pending approval, cooldown period active */
---color-error:              #EF4444;   /* Debarred, strike logged, criteria failed */
---color-info:               #0EA5E9;   /* Informational tooltips, live telemetry count */
+/* Canvas Backdrops */
+--color-canvas-light:        #FAF8F5;   /* Warm paper background */
+--color-canvas-dark:         #12110F;   /* Deep charcoal dark canvas */
+
+/* Elevated Chrome & Surfaces (Sidebar, TopNav, Cards, Modals) */
+--color-surface-light:       #FFFFFF;   /* Clean white elevated surfaces */
+--color-surface-dark:        #191816;   /* Deep warm charcoal elevated surfaces */
+--color-surface-subtle:      #F3EFE9;   /* Hover states & active nav pills (light) */
+--color-surface-subtle-dark: #24221F;   /* Hover states & active nav pills (dark) */
+
+/* Typography & Warm Ink */
+--color-ink-primary:         #1C1917;   /* Deep warm charcoal (headings, primary titles) */
+--color-ink-primary-dark:    #EFECE6;   /* Off-white parchment text in dark mode */
+--color-ink-muted:           #57534E;   /* Secondary body text & active tabs */
+--color-ink-subtle:          #78716C;   /* Metadata, tertiary captions, hints */
+--color-ink-muted-dark:      #ACA59A;   /* Secondary text in dark mode */
+--color-ink-subtle-dark:     #8A847A;   /* Muted captions in dark mode */
+
+/* Primary Interactive Accents (Teal & Emerald) */
+--color-primary-teal:        #0F766E;   /* Deep pine teal (active links, brand primary) */
+--color-primary-emerald:     #10B981;   /* Emerald gradient endpoint & live indicators */
+--color-teal-dark-accent:    #14B8A6;   /* High-contrast cyan/teal for dark mode */
+--color-teal-tint-light:     rgba(15, 118, 110, 0.08); /* Active badge backdrops */
+--color-teal-tint-dark:      rgba(20, 184, 166, 0.12); /* Active badge backdrops (dark) */
+
+/* Hairline Borders */
+--color-border-light:        rgba(28, 25, 23, 0.08);   /* 1px crisp warm border */
+--color-border-dark:         rgba(239, 236, 230, 0.08); /* 1px crisp dark border */
+
+/* Status Signals */
+--color-success:             #10B981;   /* Verified, eligible, offer cleared */
+--color-warning:             #D97706;   /* In review, interview round active, pending */
+--color-error:               #E11D48;   /* Withdrawn, rejected, strike logged */
+--color-info:                #0284C7;   /* Informational tooltips, NIRF telemetry */
 ```
 
-#### Marketing & Demo Surface Colors (As Seen in `src/app/page.tsx` & `demos/`)
-* **Warm Canvas Background:** `#f6f3f1` / `#faf9f8`
-* **Deep Charcoal Console:** `#242424` / `#1c1d20` / `#141517`
-* **Electric Accent Blue:** `#2B59D1`
-* **Soft Blue Badge Tint:** `#cfdaf5` (text: `#2B59D1`)
-* **Soft Sage Badge Tint:** `#a7fccd` / `#dcfce7` (text: `#16A34A`)
-* **Hairline Border:** `#cecac8` / `#E2E8F0`
+#### Chrome Layout Architecture (The Single Source of Truth Rule)
+* **Left Sidebar (`StudentSidebar.tsx`):**
+  - Crisp elevated surface (`bg-white dark:bg-[#191816]`) with warm 1px hairline border.
+  - Houses the brand emblem (`P` with teal-to-emerald gradient) and clean workspace navigation (`Dashboard`, `Jobs`, `My Applications`, `AI Resume Maker`, `AI Job Search`, `Placement Policies`, `DigiProfile`, `Subscription`).
+  - Anchored at the bottom with the verified student identity capsule and sign-out action.
+  - **Zero clutter:** Completely devoid of credit balance and theme toggles.
+* **Top Navigation Bar (`StudentTopNav.tsx`):**
+  - Semi-translucent elevated surface (`bg-white/85 dark:bg-[#191816]/85 backdrop-blur-md`).
+  - Houses the university breadcrumb (`[Institution Name] > Hello, [Candidate]`) and `Ctrl+K` Command Palette search trigger.
+  - **Top-Right Exclusive Hub:** The sole, authoritative home for:
+    1. **AI Credit Balance Capsule:** `{creditBalance} credits + Top up` pill with direct billing modal link.
+    2. **Quick Applications Shortcut:** Direct 1-click icon to active submissions.
+    3. **Fluid Theme Toggle:** Sun/Moon toggle with radial wave view transition.
 
 ---
 
@@ -323,18 +356,28 @@ Placeme deliberately splits its frontend user experience into **two distinct ope
 └──────────────────────────────────────┴──────────────────────────────────────┘
 ```
 
-#### A. Surface A: The Student Career Copilot
-* **Design File Pointer:** [`DESIGN_STUDENT.md`](file:///d:/Antigravity%20Projects/Placement%20Management/DESIGN_STUDENT.md) (Modeled after `cal.com`)
+#### A. Surface A: The Student Career Copilot (Unslop Warm Paper Edition)
+* **Design File Pointer:** [`DESIGN_STUDENT.md`](file:///d:/Antigravity%20Projects/Placement%20Management/DESIGN_STUDENT.md) (Warm Paper & Deep Pine Teal standard)
 * **Target Users:** Final-year engineering & management candidates (`src/app/(dashboards)/student/*`).
 * **Layout & Geometry:**
-  - **Spacious & Card-First:** Clean white/warm surfaces (`#FFFFFF` on `#F8FAFC`), wrapped in `rounded-2xl` cards with diffused shadows (`shadow-sm`).
-  - **1-Click Pill CTAs:** All primary actions use `rounded-full` pill buttons (`h-11` or `h-12`, `bg-[#2b59d1]` or `bg-[#0F172A]`) with generous horizontal padding (`px-6` to `px-8`).
-  - **Micro-Delight & Motivation:** Circular SVG match score rings (e.g. `92% Fit`), purple/indigo AI glow highlights on resume builders, and instant celebratory toasts on offer unlocks.
-  - **Timeline Simplicity:** Candidate application pipeline visualized as a friendly 4-step progress stepper rather than an exhaustive 14-state table.
+  - **Elevated Panels on Warm Paper Canvas:** Main scroll area is Warm Paper (`#FAF8F5` light / `#12110F` dark). Interactive cards, sidebars, top navigation bars, and slide-overs are crisp elevated panels (`#FFFFFF` in light, `#191816` in dark) bordered by hairline dividers (`#1C1917]/[0.08]` light, `#EFECE6]/[0.08]` dark) with diffused micro-shadows (`shadow-[0_1px_2px_rgba(28,25,23,0.04)]`).
+  - **1-Click Pill CTAs:** All primary actions use `rounded-lg` or `rounded-full` buttons powered by Deep Pine Teal (`bg-[#0F766E]` hover `bg-[#115E59]` light / `bg-[#14B8A6]` dark) or gradients (`from-[#0F766E] to-[#10B981]`). Zero purple or generic blue.
+  - **Precision SVG Signals (Zero Emojis):** Absolutely no emojis anywhere in the interface. Every status indicator uses `lucide-react` icons (`stroke-[1.5]`) paired with subtle status tints (`bg-emerald-500/10 text-emerald-600`, `bg-amber-500/10 text-amber-600`, `bg-rose-500/10 text-rose-600`).
+  - **Top-Right Exclusive Hub:** The AI Credit Balance capsule (`{creditBalance} credits + Top up`) and the fluid theme toggle are housed strictly in the top navigation bar, leaving the left sidebar completely uncluttered.
+  - **Fluid Theme Transition:** 520ms radial wave transition (`::view-transition-new(root)`) smoothly expanding outward from click coordinates, preventing abrupt theme jumps.
+  - **Exclusive 4-Surface Placement Declaration Rule:** The `DeclareHiredModal` ("Declare Placement" / "Offer Verification Pending") action button is strictly constrained to 4 canonical operational views:
+    1. **My Applications:** [`src/app/(dashboards)/student/applications/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/applications/page.tsx)
+    2. **Placement Policies:** [`src/app/(dashboards)/student/policies/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/policies/page.tsx)
+    3. **DigiProfile:** [`src/app/(dashboards)/student/profile/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/profile/page.tsx)
+    4. **Campus Jobs:** [`src/app/(dashboards)/student/jobs/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/jobs/page.tsx)
+    It is intentionally excluded from the Student Dashboard, AI Resume Maker, AI Job Search, and Subscription views to eliminate clutter and maintain strict action contexts.
 * **Core Views:**
   - Student Dashboard: [`src/app/(dashboards)/student/dashboard/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/dashboard/page.tsx)
-  - AI Resume Studio: [`src/app/(dashboards)/student/ai-resume/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/ai-resume/page.tsx)
-  - Scraped Job Discovery: [`src/app/(dashboards)/student/ai-job-search/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/ai-job-search/page.tsx)
+  - Jobs Directory & Drawer: [`src/app/(dashboards)/student/jobs/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/jobs/page.tsx)
+  - My Applications Conveyor: [`src/app/(dashboards)/student/applications/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/applications/page.tsx)
+  - AI Resume Studio & ATS Analyzer: [`src/app/(dashboards)/student/ai-resume/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/ai-resume/page.tsx)
+  - LaTeX Resume Builder: [`src/app/builder/[id]/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/builder/[id]/page.tsx)
+  - AI Job Search: [`src/app/(dashboards)/student/ai-job-search/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/ai-job-search/page.tsx)
   - Credit Billing Drawer: [`src/app/(dashboards)/student/billing/page.tsx`](file:///d:/Antigravity%20Projects/Placement%20Management/src/app/(dashboards)/student/billing/page.tsx)
 
 #### B. Surface B: The College TPO Command Center
@@ -799,11 +842,13 @@ Do not scan the codebase.
 
 #### Template 4: For Designing or Modifying a Student Feature (Surface A)
 ```
-Read 'product_grantha.md' Part 2.7A and 'DESIGN_STUDENT.md'.
+Read 'product_grantha.md' Part 2 (Warm Paper & Deep Pine Teal Edition) and Part 2.7A.
 Build or edit the requested student feature using Surface A specifications:
-- Spacious, card-driven container geometry (rounded-2xl)
-- 1-click pill buttons (rounded-full)
-- Encouraging copy with visual progress feedback and AI glow accents
+- Warm Paper Canvas (#FAF8F5 light / #12110F dark) with crisp white/charcoal elevated panels (#FFFFFF / #191816)
+- Deep Pine Teal (#0F766E light / #14B8A6 dark) to Emerald (#10B981) gradient CTAs and route markers
+- Hairline borders (border-[#1C1917]/[0.08] light, border-[#EFECE6]/[0.08] dark)
+- Zero Emojis: Rely 100% on precision lucide-react SVGs with stroke-[1.5]
+- AI Credit Balance & Theme Toggle restricted strictly to the top-right header hub
 Do not scan the rest of the codebase.
 ```
 
